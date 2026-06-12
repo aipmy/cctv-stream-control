@@ -91,10 +91,14 @@ function statusLabel(camera: Camera) {
 type PtzFeedback = "sending" | "success" | "warning" | "failure";
 
 export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin }: Props) {
-  const role = useAuth((s) => s.user?.role);
-  const canEdit = role === "admin" || role === "teknisi";
-  const canDelete = role === "admin";
-  const canUseAudio = role === "admin";
+  const user = useAuth((s) => s.user);
+  const role = user?.role;
+  const perms = user?.permissions;
+  
+  const canEdit = role === "admin" || role === "teknisi" || !!perms?.canEditCamera;
+  const canDelete = role === "admin" || !!perms?.canDeleteCamera;
+  const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
+  const canUseAudio = role === "admin" || role === "teknisi";
   const canUsePtz = role === "admin" || role === "teknisi";
   const canSeeIp = role !== "guest";
   const isDisabled = !camera.enabled;
@@ -214,9 +218,12 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           <span className={cn("status-dot", !camera.enabled || camera.status === "offline" ? "status-dot-offline" : camera.status === "starting" ? "status-dot-warning" : "status-dot-online")} />
           <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
         </div>
-        <Badge variant="outline" className={cn("shrink-0 text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[camera.status])}>
-          {statusLabel(camera)}
-        </Badge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
+          <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[camera.status])}>
+            {statusLabel(camera)}
+          </Badge>
+        </div>
       </div>
 
       <div
@@ -324,7 +331,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               {!camera.enabled && <span className="text-warning">· Nonaktif</span>}
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
-              <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Users className="h-3 w-3" />{camera.viewerCount || 0} viewer</span>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Gauge className="h-3 w-3" />out {outRate}</span>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Radio className="h-3 w-3" />pull {pullRate}</span>
@@ -333,24 +339,23 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1 pt-1">
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => onTogglePin(camera)} title={pinned ? "Lepas pin kamera" : "Pin kamera sebagai prioritas"}>
-            {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-            {pinned ? "Lepas Pin" : "Pin"}
+        <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
+          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? "Lepas pin kamera" : "Pin kamera sebagai prioritas"}>
+            {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
           </Button>
+          {canRestart && (
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title="Restart stream">
+                <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
+              </Button>
+          )}
           {canEdit && (
-            <>
-              <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => onRestart(camera)} title="Restart stream">
-                <RefreshCw className="h-3.5 w-3.5" /> Restart
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title="Edit kamera">
+                <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => onEdit(camera)} title="Edit kamera">
-                <Pencil className="h-3.5 w-3.5" /> Edit
-              </Button>
-            </>
           )}
           {canDelete && (
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" onClick={() => onDelete(camera)} title="Hapus kamera">
-              <Trash2 className="h-3.5 w-3.5" /> Hapus
+            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title="Hapus kamera">
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
         </div>

@@ -20,9 +20,14 @@ export default function Cameras() {
   const camerasQuery = useCamerasQuery();
   const cameras = camerasQuery.data || [];
   const { deleteCamera, restartCamera, probeAll, probeCamera } = useCameraActions();
-  const role = useAuth((s) => s.user?.role);
-  const canEdit = role === "admin" || role === "teknisi";
-  const canDelete = role === "admin";
+  const user = useAuth((s) => s.user);
+  const role = user?.role;
+  const perms = user?.permissions;
+  
+  const canAdd = role === "admin" || role === "teknisi" || !!perms?.canAddCamera;
+  const canEdit = role === "admin" || role === "teknisi" || !!perms?.canEditCamera;
+  const canDelete = role === "admin" || !!perms?.canDeleteCamera;
+  const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
   const canSeeIp = role !== "guest";
 
   const [q, setQ] = useState("");
@@ -61,7 +66,7 @@ export default function Cameras() {
           <Button variant="outline" onClick={async () => { try { await probeAll(false); toast.success("Probe koneksi selesai"); } catch (err) { toast.error(err instanceof Error ? err.message : "Probe gagal"); } }}>
             <Radar className="h-4 w-4" /> Cek Koneksi
           </Button>
-          {canEdit && (
+          {canAdd && (
             <Button onClick={() => { setEdit(null); setOpen(true); }} className="bg-gradient-primary text-primary-foreground hover:opacity-95">
               <Plus className="h-4 w-4" /> Tambah Kamera
             </Button>
@@ -134,21 +139,21 @@ export default function Cameras() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" title={previewId === c.id ? "Tutup preview" : "Preview stream"} onClick={() => setPreviewId((v) => v === c.id ? null : c.id)}>
+                      {previewId === c.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" title="Probe koneksi" onClick={async () => { try { await probeCamera(c.id, false); toast.success(`Probe ${c.name} selesai`); } catch (err) { toast.error(err instanceof Error ? err.message : "Probe gagal"); } }}>
+                      <Radar className="h-3.5 w-3.5" />
+                    </Button>
+                    {canRestart && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setRestart(c)}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {canEdit && (
-                      <>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" title={previewId === c.id ? "Tutup preview" : "Preview stream"} onClick={() => setPreviewId((v) => v === c.id ? null : c.id)}>
-                          {previewId === c.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Probe koneksi" onClick={async () => { try { await probeCamera(c.id, false); toast.success(`Probe ${c.name} selesai`); } catch (err) { toast.error(err instanceof Error ? err.message : "Probe gagal"); } }}>
-                          <Radar className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setRestart(c)}>
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEdit(c); setOpen(true); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEdit(c); setOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                     )}
                     {canDelete && (
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDel(c)}>

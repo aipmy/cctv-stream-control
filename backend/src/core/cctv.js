@@ -72,6 +72,7 @@ export function normalizeCamera(input, existing = {}) {
     status: ["online", "offline", "starting"].includes(String(input.status ?? existing.status ?? "offline")) ? String(input.status ?? existing.status ?? "offline") : "offline",
     sourceType,
     streamType: input.streamType || existing.streamType || "HLS Stable",
+    streamQuality: input.streamQuality || existing.streamQuality || "Auto",
     rtspTransport: ["tcp", "udp", "auto"].includes(String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase())
       ? String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase()
       : "tcp",
@@ -89,6 +90,7 @@ export function normalizeCamera(input, existing = {}) {
     bandwidthKbps: Number(input.bandwidthKbps ?? existing.bandwidthKbps ?? 0),
     latencyMs: Number(input.latencyMs ?? existing.latencyMs ?? 0),
     qualityProfile: input.qualityProfile || existing.qualityProfile || "Medium",
+    errorHistory: Array.isArray(input.errorHistory) ? input.errorHistory : Array.isArray(existing.errorHistory) ? existing.errorHistory : [],
   };
   if (!camera.enabled) camera.status = "offline";
   camera.rtspUrl = buildSourceUrl(camera);

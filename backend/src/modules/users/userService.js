@@ -26,6 +26,8 @@ export function publicUser(user) {
   const { password: _password, ...safe } = user;
   return {
     ...safe,
+    permissions: user.permissions || {},
+    allowedGroups: user.allowedGroups || [],
     preferences: normalizePreferences(user.preferences),
   };
 }
@@ -67,6 +69,8 @@ export function createUserService({ store }) {
         password,
         role: "admin",
         active: true,
+        permissions: {},
+        allowedGroups: [],
         preferences: normalizePreferences(),
       };
       return [created];
@@ -86,6 +90,8 @@ export function createUserService({ store }) {
       password: String(payload.password),
       role: payload.role || "guest",
       active: payload.active !== false,
+      permissions: payload.permissions || {},
+      allowedGroups: Array.isArray(payload.allowedGroups) ? payload.allowedGroups : [],
       preferences: normalizePreferences(payload.preferences),
     };
     await store.update((users) => {
@@ -110,6 +116,8 @@ export function createUserService({ store }) {
         password,
         role: payload.role ?? user.role,
         active: payload.active ?? user.active,
+        permissions: payload.permissions ?? user.permissions ?? {},
+        allowedGroups: payload.allowedGroups ?? user.allowedGroups ?? [],
         preferences: normalizePreferences(payload.preferences ?? user.preferences),
       };
       return updated;

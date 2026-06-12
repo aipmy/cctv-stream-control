@@ -1,12 +1,15 @@
 import fs from "node:fs";
 import { Router } from "express";
 import { getCamera, markCameraStatus } from "../services/cameraService.js";
-import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordHlsViewer, recordCameraTraffic, isChildAlive } from "../stream/streamManager.js";
+import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive } from "../stream/streamManager.js";
 import { classifyStreamError } from "../stream/streamError.js";
 
 export const streamRoutes = Router();
 
-function normalizeOutput(q) {
+async function getCameraOutput(id) {
+  const camera = await getCamera(id);
+  if (!camera) return "HLS Stable";
+  const q = camera.streamType;
   if (q === "MJPEG" || q === "mjpeg") return "MJPEG";
   return q === "HLS Low Latency" || q === "ll" ? "HLS Low Latency" : "HLS Stable";
 }
@@ -31,7 +34,7 @@ streamRoutes.get("/status", (_req, res) => res.json(streamStatus()));
 
 streamRoutes.post("/:id/start", async (req, res, next) => {
   try {
-    const output = normalizeOutput(req.body?.output || req.query.output);
+    const output = await getCameraOutput(req.params.id);
     if (output === "MJPEG") {
       const session = await startMjpeg(req.params.id);
       if (!session) return res.status(404).json({ error: "Camera not found" });
@@ -45,11 +48,9 @@ streamRoutes.post("/:id/start", async (req, res, next) => {
       }
       return res.json({ ok: true, ready: true, streamUrl: `/api/streams/${req.params.id}/video.mjpg?${segmentQuery(req, output)}`, pid: session.pid });
     }
-    recordHlsViewer(req.params.id, viewerId(req), output);
+    recordViewer(req.params.id, viewerId(req), output);
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).json({ error: "Camera not found" });
-    // Jangan tahan response sampai playlist ready. Dulu UI langsung menganggap error
-    // saat HLS belum sempat membuat segmen, padahal FFmpeg masih warming up.
     const q = segmentQuery(req, output);
     res.json({ ok: true, ready: false, streamUrl: `/api/streams/${req.params.id}/index.m3u8?${q}`, pid: session.pid });
   } catch (err) { next(err); }
@@ -59,14 +60,39 @@ streamRoutes.post("/:id/stop", async (req, res, next) => {
   try { res.json({ stopped: await stopCameraStreams(req.params.id) }); } catch (err) { next(err); }
 });
 
+streamRoutes.post("/:id/ping", async (req, res) => {
+  try {
+    const output = await getCameraOutput(req.params.id);
+    recordViewer(req.params.id, viewerId(req), output);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+streamRoutes.post("/:id/leave", async (req, res) => {
+  try {
+    const { removeViewer } = await import("../stream/streamManager.js");
+    removeViewer(req.params.id, viewerId(req));
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+streamRoutes.post("/:id/fallback", async (req, res, next) => {
+  try {
+    const { updateCamera } = await import("../services/cameraService.js");
+    await updateCamera(req.params.id, { hlsMode: "transcode" });
+    await stopCameraStreams(req.params.id);
+    res.json({ ok: true, fallback: "transcode" });
+  } catch (err) { next(err); }
+});
+
 streamRoutes.get("/:id/video.mjpg", async (req, res, next) => {
   try { await serveMjpeg(req.params.id, res); } catch (err) { next(err); }
 });
 
 streamRoutes.get("/:id/index.m3u8", async (req, res, next) => {
   try {
-    const output = normalizeOutput(req.query.output);
-    recordHlsViewer(req.params.id, viewerId(req), output);
+    const output = await getCameraOutput(req.params.id);
+    recordViewer(req.params.id, viewerId(req), output);
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).send("Camera not found");
     const ready = await waitForPlaylist(session);
@@ -97,8 +123,8 @@ streamRoutes.get("/:id/index.m3u8", async (req, res, next) => {
 
 streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
-    const output = normalizeOutput(req.query.output);
-    recordHlsViewer(req.params.id, viewerId(req), output);
+    const output = await getCameraOutput(req.params.id);
+    recordViewer(req.params.id, viewerId(req), output);
     const filePath = getHlsFilePath(req.params.id, output, req.params.file);
     if (!filePath || !fs.existsSync(filePath)) return res.status(404).send("Segment not found");
     try {

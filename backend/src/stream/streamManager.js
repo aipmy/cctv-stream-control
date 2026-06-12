@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { URL } from "node:url";
 import { config } from "../core/config.js";
 import { buildSourceUrl } from "../core/cctv.js";
-import { getCamera, markCameraStatus } from "../services/cameraService.js";
+import { getCamera, markCameraStatus, logCameraError } from "../services/cameraService.js";
 import { recordTraffic } from "../core/traffic.js";
 import {
   buildHlsArgs,
@@ -22,7 +22,7 @@ const hlsSessions = new Map();      // cameraId -> session, termasuk stopped/err
 const hlsStartLocks = new Map();    // cameraId -> Promise<session|null>
 const mjpegSessions = new Map();    // cameraId -> shared MJPEG session
 const mjpegStartLocks = new Map();  // cameraId -> Promise<session|null>
-const hlsViewers = new Map();       // cameraId -> Map(viewerId -> { lastSeen, output })
+const streamViewers = new Map();       // cameraId -> Map(viewerId -> { lastSeen, output })
 const cameraTrafficTotals = new Map(); // cameraId -> { pullBytes, outBytes }
 const cameraTrafficLast = new Map();   // cameraId -> { at, pullBytes, outBytes }
 const VIEWER_TTL_MS = 18_000;
@@ -55,24 +55,26 @@ function safeViewerId(value) {
     .slice(0, 120) || "anonymous";
 }
 
-export function recordHlsViewer(id, viewerId, output = "HLS Stable") {
+export function removeViewer(id, viewerId) { const k = safeViewerId(viewerId); const v = streamViewers.get(id); if (v) { v.delete(k); if (v.size === 0) streamViewers.delete(id); } }
+
+export function recordViewer(id, viewerId, output = "HLS Stable") {
   if (!id) return;
   const key = safeViewerId(viewerId);
   const now = Date.now();
-  let viewers = hlsViewers.get(id);
+  let viewers = streamViewers.get(id);
   if (!viewers) {
     viewers = new Map();
-    hlsViewers.set(id, viewers);
+    streamViewers.set(id, viewers);
   }
   viewers.set(key, { lastSeen: now, output: normalizeOutput(output) });
   for (const [k, v] of viewers.entries()) {
     if (now - v.lastSeen > VIEWER_TTL_MS) viewers.delete(k);
   }
-  if (viewers.size === 0) hlsViewers.delete(id);
+  if (viewers.size === 0) streamViewers.delete(id);
 }
 
-function activeHlsViewerCount(id) {
-  const viewers = hlsViewers.get(id);
+function activeViewerCount(id) {
+  const viewers = streamViewers.get(id);
   if (!viewers) return 0;
   const now = Date.now();
   let count = 0;
@@ -80,7 +82,7 @@ function activeHlsViewerCount(id) {
     if (now - v.lastSeen <= VIEWER_TTL_MS) count += 1;
     else viewers.delete(k);
   }
-  if (viewers.size === 0) hlsViewers.delete(id);
+  if (viewers.size === 0) streamViewers.delete(id);
   return count;
 }
 
@@ -203,6 +205,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     return session;
   }
 
+  await stopMjpeg(id);
+
   const startPromise = (async () => {
     const camera = await getCamera(id, { revealSecret: true });
     if (!camera) return null;
@@ -255,6 +259,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       logLifecycle(session, `closed: code=${code} signal=${signal || "-"}`);
       if (!wasRequestedStop && code !== 0 && signal !== "SIGTERM") {
         await markCameraStatus(id, { status: "offline" });
+        await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
       }
     });
     child.on("error", async (err) => {
@@ -263,6 +268,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       session.closedAt = nowIso();
       logLifecycle(session, `spawn error: ${err.message}`);
       await markCameraStatus(id, { status: "offline" });
+      await logCameraError(id, `Spawn error: ${err.message}`);
     });
     return session;
   })().finally(() => hlsStartLocks.delete(id));
@@ -372,6 +378,8 @@ async function startSharedMjpeg(id) {
   const locked = mjpegStartLocks.get(id);
   if (locked) return locked;
 
+  await stopHls(id);
+
   const startPromise = (async () => {
     const camera = await getCamera(id, { revealSecret: true });
     if (!camera) return null;
@@ -388,7 +396,7 @@ async function startSharedMjpeg(id) {
       ...buildRtspInputArgs(camera, config),
       "-i", source,
       "-an",
-      "-vf", `fps=${config.mjpegFps},scale=${config.mjpegWidth}:-2`,
+      "-vf", `fps=${config.mjpegFps}${camera.streamQuality && camera.streamQuality !== "Auto" ? `,scale=-2:${camera.streamQuality.replace("p", "")}` : `,scale=${config.mjpegWidth}:-2`}`,
       "-q:v", String(config.mjpegQuality),
       "-f", "mjpeg",
       "pipe:1",
@@ -444,7 +452,10 @@ async function startSharedMjpeg(id) {
       }
       session.clients.clear();
       if (mjpegSessions.get(id) === session) mjpegSessions.delete(id);
-      if (code !== 0 && signal !== "SIGTERM") await markCameraStatus(id, { status: "offline" });
+      if (code !== 0 && signal !== "SIGTERM") {
+        await markCameraStatus(id, { status: "offline" });
+        await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
+      }
     });
     child.on("error", async (err) => {
       session.status = "error";
@@ -455,6 +466,7 @@ async function startSharedMjpeg(id) {
       session.frameWaiters?.clear?.();
       if (mjpegSessions.get(id) === session) mjpegSessions.delete(id);
       await markCameraStatus(id, { status: "offline" });
+      await logCameraError(id, `Spawn error: ${err.message}`);
     });
     return session;
   })().finally(() => mjpegStartLocks.delete(id));
@@ -565,7 +577,7 @@ export function streamStatus() {
       signalCode: session.signalCode ?? null,
       lastRequestAt: session.lastRequestAt ? new Date(session.lastRequestAt).toISOString() : null,
       idleSeconds: session.lastRequestAt ? Math.round((now - session.lastRequestAt) / 1000) : null,
-      viewers: activeHlsViewerCount(id),
+      viewers: activeViewerCount(id),
       error: classifyStreamError(session.rawError),
       playlistReady: fsSync.existsSync(session.playlist),
     });
@@ -579,7 +591,7 @@ export function streamStatus() {
       rtspTimeoutOption: session.rtspTimeoutOption || "none",
       pid: session.pid,
       status: isChildAlive(session.child) ? session.status : session.status || "stopped",
-      clients: session.clients.size,
+      clients: activeViewerCount(id),
       startedAt: session.startedAt,
       closedAt: session.closedAt || null,
       exitCode: session.exitCode ?? null,
@@ -632,13 +644,13 @@ export function streamMetricsFor(id, streamType) {
   if (hls && isChildAlive(hls.child)) {
     running = hls.status === "running";
     starting = hls.status !== "running";
-    viewers += activeHlsViewerCount(id);
-  }
   const mjpeg = mjpegSessions.get(id);
   if (mjpeg && isChildAlive(mjpeg.child)) {
     running = running || mjpeg.status === "running";
     starting = starting || mjpeg.status !== "running";
-    viewers += mjpeg.clients.size;
+  }
+  if (running || starting) {
+    viewers = activeViewerCount(id);
   }
   const perViewerKbps = estimatedKbpsFor(streamType);
   const fallbackOutKbps = viewers === 0 ? 0 : perViewerKbps * viewers;
@@ -667,7 +679,7 @@ export function streamSystemMetrics() {
     const type = session.output || "HLS Stable";
     const per = estimatedKbpsFor(type);
     cctvPullKbps += per;
-    const v = activeHlsViewerCount(id);
+    const v = activeViewerCount(id);
     viewers += v;
     cctvOutKbps += per * v;
     seen.add(id);
@@ -677,21 +689,29 @@ export function streamSystemMetrics() {
     activeProcesses += 1;
     const per = estimatedKbpsFor("MJPEG");
     cctvPullKbps += per;
-    viewers += session.clients.size;
-    cctvOutKbps += per * session.clients.size;
+    const v = activeViewerCount(id);
+    viewers += v;
+    cctvOutKbps += per * v;
     seen.add(id);
   }
   return { cctvPullKbps, cctvOutKbps, viewers, activeProcesses, activeCameras: seen.size };
 }
 
-export async function stopCameraStreams(id) {
-  const stopped = await stopHls(id);
+export async function stopMjpeg(id) {
   const mjpeg = mjpegSessions.get(id);
   if (mjpeg) {
     if (isChildAlive(mjpeg.child)) mjpeg.child.kill("SIGTERM");
     mjpeg.status = "stopped";
     mjpeg.closedAt = nowIso();
     mjpegSessions.delete(id);
+    return true;
+  }
+  return false;
+}
+
+export async function stopCameraStreams(id) {
+  const stopped = await stopHls(id);
+  if (await stopMjpeg(id)) {
     stopped.push(`${id}:mjpeg`);
   }
   return stopped;

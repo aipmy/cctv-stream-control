@@ -192,6 +192,8 @@ export const auditApi = {
     const suffix = params.toString();
     return api<AuditPage>(`/api/audit${suffix ? `?${suffix}` : ""}`);
   },
+  clear: () => api<{ ok: boolean }>("/api/audit/clear", { method: "POST" }),
+  exportUrl: () => withToken(`${API_BASE}/api/audit/export`),
 };
 
 export interface StreamStatus {
@@ -207,6 +209,9 @@ export interface StreamStatus {
 export const streamApi = {
   start: (id: string, output?: StreamType) => api<{ ok: boolean; ready: boolean; streamUrl: string }>(`/api/streams/${encodeURIComponent(id)}/start?vid=${encodeURIComponent(getViewerId())}`, { method: "POST", json: { output } }),
   stop: (id: string, output?: StreamType) => api<{ stopped: string[] }>(`/api/streams/${encodeURIComponent(id)}/stop`, { method: "POST", json: { output } }),
+  ping: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/ping?vid=${encodeURIComponent(getViewerId())}`, { method: "POST" }),
+  leave: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/leave?vid=${encodeURIComponent(getViewerId())}`, { method: "POST" }),
+  fallback: (id: string) => api<{ ok: boolean; fallback: string }>(`/api/streams/${encodeURIComponent(id)}/fallback`, { method: "POST" }),
   status: () => api<StreamStatus[]>("/api/streams/status"),
 };
 

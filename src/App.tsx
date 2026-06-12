@@ -13,8 +13,6 @@ import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound.tsx";
 import { BootstrapGate } from "@/features/auth/BootstrapGate";
-import { GlobalThemeToggle } from "@/components/GlobalThemeToggle";
-
 const App = () => {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -26,7 +24,6 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeManager />
-        <GlobalThemeToggle />
         <Toaster />
         <Sonner position="bottom-right" richColors closeButton />
         <BrowserRouter>

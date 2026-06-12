@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Plus, Pencil, Trash2, ScrollText, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ScrollText, Loader2, Download, Trash } from "lucide-react";
 import type { AuditOutcome, CreateUserInput, Role, UserSummary } from "@/types";
+import { auditApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
@@ -31,7 +32,8 @@ export default function Users() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<UserSummary | null>(null);
   const [del, setDel] = useState<UserSummary | null>(null);
-  const [form, setForm] = useState<CreateUserInput>({ username: "", password: "", role: "guest", active: true });
+  const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false };
+  const [form, setForm] = useState<CreateUserInput>({ username: "", password: "", role: "guest", active: true, permissions: emptyPermissions, allowedGroups: [] });
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("users");
   const [auditActor, setAuditActor] = useState("");
@@ -48,10 +50,10 @@ export default function Users() {
 
   if (role !== "admin") return <Navigate to="/" replace />;
 
-  const openNew = () => { setEdit(null); setForm({ username: "", password: "", role: "guest", active: true }); setOpen(true); };
+  const openNew = () => { setEdit(null); setForm({ username: "", password: "", role: "guest", active: true, permissions: emptyPermissions, allowedGroups: [] }); setOpen(true); };
   const openEdit = (u: UserSummary) => {
     setEdit(u);
-    setForm({ username: u.username, password: "", role: u.role, active: u.active });
+    setForm({ username: u.username, password: "", role: u.role, active: u.active, permissions: u.permissions || emptyPermissions, allowedGroups: u.allowedGroups || [] });
     setOpen(true);
   };
 
@@ -105,9 +107,17 @@ export default function Users() {
                 <TableCell className="font-medium">{u.username}</TableCell>
                 <TableCell><Badge variant="outline" className={roleColors[u.role]}>{u.role}</Badge></TableCell>
                 <TableCell>
-                  {u.active
-                    ? <Badge variant="outline" className="border-success/30 text-success">Aktif</Badge>
-                    : <Badge variant="outline" className="text-muted-foreground">Nonaktif</Badge>}
+                  <Switch
+                    checked={u.active}
+                    onCheckedChange={async (v) => {
+                      try {
+                        await updateUser(u.id, { active: v });
+                        toast.success(`Pengguna ${v ? "diaktifkan" : "dinonaktifkan"}`);
+                      } catch (err) {
+                        toast.error("Gagal mengubah status pengguna");
+                      }
+                    }}
+                  />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -121,27 +131,43 @@ export default function Users() {
       </TabsContent>
 
       <TabsContent value="audit" className="space-y-3">
-        <Card className="grid gap-2 p-3 md:grid-cols-[1fr_1fr_180px]">
-          <Input
-            value={auditActor}
-            onChange={(event) => setAuditActor(event.target.value)}
-            placeholder="Filter actor/username"
-          />
-          <Input
-            value={auditAction}
-            onChange={(event) => setAuditAction(event.target.value)}
-            placeholder="Filter action, contoh: ptz.command"
-          />
-          <Select value={auditOutcome} onValueChange={(value) => setAuditOutcome(value as AuditOutcome | "all")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua hasil</SelectItem>
-              <SelectItem value="success">Success</SelectItem>
-              <SelectItem value="warning">Warning</SelectItem>
-              <SelectItem value="failure">Failure</SelectItem>
-            </SelectContent>
-          </Select>
-        </Card>
+        <div className="flex flex-col md:flex-row gap-2 justify-between items-start md:items-center">
+          <Card className="grid gap-2 p-3 md:grid-cols-[1fr_1fr_180px] flex-1 w-full">
+            <Input
+              value={auditActor}
+              onChange={(event) => setAuditActor(event.target.value)}
+              placeholder="Filter actor/username"
+            />
+            <Input
+              value={auditAction}
+              onChange={(event) => setAuditAction(event.target.value)}
+              placeholder="Filter action, contoh: ptz.command"
+            />
+            <Select value={auditOutcome} onValueChange={(value) => setAuditOutcome(value as AuditOutcome | "all")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua hasil</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="failure">Failure</SelectItem>
+              </SelectContent>
+            </Select>
+          </Card>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => window.open(auditApi.exportUrl(), "_blank")}><Download className="h-4 w-4 mr-2" /> Export</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (confirm("Hapus semua log audit?")) {
+                try {
+                  await auditApi.clear();
+                  toast.success("Audit log dibersihkan");
+                  audit.refetch();
+                } catch (err) {
+                  toast.error("Gagal menghapus log");
+                }
+              }
+            }}><Trash className="h-4 w-4 mr-2" /> Clear</Button>
+          </div>
+        </div>
         <Card className="overflow-hidden">
           <Table>
             <TableHeader>
@@ -219,6 +245,37 @@ export default function Users() {
               <Label className="text-sm">Status Aktif</Label>
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
             </div>
+            
+            {form.role !== "admin" && (
+              <div className="space-y-4 pt-4 border-t mt-4">
+                <Label className="text-xs uppercase tracking-wider">Group/Site yang diizinkan</Label>
+                <p className="text-xs text-muted-foreground -mt-3 mb-2">Pisahkan dengan koma. Kosongkan untuk menolak akses ke semua grup.</p>
+                <Input 
+                  value={(form.allowedGroups || []).join(", ")}
+                  onChange={(e) => setForm({ ...form, allowedGroups: e.target.value.split(",").map(g => g.trim()).filter(Boolean) })}
+                  placeholder="Gudang, Lobby, Pusat" 
+                />
+
+                <Label className="text-xs uppercase tracking-wider block mt-4 mb-2">Izin Spesifik</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { key: "canAddCamera", label: "Tambah Kamera" },
+                    { key: "canEditCamera", label: "Edit Kamera" },
+                    { key: "canDeleteCamera", label: "Hapus Kamera" },
+                    { key: "canRestartStream", label: "Restart Stream" },
+                    { key: "canViewManagement", label: "Lihat Manajemen Kamera" }
+                  ].map((p) => (
+                    <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
+                      <Label className="text-xs font-normal">{p.label}</Label>
+                      <Switch 
+                        checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
+                        onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as any })} 
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>Batal</Button>

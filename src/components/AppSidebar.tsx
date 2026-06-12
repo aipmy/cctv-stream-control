@@ -82,50 +82,6 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
-        {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md p-2 text-left hover:bg-sidebar-accent",
-                  collapsed && "justify-center",
-                )}
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <UserRound className="h-4 w-4" />
-                </span>
-                {!collapsed && (
-                  <>
-                    <span className="min-w-0 flex-1 leading-tight">
-                      <span className="block truncate text-xs font-medium">{user.username}</span>
-                      <span className="block text-[10px] capitalize text-muted-foreground">{user.role}</span>
-                    </span>
-                    <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  </>
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
-              <DropdownMenuLabel>
-                <div className="text-xs font-medium">{user.username}</div>
-                <div className="text-[10px] font-normal capitalize text-muted-foreground">{user.role}</div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
-                <KeyRound className="mr-2 h-4 w-4" />
-                Ubah password
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void logout()} className="text-destructive focus:text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                Keluar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </SidebarFooter>
-      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </Sidebar>
   );
 }

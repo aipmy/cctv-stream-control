@@ -144,5 +144,18 @@ export function createAuditStore({
     async flush() {
       await writeLock;
     },
+
+    async clear() {
+      return queueWrite(async () => {
+        records = [];
+        await compact();
+        return true;
+      });
+    },
+
+    async exportAll() {
+      // Return plain JS array for JSON export
+      return [...records].sort((a, b) => b.ts - a.ts);
+    },
   };
 }

@@ -10,7 +10,15 @@ export const cameraRoutes = Router();
 cameraRoutes.get("/", async (req, res, next) => {
   try {
     const revealSecret = req.auth?.role === "admin" || req.auth?.role === "teknisi";
-    res.json(await listCameras({ revealSecret }));
+    let cameras = await listCameras({ revealSecret });
+    if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
+      if (req.auth.allowedGroups.length > 0) {
+        cameras = cameras.filter((cam) => req.auth.allowedGroups.includes(cam.site));
+      } else {
+        cameras = [];
+      }
+    }
+    res.json(cameras);
   } catch (err) { next(err); }
 });
 
@@ -32,6 +40,11 @@ cameraRoutes.post("/bulk/import", requireRole("admin", "teknisi"), async (req, r
 
 cameraRoutes.post("/", requireRole("admin", "teknisi"), async (req, res, next) => {
   try {
+    if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
+      if (!req.auth.allowedGroups.includes(req.body?.site)) {
+        return res.status(403).json({ error: "Anda tidak memiliki izin untuk menambah kamera di group ini" });
+      }
+    }
     const camera = await createCamera(req.body, { revealSecret: true });
     await auditRequest(req, {
       action: "camera.create",
@@ -53,6 +66,15 @@ cameraRoutes.post("/", requireRole("admin", "teknisi"), async (req, res, next) =
 
 cameraRoutes.put("/:id", requireRole("admin", "teknisi"), async (req, res, next) => {
   try {
+    if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
+      const existing = await getCamera(req.params.id);
+      if (existing && !req.auth.allowedGroups.includes(existing.site)) {
+        return res.status(403).json({ error: "Anda tidak memiliki izin untuk mengedit kamera ini" });
+      }
+      if (req.body?.site && !req.auth.allowedGroups.includes(req.body.site)) {
+        return res.status(403).json({ error: "Anda tidak memiliki izin untuk memindahkan kamera ke group ini" });
+      }
+    }
     const camera = await updateCamera(req.params.id, req.body, { revealSecret: true });
     if (!camera) return res.status(404).json({ error: "Camera not found" });
     clearPtzCache(req.params.id);

@@ -81,6 +81,20 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
   }, [camera.id, camera.enabled, output, src]);
 
   useEffect(() => {
+    if (!camera.enabled) return;
+    const interval = setInterval(() => {
+      void streamApi.ping(camera.id);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [camera.enabled, camera.id]);
+
+  useEffect(() => {
+    return () => {
+      void streamApi.leave(camera.id);
+    };
+  }, [camera.id]);
+
+  useEffect(() => {
     if (!camera.enabled || output === "MJPEG") return;
 
     let disposed = false;
@@ -144,10 +158,18 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         });
         hls.on(Hls.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string; type?: string }) => {
           if (!data?.fatal || disposed) return;
-          if (data.type === "mediaError" && mediaRecoveryAttempts < 1) {
-            mediaRecoveryAttempts += 1;
-            hls?.recoverMediaError();
-            return;
+          if (data.type === "mediaError") {
+            if (mediaRecoveryAttempts < 1) {
+              mediaRecoveryAttempts += 1;
+              hls?.recoverMediaError();
+              return;
+            }
+            if (!disposed && output !== "MJPEG") {
+              // Fatal media error, probably codec issue (e.g. H.265 in copy mode).
+              void streamApi.fallback(camera.id).then(() => {
+                if (!disposed) window.location.reload();
+              });
+            }
           }
           setLoading(false);
           const base = playbackErrorMessage(data.details, data.type);

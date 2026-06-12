@@ -9,8 +9,8 @@ import { toast } from "sonner";
 import type { Camera, CameraInput, Brand, StreamType, SourceType, RtspTransport, HlsMode } from "@/types";
 import { SOURCE_SUPPORTS_PTZ } from "@/types";
 import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity } from "lucide-react";
-import { useCameraActions, useCamerasQuery } from "@/features/cameras/queries";
 import { cameraApi, type PtzResult } from "@/lib/api";
+import { useAuth } from "@/features/auth/store";
 import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, defaultPath } from "@/lib/cctv";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ const empty = {
   streamType: "HLS Stable" as StreamType,
   rtspTransport: "tcp" as RtspTransport,
   hlsMode: "copy" as HlsMode,
+  streamQuality: "Auto" as Camera["streamQuality"],
   enableAudio: false,
   enablePTZ: false,
   enabled: true,
@@ -92,10 +93,20 @@ const PRESETS: Preset[] = [
 ];
 
 export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
+  const user = useAuth((s) => s.user);
   const cameras = useCamerasQuery().data || [];
   const { addCamera, updateCamera } = useCameraActions();
-  const siteOptions = useMemo(() => Array.from(new Set(cameras.map((c) => c.site).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [cameras]);
-  const [form, setForm] = useState(empty);
+  const siteOptions = useMemo(() => {
+    const all = Array.from(new Set(cameras.map((c) => c.site).filter(Boolean)));
+    if (user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0) {
+      return all.filter((s) => user.allowedGroups.includes(s)).sort((a, b) => a.localeCompare(b));
+    }
+    return all.sort((a, b) => a.localeCompare(b));
+  }, [cameras, user]);
+
+  const defaultSite = user?.role !== "admin" && user?.allowedGroups?.[0] ? user.allowedGroups[0] : "";
+  const emptyWithSite = { ...empty, site: defaultSite };
+  const [form, setForm] = useState(emptyWithSite);
   const activePresetIndex = PRESETS.findIndex(
     (p) =>
       p.streamType === form.streamType &&
@@ -120,7 +131,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     }
   };
 
-  const [clearPassword, setClearPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,6 +167,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         password: form.password,
         site: form.site || "Test",
         streamType: form.streamType,
+        streamQuality: form.streamQuality,
         rtspTransport: form.rtspTransport,
         hlsMode: form.hlsMode,
         enableAudio: form.enableAudio,
@@ -247,14 +258,19 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     if (camera) {
       const st = camera.sourceType ?? "RTSP+ONVIF";
       setForm({
-        name: camera.name, brand: camera.brand, ip: camera.ip,
+        name: camera.name,
+        brand: camera.brand || "Universal",
+        ip: camera.ip,
         sourceType: st,
-        rtspPort: camera.rtspPort ?? DEFAULT_PORTS[st].primary,
-        onvifPort: camera.onvifPort ?? 80,
-        httpPort: camera.httpPort ?? (st === "HLS" ? 443 : 80),
+        rtspPort: camera.rtspPort ?? DEFAULT_PORTS[st]?.rtsp ?? 554,
+        onvifPort: camera.onvifPort ?? DEFAULT_PORTS[st]?.onvif ?? 80,
+        httpPort: camera.httpPort ?? DEFAULT_PORTS[st]?.http ?? 80,
         sourcePath: camera.sourcePath ?? defaultPath(st),
-        username: camera.username || "", password: camera.password || "", site: camera.site,
+        username: camera.username || "",
+        password: "",
+        site: camera.site || "",
         streamType: camera.streamType,
+        streamQuality: camera.streamQuality || "Auto",
         rtspTransport: camera.rtspTransport ?? "tcp",
         hlsMode: camera.hlsMode ?? "copy",
         enableAudio: camera.enableAudio, enablePTZ: camera.enablePTZ,
@@ -264,7 +280,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       setForm(empty);
     }
     setErrors({});
-    setClearPassword(false);
     setShowPassword(false);
     setPtzResult(null);
   }, [camera, open]);
@@ -316,13 +331,13 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       username: form.username,
       site: form.site,
       streamType: form.streamType,
+      streamQuality: form.streamQuality,
       rtspTransport: form.rtspTransport,
       hlsMode: form.hlsMode,
       enableAudio: form.enableAudio,
       enablePTZ: form.enablePTZ,
       enabled: form.enabled,
       ...(form.password ? { password: form.password } : {}),
-      ...(clearPassword ? { clearPassword: true } : {}),
     };
 
     setSaving(true);
@@ -382,16 +397,27 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             <Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.10" />
           </Field>
           <Field label="Site / Group" error={errors.site}>
-            <Input
-              list="cctv-site-options"
-              value={form.site}
-              onChange={(e) => setForm({ ...form, site: e.target.value })}
-              placeholder="Pilih site atau ketik baru"
-            />
-            <datalist id="cctv-site-options">
-              {siteOptions.map((s) => <option key={s} value={s} />)}
-            </datalist>
-            <p className="text-[11px] text-muted-foreground mt-1">Dropdown memakai site yang sudah ada secara ascending. Ketik nama baru untuk menambah group/site.</p>
+            {user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0 ? (
+              <Select value={form.site} onValueChange={(v) => setForm({ ...form, site: v })}>
+                <SelectTrigger><SelectValue placeholder="Pilih site" /></SelectTrigger>
+                <SelectContent>
+                  {user.allowedGroups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <>
+                <Input
+                  list="cctv-site-options"
+                  value={form.site}
+                  onChange={(e) => setForm({ ...form, site: e.target.value })}
+                  placeholder="Pilih site atau ketik baru"
+                />
+                <datalist id="cctv-site-options">
+                  {siteOptions.map((s) => <option key={s} value={s} />)}
+                </datalist>
+                <p className="text-[11px] text-muted-foreground mt-1">Dropdown memakai site yang sudah ada secara ascending. Ketik nama baru untuk menambah group/site.</p>
+              </>
+            )}
           </Field>
 
           <Field label="Stream Source" className="md:col-span-2">
@@ -455,7 +481,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 value={form.password}
                 onChange={(e) => {
                   setForm({ ...form, password: e.target.value });
-                  if (e.target.value) setClearPassword(false);
                 }}
                 autoComplete="new-password"
                 className="pr-9"
@@ -471,19 +496,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             </div>
             {camera?.hasPassword && (
               <p className="text-[11px] text-muted-foreground mt-1">Password tersimpan untuk teknisi. Ubah jika diperlukan.</p>
-            )}
-            {camera && (
-              <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={clearPassword}
-                  onChange={(event) => {
-                    setClearPassword(event.target.checked);
-                    if (event.target.checked) setForm({ ...form, password: "" });
-                  }}
-                />
-                Hapus password kamera saat disimpan
-              </label>
             )}
           </Field>
 
@@ -560,16 +572,37 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             </div>
           )}
 
-          <Field label="Stream Output Default">
-            <Select value={form.streamType} onValueChange={(v) => setForm({ ...form, streamType: v as StreamType })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="HLS Stable">HLS Stable</SelectItem>
-                <SelectItem value="HLS Low Latency">HLS Low Latency</SelectItem>
-                <SelectItem value="MJPEG">MJPEG</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output Format</Label>
+              <Select value={form.streamType} onValueChange={(v) => setForm({ ...form, streamType: v as StreamType })}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HLS Stable">HLS Stable (Compatible)</SelectItem>
+                  <SelectItem value="HLS Low Latency">HLS Low Latency</SelectItem>
+                  <SelectItem value="MJPEG">MJPEG (Legacy)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stream Quality</Label>
+              <Select value={form.streamQuality} onValueChange={(v) => setForm({ ...form, streamQuality: v as Camera["streamQuality"] })}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Auto">Auto (Original)</SelectItem>
+                  <SelectItem value="1080p">1080p</SelectItem>
+                  <SelectItem value="720p">720p</SelectItem>
+                  <SelectItem value="480p">480p</SelectItem>
+                  <SelectItem value="360p">360p</SelectItem>
+                  <SelectItem value="144p">144p</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {isRtspFamily && (
             <Field label="RTSP Transport">
@@ -652,6 +685,22 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {camera && camera.errorHistory && camera.errorHistory.length > 0 && (
+            <div className="md:col-span-2 rounded-md border p-3 mt-4 border-destructive/20 bg-destructive/5">
+              <h3 className="text-sm font-medium text-destructive mb-2">Riwayat Error FFmpeg (Max 10)</h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                {camera.errorHistory.map((err, idx) => (
+                  <div key={idx} className="text-xs bg-background p-2 rounded border">
+                    <span className="font-mono text-muted-foreground mr-2 text-[10px]">
+                      {new Date(err.timestamp).toLocaleString()}
+                    </span>
+                    <span className="text-foreground">{err.message}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

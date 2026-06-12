@@ -26,7 +26,7 @@ export const config = {
   streamProfile: process.env.STREAM_PROFILE || "copy",
   rtspTransport: process.env.RTSP_TRANSPORT || "tcp",
   hlsStartTimeoutMs: Number(process.env.HLS_START_TIMEOUT_MS || 20000),
-  streamIdleMs: Number(process.env.STREAM_IDLE_MS || 15000),
+  streamIdleMs: Number(process.env.STREAM_IDLE_MS || 10000),
   // Default 0: jangan tambahkan opsi timeout FFmpeg.
   // Beberapa build FFmpeg tidak support -rw_timeout; jika butuh, set
   // RTSP_TIMEOUT_OPTION=stimeout|timeout|rw_timeout dan STREAM_READ_TIMEOUT_US.

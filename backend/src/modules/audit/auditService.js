@@ -55,3 +55,13 @@ export function changedFields(payload, allowlist) {
   const allowed = new Set(allowlist);
   return Object.keys(payload).filter((key) => allowed.has(key)).sort();
 }
+
+export async function clearAudit() {
+  await initializeAudit();
+  return store.clear();
+}
+
+export async function exportAudit() {
+  await initializeAudit();
+  return store.exportAll();
+}

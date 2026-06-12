@@ -47,6 +47,8 @@ export interface Camera {
   pullBytesPerSec?: number;
   latencyMs: number;
   qualityProfile: "Low" | "Medium" | "High" | "4K";
+  streamQuality: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
+  errorHistory?: Array<{ timestamp: string; message: string }>;
 }
 
 export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassword">> {
@@ -57,11 +59,21 @@ export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassw
   clearPassword?: boolean;
 }
 
+export interface UserPermissions {
+  canAddCamera: boolean;
+  canEditCamera: boolean;
+  canDeleteCamera: boolean;
+  canRestartStream: boolean;
+  canViewManagement: boolean;
+}
+
 export interface UserSummary {
   id: string;
   username: string;
   role: Role;
   active: boolean;
+  permissions: UserPermissions;
+  allowedGroups: string[];
   preferences: {
     pinnedCameraIds: string[];
   };
@@ -72,6 +84,8 @@ export interface CreateUserInput {
   password: string;
   role: Role;
   active: boolean;
+  permissions?: Partial<UserPermissions>;
+  allowedGroups?: string[];
 }
 
 export interface UpdateUserInput {
@@ -79,6 +93,8 @@ export interface UpdateUserInput {
   password?: string;
   role?: Role;
   active?: boolean;
+  permissions?: Partial<UserPermissions>;
+  allowedGroups?: string[];
 }
 
 export type User = UserSummary;

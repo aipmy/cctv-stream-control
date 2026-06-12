@@ -75,6 +75,19 @@ export async function markCameraStatus(id, patch) {
   return updated ? publicCamera(updated) : null;
 }
 
+export async function logCameraError(id, message) {
+  let updated = null;
+  await store.update((cameras) => cameras.map((camera) => {
+    if (camera.id !== id) return camera;
+    const errorHistory = Array.isArray(camera.errorHistory) ? [...camera.errorHistory] : [];
+    errorHistory.unshift({ timestamp: new Date().toISOString(), message });
+    if (errorHistory.length > 10) errorHistory.length = 10;
+    updated = normalizeCamera({ ...camera, errorHistory }, camera);
+    return updated;
+  }));
+  return updated ? publicCamera(updated) : null;
+}
+
 function tcpProbe(host, port, timeoutMs = 1500) {
   return new Promise((resolve) => {
     const socket = new net.Socket();

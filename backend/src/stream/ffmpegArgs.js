@@ -62,6 +62,15 @@ function copyHlsArgs(camera, output, dir, options) {
   ];
 }
 
+function videoScaleArgs(camera) {
+  if (!camera.streamQuality || camera.streamQuality === "Auto") return [];
+  const match = camera.streamQuality.match(/^(\d+)p$/);
+  if (match) {
+    return ["-vf", `scale=-2:${match[1]}`];
+  }
+  return [];
+}
+
 function transcodeHlsArgs(camera, output, dir, options) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
@@ -85,6 +94,7 @@ function transcodeHlsArgs(camera, output, dir, options) {
     "-tune", "zerolatency",
     "-profile:v", "baseline",
     "-pix_fmt", "yuv420p",
+    ...videoScaleArgs(camera),
     "-r", fps,
     "-g", gop,
     "-keyint_min", gop,
@@ -106,7 +116,9 @@ function transcodeHlsArgs(camera, output, dir, options) {
 }
 
 export function buildHlsArgs({ camera, output, dir, options = {} }) {
-  return normalizeHlsMode(camera.hlsMode, options) === "transcode"
+  const needsTranscode = normalizeHlsMode(camera.hlsMode, options) === "transcode" || 
+                         (camera.streamQuality && camera.streamQuality !== "Auto");
+  return needsTranscode
     ? transcodeHlsArgs(camera, output, dir, options)
     : copyHlsArgs(camera, output, dir, options);
 }
