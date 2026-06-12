@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CCTV Monitoring Lite — Design System
+   Dark-first, compact operator UI. All colors HSL.
+*/
+
+@layer base {
+  :root {
+    /* Light theme — clean operator console */
+    --background: 210 25% 97%;
+    --foreground: 222 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 40% 12%;
+
+    --primary: 174 72% 38%;
+    --primary-foreground: 180 100% 97%;
+    --primary-glow: 174 80% 50%;
+
+    --secondary: 215 25% 92%;
+    --secondary-foreground: 222 40% 18%;
+
+    --muted: 215 20% 94%;
+    --muted-foreground: 215 15% 42%;
+
+    --accent: 174 60% 92%;
+    --accent-foreground: 174 80% 22%;
+
+    --destructive: 0 78% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 145 65% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 95% 52%;
+    --warning-foreground: 30 60% 12%;
+    --info: 210 90% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 215 20% 88%;
+    --input: 215 20% 88%;
+    --ring: 174 72% 38%;
+
+    --radius: 0.6rem;
+
+    --sidebar-background: 215 30% 98%;
+    --sidebar-foreground: 222 30% 22%;
+    --sidebar-primary: 174 72% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 92%;
+    --sidebar-accent-foreground: 222 40% 14%;
+    --sidebar-border: 215 20% 88%;
+    --sidebar-ring: 174 72% 38%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 38%), hsl(190 80% 48%));
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(215 25% 96%));
+    --shadow-card: 0 1px 2px hsl(222 40% 12% / 0.04), 0 4px 16px -8px hsl(222 40% 12% / 0.08);
+    --shadow-glow: 0 0 32px -8px hsl(174 80% 50% / 0.5);
+  }
+
+  .dark {
+    /* Dark theme — operator night-mode */
+    --background: 222 30% 7%;
+    --foreground: 210 30% 92%;
+
+    --card: 222 28% 10%;
+    --card-foreground: 210 30% 94%;
+
+    --popover: 222 30% 9%;
+    --popover-foreground: 210 30% 94%;
+
+    --primary: 174 72% 48%;
+    --primary-foreground: 222 40% 8%;
+    --primary-glow: 174 95% 60%;
+
+    --secondary: 222 22% 16%;
+    --secondary-foreground: 210 30% 90%;
+
+    --muted: 222 22% 14%;
+    --muted-foreground: 215 15% 62%;
+
+    --accent: 174 50% 18%;
+    --accent-foreground: 174 95% 75%;
+
+    --destructive: 0 75% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 145 60% 48%;
+    --success-foreground: 222 40% 8%;
+    --warning: 38 95% 58%;
+    --warning-foreground: 30 60% 10%;
+    --info: 210 90% 60%;
+    --info-foreground: 222 40% 8%;
+
+    --border: 222 22% 18%;
+    --input: 222 22% 18%;
+    --ring: 174 72% 48%;
+
+    --sidebar-background: 222 32% 6%;
+    --sidebar-foreground: 210 25% 80%;
+    --sidebar-primary: 174 72% 48%;
+    --sidebar-primary-foreground: 222 40% 8%;
+    --sidebar-accent: 222 24% 12%;
+    --sidebar-accent-foreground: 210 30% 92%;
+    --sidebar-border: 222 22% 14%;
+    --sidebar-ring: 174 72% 48%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 42%), hsl(195 85% 50%));
+    --gradient-surface: linear-gradient(180deg, hsl(222 28% 11%), hsl(222 30% 8%));
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.3), 0 8px 24px -12px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 28px -6px hsl(174 95% 60% / 0.45);
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  html { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+}
+
+@layer components {
+  .glass-panel {
+    background: var(--gradient-surface);
+    box-shadow: var(--shadow-card);
+  }
+  .status-dot {
+    @apply inline-block h-2 w-2 rounded-full;
+    box-shadow: 0 0 0 3px hsl(var(--background));
+  }
+  .status-dot-online { background: hsl(var(--success)); box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 12px hsl(var(--success) / 0.7); }
+  .status-dot-offline { background: hsl(var(--muted-foreground)); }
+  .status-dot-warning { background: hsl(var(--warning)); box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 12px hsl(var(--warning) / 0.65); }
+
+  /* Live feed harus polos. Tidak ada scanline/gradient animasi di area kamera. */
+  .cctv-feed {
+    background: hsl(0 0% 0%);
+    position: relative;
+    overflow: hidden;
+  }
+  .cctv-feed::after { display: none; }
+  .cctv-feed-offline { background: hsl(0 0% 0%); }
+
+  .pulse-live { animation: none; }
+}

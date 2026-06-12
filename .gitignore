@@ -1,0 +1,22 @@
+node_modules
+
+# runtime app data
+backend/data/
+backend/backups/
+backend/logs/
+backend/storage/
+storage/
+
+# logs/history
+*.log
+*.ndjson
+
+# build output
+dist/
+frontend/dist/
+
+# secrets
+.env
+.env.*
+!.env.example
+!backend/.env.example

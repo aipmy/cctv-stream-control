@@ -1,0 +1,60 @@
+import { Router } from "express";
+import { listCameras } from "../services/cameraService.js";
+import { streamMetricsFor, streamRuntimeStatusFor } from "../stream/streamManager.js";
+import { getLatestTraffic, getTrafficHistory } from "../modules/stats/trafficHistoryService.js";
+
+export const statRoutes = Router();
+
+function enrichCameras(cameras) {
+  return cameras.map((camera) => {
+    const m = streamMetricsFor(camera.id, camera.streamType);
+    const runtimeStatus = camera.enabled ? streamRuntimeStatusFor(camera.id) : null;
+    return {
+      ...camera,
+      status: !camera.enabled ? "offline" : runtimeStatus || camera.status || "offline",
+      viewerCount: m.viewers,
+      bandwidthKbps: m.bandwidthKbps,
+      pullBandwidthKbps: m.cctvPullKbps,
+      outBytesPerSec: m.outBytesPerSec || 0,
+      pullBytesPerSec: m.pullBytesPerSec || 0,
+      latencyMs: m.latencyMs,
+    };
+  });
+}
+
+statRoutes.get("/", async (req, res, next) => {
+  try {
+    const revealSecret = req.auth?.role === "admin" || req.auth?.role === "teknisi";
+    const cameras = await listCameras({ revealSecret });
+    const enriched = enrichCameras(cameras);
+    const enabled = enriched.filter((c) => c.enabled).length;
+    const disabled = enriched.length - enabled;
+    const online = enriched.filter((c) => c.enabled && c.status === "online").length;
+    const starting = enriched.filter((c) => c.enabled && c.status === "starting").length;
+    const traffic = getLatestTraffic();
+    res.json({
+      cameras: enriched,
+      traffic,
+      totals: {
+        total: enriched.length,
+        enabled,
+        disabled,
+        online,
+        starting,
+        offline: enriched.filter((c) => c.enabled && c.status === "offline").length,
+        streaming: enriched.filter((c) => c.enabled && c.viewerCount > 0).length,
+        viewers: enriched.reduce((a, c) => a + c.viewerCount, 0),
+        bandwidthKbps: enriched.reduce((a, c) => a + c.bandwidthKbps, 0),
+        pullBandwidthKbps: enriched.reduce((a, c) => a + (c.pullBandwidthKbps || 0), 0),
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+statRoutes.get("/traffic", async (_req, res, next) => {
+  try { res.json(getLatestTraffic()); } catch (err) { next(err); }
+});
+
+statRoutes.get("/traffic/history", async (req, res, next) => {
+  try { res.json(getTrafficHistory(req.query.range)); } catch (err) { next(err); }
+});

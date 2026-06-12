@@ -1,0 +1,36 @@
+{
+  "mode": "append",
+  "cameras": [
+    {
+      "name": "Gerbang Utama 01",
+      "site": "Gerbang Utama",
+      "ip": "172.16.50.253",
+      "brand": "Universal",
+      "sourceType": "RTSP+ONVIF",
+      "streamType": "HLS Stable",
+      "rtspPort": 8554,
+      "onvifPort": 8000,
+      "sourcePath": "/Streaming/Channels/101",
+      "username": "admin",
+      "password": "ganti-password-kamera",
+      "enableAudio": false,
+      "enablePTZ": true,
+      "enabled": true
+    },
+    {
+      "name": "Substream Ringan 01",
+      "site": "Parkiran",
+      "ip": "192.168.10.21",
+      "brand": "Hikvision",
+      "sourceType": "RTSP",
+      "streamType": "HLS Stable",
+      "rtspPort": 554,
+      "sourcePath": "/Streaming/Channels/102",
+      "username": "admin",
+      "password": "password-kamera",
+      "enableAudio": false,
+      "enablePTZ": false,
+      "enabled": true
+    }
+  ]
+}
