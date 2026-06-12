@@ -644,6 +644,7 @@ export function streamMetricsFor(id, streamType) {
   if (hls && isChildAlive(hls.child)) {
     running = hls.status === "running";
     starting = hls.status !== "running";
+  }
   const mjpeg = mjpegSessions.get(id);
   if (mjpeg && isChildAlive(mjpeg.child)) {
     running = running || mjpeg.status === "running";

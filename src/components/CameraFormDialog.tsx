@@ -11,6 +11,7 @@ import { SOURCE_SUPPORTS_PTZ } from "@/types";
 import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity } from "lucide-react";
 import { cameraApi, type PtzResult } from "@/lib/api";
 import { useAuth } from "@/features/auth/store";
+import { useCamerasQuery, useCameraActions } from "@/features/cameras/queries";
 import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, defaultPath } from "@/lib/cctv";
 import { cn } from "@/lib/utils";
 
