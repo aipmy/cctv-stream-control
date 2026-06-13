@@ -11,7 +11,7 @@ interface LangState {
 export const useLangStore = create<LangState>()(
   persist(
     (set) => ({
-      lang: "id",
+      lang: "en",
       setLang: (lang) => set({ lang }),
     }),
     { name: "cctv-lang" }

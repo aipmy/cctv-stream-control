@@ -16,6 +16,7 @@ import {
 import { ChangePasswordDialog } from "@/features/auth/ChangePasswordDialog";
 import { GlobalThemeToggle } from "./GlobalThemeToggle";
 import { NotificationBell } from "./NotificationBell";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useLangStore } from "@/features/ui/useLangStore";
 import {
   AlertDialog,
@@ -42,7 +43,8 @@ export function Topbar() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  const { lang, setLang } = useLangStore();
+  const { t, lang } = useTranslation();
+  const setLang = useLangStore((s) => s.setLang);
 
   const handleLogout = async () => {
     try {
@@ -58,7 +60,7 @@ export function Topbar() {
         <SidebarTrigger />
         <div className="hidden md:flex items-center gap-2 ml-2">
           <Activity className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">{lang === "id" ? "Pusat Monitoring" : "Monitoring Center"}</span>
+          <span className="text-sm font-medium">{t("monitoringCenter")}</span>
           <Badge variant="outline" className="ml-1 border-success/40 text-success">
             <span className="status-dot status-dot-online mr-1.5" />
             {online}/{cameras.length} online
@@ -103,11 +105,11 @@ export function Topbar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
                 <KeyRound className="mr-2 h-4 w-4" />
-                {lang === "id" ? "Ubah password" : "Change Password"}
+                {t("changePassword")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setLogoutOpen(true)} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                {lang === "id" ? "Keluar" : "Log out"}
+                {t("logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -119,15 +121,15 @@ export function Topbar() {
       <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{lang === "id" ? "Konfirmasi Keluar" : "Confirm Logout"}</AlertDialogTitle>
+            <AlertDialogTitle>{t("confirmLogout")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {lang === "id" ? "Apakah Anda yakin ingin keluar dari aplikasi?" : "Are you sure you want to log out from the application?"}
+              {t("logoutMessage")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{lang === "id" ? "Batal" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => void handleLogout()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {lang === "id" ? "Keluar" : "Log out"}
+              {t("logout")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
