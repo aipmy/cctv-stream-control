@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [stream, setStream] = useState("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [isNewSite, setIsNewSite] = useState(false);
 
   const [editCam, setEditCam] = useState<Camera | null>(null);
   const [deleteCam, setDeleteCam] = useState<Camera | null>(null);

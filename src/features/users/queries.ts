@@ -17,7 +17,10 @@ export function useUsersQuery(enabled = true) {
 
 export function useUserActions() {
   const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: userKeys.all });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: userKeys.all });
+    queryClient.invalidateQueries({ queryKey: ["audit"] });
+  };
   const create = useMutation({ mutationFn: userApi.create, onSuccess: refresh });
   const update = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateUserInput }) =>

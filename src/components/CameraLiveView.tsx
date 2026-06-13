@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, PowerOff } from "lucide-react";
 import type { Camera, StreamType } from "@/types";
 import { streamApi, streamUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   camera: Camera;
@@ -32,6 +33,7 @@ function playbackErrorMessage(details?: string, type?: string) {
 }
 
 export function CameraLiveView({ camera, output = camera.streamType, className, muted = true, volume = 1, showErrorUrl = false, controls = false }: Props) {
+  const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [loading, setLoading] = useState(Boolean(camera.enabled));
   const [error, setError] = useState<string | null>(null);
@@ -109,12 +111,25 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     video.removeAttribute("src");
     video.load();
 
+    // Detect Safari — only Safari should use native HLS.
+    // Chrome/Edge report canPlayType support but their native demuxer
+    // often fails with DEMUXER_ERROR_COULD_NOT_PARSE on live HLS streams.
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
     async function attachHls() {
       try {
         await streamApi.start(camera.id, output);
         if (disposed) return;
 
-        if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        // Prefer hls.js on all browsers except Safari.
+        // Safari's native HLS is more reliable and supports features
+        // like Low-Latency HLS natively.
+        const mod = await import("hls.js");
+        const HlsLib = mod.default;
+        const useNative = isSafari && video.canPlayType("application/vnd.apple.mpegurl");
+        const useHlsJs = !useNative && HlsLib.isSupported();
+
+        if (useNative) {
           video.src = src;
           video.onloadeddata = () => {
             if (!disposed) setLoading(false);
@@ -122,7 +137,8 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           video.onerror = () => {
             if (!disposed) {
               setLoading(false);
-              setError(`${output} gagal dimuat oleh browser. Cek codec H.264/AAC atau ubah HLS Mode ke transcode.`);
+              const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
+              setError(`${output} gagal dimuat oleh browser. ${errMsg || "Cek codec H.264/AAC atau ubah HLS Mode ke transcode."}`);
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
@@ -131,13 +147,11 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           return;
         }
 
-        const mod = await import("hls.js");
-        const Hls = mod.default;
-        if (!Hls.isSupported()) {
-          throw new Error("Browser ini tidak mendukung HLS.js.");
+        if (!useHlsJs) {
+          throw new Error("Browser ini tidak mendukung HLS. Coba gunakan Chrome, Firefox, atau Safari.");
         }
 
-        hls = new Hls({
+        hls = new HlsLib({
           lowLatencyMode: output === "HLS Low Latency",
           backBufferLength: 10,
           liveSyncDurationCount: output === "HLS Low Latency" ? 2 : 3,
@@ -149,14 +163,14 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         });
         hls.loadSource(src);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.on(HlsLib.Events.MANIFEST_PARSED, () => {
           if (disposed) return;
           setLoading(false);
           video.volume = Math.max(0, Math.min(1, volume));
           video.muted = muted || video.volume <= 0.02;
           void video.play().catch(() => undefined);
         });
-        hls.on(Hls.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string; type?: string }) => {
+        hls.on(HlsLib.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string; type?: string }) => {
           if (!data?.fatal || disposed) return;
           if (data.type === "mediaError") {
             if (mediaRecoveryAttempts < 1) {
@@ -167,7 +181,9 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             if (!disposed && output !== "MJPEG") {
               // Fatal media error, probably codec issue (e.g. H.265 in copy mode).
               void streamApi.fallback(camera.id).then(() => {
-                if (!disposed) window.location.reload();
+                if (!disposed) {
+                  void queryClient.invalidateQueries({ queryKey: ["cameras"] });
+                }
               });
             }
           }
@@ -229,6 +245,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           playsInline
           autoPlay
           controls={controls}
+          crossOrigin="anonymous"
         />
       )}
 

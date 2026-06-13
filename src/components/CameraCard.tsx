@@ -10,6 +10,7 @@ import {
   ArrowUp,
   Home,
   Maximize2,
+  Minimize2,
   Minus,
   Pencil,
   Plus,
@@ -98,12 +99,16 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const canEdit = role === "admin" || role === "teknisi" || !!perms?.canEditCamera;
   const canDelete = role === "admin" || !!perms?.canDeleteCamera;
   const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
+
+  const latestError = camera.errorHistory?.[camera.errorHistory.length - 1];
+  const isError = camera.status === "offline" && !!latestError;
+  const badgeTooltip = isError ? (latestError?.message || "") : "";
   const canUseAudio = role === "admin" || role === "teknisi";
   const canUsePtz = role === "admin" || role === "teknisi";
   const canSeeIp = role !== "guest";
   const isDisabled = !camera.enabled;
   const ptzAvailable = canUsePtz && camera.enabled && camera.enablePTZ && camera.sourceType === "RTSP+ONVIF";
-  const audioAvailable = canUseAudio && camera.enableAudio && camera.streamType !== "MJPEG";
+  const audioAvailable = canUseAudio && camera.audioMode !== "Disable" && camera.streamType !== "MJPEG";
 
   const cardRef = useRef<HTMLDivElement | null>(null);
   const hideTimer = useRef<number | null>(null);
@@ -111,8 +116,9 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const activePtzPointer = useRef<number | null>(null);
   const feedbackTimer = useRef<number | null>(null);
   const [audio, setAudio] = useState(() => readAudioState(camera));
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
   const [ptzFeedback, setPtzFeedback] = useState<PtzFeedback | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     setAudio(readAudioState(camera));
@@ -129,6 +135,17 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     if (feedbackTimer.current) window.clearTimeout(feedbackTimer.current);
   }, []);
 
+  // Track fullscreen state changes (including ESC key exit)
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const onFsChange = () => {
+      setIsFullscreen(document.fullscreenElement === el);
+    };
+    el.addEventListener("fullscreenchange", onFsChange);
+    return () => el.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
   const effectiveMuted = !audioAvailable || audio.muted || audio.volume <= 0.02;
   const effectiveVolume = audioAvailable && !effectiveMuted ? audio.volume : 0;
   const volumePct = Math.round(audio.volume * 100);
@@ -138,12 +155,22 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const revealControls = () => {
     setControlsVisible(true);
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    hideTimer.current = window.setTimeout(() => setControlsVisible(false), 2200);
+    hideTimer.current = window.setTimeout(() => setControlsVisible(false), 3000);
   };
 
-  const fullscreen = async () => {
+  const hideControls = () => {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+    setControlsVisible(false);
+  };
+
+  const toggleFullscreen = async () => {
     try {
-      await cardRef.current?.requestFullscreen?.();
+      if (document.fullscreenElement === cardRef.current) {
+        await document.exitFullscreen();
+      } else {
+        await cardRef.current?.requestFullscreen?.();
+      }
     } catch {
       toast.error("Browser menolak fullscreen");
     }
@@ -219,6 +246,11 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {isError && (
+            <Badge variant="outline" title={badgeTooltip} className="text-[9px] px-1 h-4 cursor-help border-destructive/50 text-destructive">
+              Error
+            </Badge>
+          )}
           <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
           <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[camera.status])}>
             {statusLabel(camera)}
@@ -230,8 +262,8 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         ref={cardRef}
         className={cn("relative aspect-video bg-black overflow-hidden group", !controlsVisible && "cursor-none")}
         onMouseMove={revealControls}
-        onPointerMove={revealControls}
         onMouseEnter={revealControls}
+        onMouseLeave={hideControls}
       >
         <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} />
         {ptzFeedback && (
@@ -311,8 +343,8 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
             >
               {effectiveMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </Button>
-            <Button size="icon" variant="secondary" className="h-8 w-8 bg-black/55 text-white hover:bg-black/75 border border-white/15" onClick={fullscreen} title="Fullscreen">
-              <Maximize2 className="h-3.5 w-3.5" />
+            <Button size="icon" variant="secondary" className="h-8 w-8 bg-black/55 text-white hover:bg-black/75 border border-white/15" onClick={toggleFullscreen} title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </Button>
           </div>
         </div>

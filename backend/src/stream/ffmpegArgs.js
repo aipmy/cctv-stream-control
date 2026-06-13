@@ -32,13 +32,14 @@ export function buildRtspInputArgs(camera, options = {}) {
   return args;
 }
 
-function audioArgs(camera) {
-  return camera.enableAudio
-    ? ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "96k", "-ac", "1"]
-    : ["-an"];
+function audioArgs(camera, audioFallback) {
+  if (camera.audioMode === "Disable") return ["-an"];
+  if (camera.audioMode === "Auto" && audioFallback) return ["-an"];
+  // Transcode to AAC if possible, or fallback to -an if Auto and failed
+  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "96k", "-ac", "1", "-af", "aresample=async=1"];
 }
 
-function copyHlsArgs(camera, output, dir, options) {
+function copyHlsArgs(camera, output, dir, options, audioFallback) {
   const source = buildSourceUrl(camera);
   const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
   return [
@@ -51,7 +52,7 @@ function copyHlsArgs(camera, output, dir, options) {
     "-map", "0:v:0",
     "-vsync", "0",
     "-vcodec", "copy",
-    ...audioArgs(camera),
+    ...audioArgs(camera, audioFallback),
     "-hls_flags", "delete_segments+omit_endlist+independent_segments+temp_file",
     "-f", "hls",
     "-hls_time", "1",
@@ -71,7 +72,7 @@ function videoScaleArgs(camera) {
   return [];
 }
 
-function transcodeHlsArgs(camera, output, dir, options) {
+function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
   const hlsTime = lowLatency ? "1" : "2";
@@ -95,6 +96,7 @@ function transcodeHlsArgs(camera, output, dir, options) {
     "-profile:v", "baseline",
     "-pix_fmt", "yuv420p",
     ...videoScaleArgs(camera),
+    "-vsync", "1",
     "-r", fps,
     "-g", gop,
     "-keyint_min", gop,
@@ -102,7 +104,7 @@ function transcodeHlsArgs(camera, output, dir, options) {
     "-b:v", lowLatency ? "1100k" : "900k",
     "-maxrate", lowLatency ? "1400k" : "1200k",
     "-bufsize", lowLatency ? "2200k" : "1800k",
-    ...audioArgs(camera),
+    ...audioArgs(camera, audioFallback),
     "-f", "hls",
     "-hls_time", hlsTime,
     "-hls_list_size", hlsListSize,
@@ -115,10 +117,10 @@ function transcodeHlsArgs(camera, output, dir, options) {
   ];
 }
 
-export function buildHlsArgs({ camera, output, dir, options = {} }) {
+export function buildHlsArgs({ camera, output, dir, options = {}, audioFallback = false }) {
   const needsTranscode = normalizeHlsMode(camera.hlsMode, options) === "transcode" || 
                          (camera.streamQuality && camera.streamQuality !== "Auto");
   return needsTranscode
-    ? transcodeHlsArgs(camera, output, dir, options)
-    : copyHlsArgs(camera, output, dir, options);
+    ? transcodeHlsArgs(camera, output, dir, options, audioFallback)
+    : copyHlsArgs(camera, output, dir, options, audioFallback);
 }

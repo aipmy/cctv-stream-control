@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import type { Camera, CameraInput, Brand, StreamType, SourceType, RtspTransport, HlsMode } from "@/types";
 import { SOURCE_SUPPORTS_PTZ } from "@/types";
-import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity } from "lucide-react";
+import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity, Check, ChevronsUpDown } from "lucide-react";
 import { cameraApi, type PtzResult } from "@/lib/api";
 import { useAuth } from "@/features/auth/store";
 import { useCamerasQuery, useCameraActions } from "@/features/cameras/queries";
 import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, defaultPath } from "@/lib/cctv";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 interface Props {
   open: boolean;
@@ -37,7 +39,7 @@ const empty = {
   rtspTransport: "tcp" as RtspTransport,
   hlsMode: "copy" as HlsMode,
   streamQuality: "Auto" as Camera["streamQuality"],
-  enableAudio: false,
+  audioMode: "Auto" as Camera["audioMode"],
   enablePTZ: false,
   enabled: true,
 };
@@ -55,7 +57,7 @@ interface Preset {
   streamType: StreamType;
   rtspTransport: RtspTransport;
   hlsMode: HlsMode;
-  enableAudio: boolean;
+  audioMode: "Auto" | "Enable" | "Disable";
 }
 
 const PRESETS: Preset[] = [
@@ -65,7 +67,7 @@ const PRESETS: Preset[] = [
     streamType: "HLS Low Latency",
     rtspTransport: "tcp",
     hlsMode: "copy",
-    enableAudio: false,
+    audioMode: "Disable",
   },
   {
     name: "Compatibility (Transcode)",
@@ -73,7 +75,7 @@ const PRESETS: Preset[] = [
     streamType: "HLS Stable",
     rtspTransport: "tcp",
     hlsMode: "transcode",
-    enableAudio: false,
+    audioMode: "Disable",
   },
   {
     name: "Full Stream + Audio",
@@ -81,7 +83,7 @@ const PRESETS: Preset[] = [
     streamType: "HLS Stable",
     rtspTransport: "tcp",
     hlsMode: "transcode",
-    enableAudio: true,
+    audioMode: "Enable",
   },
   {
     name: "Low Bandwidth (MJPEG)",
@@ -89,13 +91,14 @@ const PRESETS: Preset[] = [
     streamType: "MJPEG",
     rtspTransport: "tcp",
     hlsMode: "copy",
-    enableAudio: false,
+    audioMode: "Disable",
   },
 ];
 
 export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const user = useAuth((s) => s.user);
-  const cameras = useCamerasQuery().data || [];
+  const { data: camerasData } = useCamerasQuery();
+  const cameras = useMemo(() => camerasData || [], [camerasData]);
   const { addCamera, updateCamera } = useCameraActions();
   const siteOptions = useMemo(() => {
     const all = Array.from(new Set(cameras.map((c) => c.site).filter(Boolean)));
@@ -113,7 +116,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       p.streamType === form.streamType &&
       p.rtspTransport === form.rtspTransport &&
       p.hlsMode === form.hlsMode &&
-      p.enableAudio === form.enableAudio
+      p.audioMode === form.audioMode
   );
   const activePresetValue = activePresetIndex !== -1 ? String(activePresetIndex) : "custom";
 
@@ -127,7 +130,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         streamType: p.streamType,
         rtspTransport: p.rtspTransport,
         hlsMode: p.hlsMode,
-        enableAudio: p.enableAudio,
+        audioMode: p.audioMode,
       }));
     }
   };
@@ -146,6 +149,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     audioCodec?: string;
     recommendedIndex?: number;
   } | null>(null);
+  const [isNewSite, setIsNewSite] = useState(false);
+  const [siteOpen, setSiteOpen] = useState(false);
 
   const runAutoDetect = async () => {
     if (!form.ip.trim()) {
@@ -171,7 +176,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         streamQuality: form.streamQuality,
         rtspTransport: form.rtspTransport,
         hlsMode: form.hlsMode,
-        enableAudio: form.enableAudio,
+        audioMode: form.audioMode,
         enablePTZ: form.enablePTZ,
         enabled: true,
       };
@@ -179,8 +184,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       const res = await cameraApi.probeTest(payload);
       if (res.probe && res.probe.ok) {
         const streams = res.probe.info?.streams || [];
-        const videoStream = streams.find((s: any) => s.codec_type === "video");
-        const audioStream = streams.find((s: any) => s.codec_type === "audio");
+        const videoStream = streams.find((s: { codec_type: string; codec_name?: string }) => s.codec_type === "video");
+        const audioStream = streams.find((s: { codec_type: string; codec_name?: string }) => s.codec_type === "audio");
         
         const videoCodec = videoStream?.codec_name || "unknown";
         const audioCodec = audioStream?.codec_name || "none";
@@ -248,7 +253,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           streamType: p.streamType,
           rtspTransport: p.rtspTransport,
           hlsMode: p.hlsMode,
-          enableAudio: p.enableAudio,
+          audioMode: p.audioMode,
         }));
         toast.success(`Preset '${p.name}' berhasil diterapkan!`);
       }
@@ -263,18 +268,18 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         brand: camera.brand || "Universal",
         ip: camera.ip,
         sourceType: st,
-        rtspPort: camera.rtspPort ?? DEFAULT_PORTS[st]?.rtsp ?? 554,
+        rtspPort: camera.rtspPort ?? DEFAULT_PORTS[st]?.primary ?? 554,
         onvifPort: camera.onvifPort ?? DEFAULT_PORTS[st]?.onvif ?? 80,
-        httpPort: camera.httpPort ?? DEFAULT_PORTS[st]?.http ?? 80,
+        httpPort: camera.httpPort ?? DEFAULT_PORTS[st]?.primary ?? 80,
         sourcePath: camera.sourcePath ?? defaultPath(st),
         username: camera.username || "",
-        password: "",
+        password: camera.password || "",
         site: camera.site || "",
         streamType: camera.streamType,
         streamQuality: camera.streamQuality || "Auto",
         rtspTransport: camera.rtspTransport ?? "tcp",
         hlsMode: camera.hlsMode ?? "copy",
-        enableAudio: camera.enableAudio, enablePTZ: camera.enablePTZ,
+        audioMode: camera.audioMode ?? "Auto", enablePTZ: camera.enablePTZ,
         enabled: camera.enabled ?? true,
       });
     } else {
@@ -283,6 +288,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     setErrors({});
     setShowPassword(false);
     setPtzResult(null);
+    setIsNewSite(false);
   }, [camera, open]);
 
   const ptzSupported = SOURCE_SUPPORTS_PTZ[form.sourceType];
@@ -335,7 +341,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       streamQuality: form.streamQuality,
       rtspTransport: form.rtspTransport,
       hlsMode: form.hlsMode,
-      enableAudio: form.enableAudio,
+      audioMode: form.audioMode,
       enablePTZ: form.enablePTZ,
       enabled: form.enabled,
       ...(form.password ? { password: form.password } : {}),
@@ -399,25 +405,97 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           </Field>
           <Field label="Site / Group" error={errors.site}>
             {user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0 ? (
-              <Select value={form.site} onValueChange={(v) => setForm({ ...form, site: v })}>
-                <SelectTrigger><SelectValue placeholder="Pilih site" /></SelectTrigger>
-                <SelectContent>
-                  {user.allowedGroups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Popover open={siteOpen} onOpenChange={setSiteOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={siteOpen} className="w-full justify-between font-normal">
+                    {form.site || "Pilih site"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Cari site..." />
+                    <CommandList>
+                      <CommandEmpty>Tidak ada site ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {user.allowedGroups.map((g) => (
+                          <CommandItem
+                            key={g}
+                            value={g}
+                            onSelect={(v) => {
+                              setForm({ ...form, site: v });
+                              setSiteOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", form.site === g ? "opacity-100" : "opacity-0")} />
+                            {g}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             ) : (
-              <>
-                <Input
-                  list="cctv-site-options"
-                  value={form.site}
-                  onChange={(e) => setForm({ ...form, site: e.target.value })}
-                  placeholder="Pilih site atau ketik baru"
-                />
-                <datalist id="cctv-site-options">
-                  {siteOptions.map((s) => <option key={s} value={s} />)}
-                </datalist>
-                <p className="text-[11px] text-muted-foreground mt-1">Dropdown memakai site yang sudah ada secara ascending. Ketik nama baru untuk menambah group/site.</p>
-              </>
+              <div className="space-y-2">
+                {!isNewSite ? (
+                  <Popover open={siteOpen} onOpenChange={setSiteOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={siteOpen} className="w-full justify-between font-normal">
+                        {form.site || "Pilih site"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Cari site..." />
+                        <CommandList>
+                          <CommandEmpty>Tidak ada site ditemukan.</CommandEmpty>
+                          <CommandGroup>
+                            {siteOptions.map((s) => (
+                              <CommandItem
+                                key={s}
+                                value={s}
+                                onSelect={(v) => {
+                                  setForm({ ...form, site: v });
+                                  setSiteOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", form.site === s ? "opacity-100" : "opacity-0")} />
+                                {s}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandGroup>
+                            <CommandItem
+                              value="___new___"
+                              className="text-primary font-medium"
+                              onSelect={() => {
+                                setIsNewSite(true);
+                                setForm({ ...form, site: "" });
+                                setSiteOpen(false);
+                              }}
+                            >
+                              + Tambah Site Baru...
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={form.site}
+                      onChange={(e) => setForm({ ...form, site: e.target.value })}
+                      placeholder="Ketik nama site baru"
+                      className="flex-1"
+                      autoFocus
+                    />
+                    <Button variant="outline" size="sm" type="button" onClick={() => setIsNewSite(false)}>Batal</Button>
+                  </div>
+                )}
+              </div>
             )}
           </Field>
 
@@ -495,8 +573,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
-            {camera?.hasPassword && (
-              <p className="text-[11px] text-muted-foreground mt-1">Password tersimpan untuk teknisi. Ubah jika diperlukan.</p>
+            {camera?.hasPassword && !form.password && (
+              <p className="text-[11px] text-muted-foreground mt-1">Password tersimpan. Kosongkan untuk tetap menggunakan password lama.</p>
             )}
           </Field>
 
@@ -640,9 +718,18 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <Label className="text-sm">Aktifkan Audio</Label>
-            <Switch checked={form.enableAudio} onCheckedChange={(v) => setForm({ ...form, enableAudio: v })} />
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Pengaturan Audio</Label>
+            <Select value={form.audioMode} onValueChange={(v) => setForm({ ...form, audioMode: v as Camera["audioMode"] })}>
+              <SelectTrigger className="w-[120px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Auto">Auto</SelectItem>
+                <SelectItem value="Enable">Enable</SelectItem>
+                <SelectItem value="Disable">Disable</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className={cn("flex items-center justify-between rounded-md border p-3", !ptzSupported && "opacity-60")}>
             <div className="min-w-0 pr-2">
@@ -689,21 +776,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             </div>
           )}
 
-          {camera && camera.errorHistory && camera.errorHistory.length > 0 && (
-            <div className="md:col-span-2 rounded-md border p-3 mt-4 border-destructive/20 bg-destructive/5">
-              <h3 className="text-sm font-medium text-destructive mb-2">Riwayat Error FFmpeg (Max 10)</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                {camera.errorHistory.map((err, idx) => (
-                  <div key={idx} className="text-xs bg-background p-2 rounded border">
-                    <span className="font-mono text-muted-foreground mr-2 text-[10px]">
-                      {new Date(err.timestamp).toLocaleString()}
-                    </span>
-                    <span className="text-foreground">{err.message}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
         </div>
 

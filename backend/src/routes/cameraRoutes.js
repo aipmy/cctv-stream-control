@@ -75,10 +75,24 @@ cameraRoutes.put("/:id", requireRole("admin", "teknisi"), async (req, res, next)
         return res.status(403).json({ error: "Anda tidak memiliki izin untuk memindahkan kamera ke group ini" });
       }
     }
+    const oldCamera = await getCamera(req.params.id, { revealSecret: true });
     const camera = await updateCamera(req.params.id, req.body, { revealSecret: true });
     if (!camera) return res.status(404).json({ error: "Camera not found" });
     clearPtzCache(req.params.id);
-    if (camera.enabled === false) await stopCameraStreams(req.params.id);
+
+    // Determine if stream needs restart based on changed fields
+    const streamFields = ["streamType", "hlsMode", "streamQuality", "audioMode", "sourcePath", "ip", "rtspPort", "rtspTransport", "sourceType", "username", "password"];
+    const needsRestart = camera.enabled && oldCamera && streamFields.some(
+      (f) => oldCamera[f] !== camera[f]
+    );
+
+    if (camera.enabled === false) {
+      await stopCameraStreams(req.params.id);
+    } else if (needsRestart) {
+      // Stop and let the next viewer request auto-start with new settings
+      await stopCameraStreams(req.params.id);
+    }
+
     await auditRequest(req, {
       action: "camera.update",
       outcome: "success",
@@ -89,6 +103,7 @@ cameraRoutes.put("/:id", requireRole("admin", "teknisi"), async (req, res, next)
           "rtspTransport", "hlsMode", "rtspPort", "onvifPort", "httpPort",
           "sourcePath", "username", "password", "clearPassword", "enableAudio", "enablePTZ",
         ]),
+        streamRestarted: needsRestart || false,
       },
     });
     res.json(camera);
