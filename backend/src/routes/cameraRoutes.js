@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createCamera, deleteCamera, getCamera, listCameras, probeAll, probeCamera, probeTransientCamera, replaceCameras, updateCamera } from "../services/cameraService.js";
 import { stopCameraStreams } from "../stream/streamManager.js";
 import { clearPtzCache, sendPtzCommand, testPtzConnection } from "../services/ptzService.js";
-import { requireRole } from "../middleware/authMiddleware.js";
+import { requireRole, requirePermission } from "../middleware/authMiddleware.js";
 import { auditRequest, changedFields } from "../modules/audit/auditService.js";
 
 export const cameraRoutes = Router();
@@ -22,7 +22,7 @@ cameraRoutes.get("/", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-cameraRoutes.get("/bulk/export", requireRole("admin", "teknisi"), async (_req, res, next) => {
+cameraRoutes.get("/bulk/export", requirePermission("canEditCamera"), async (_req, res, next) => {
   try {
     const cameras = await listCameras({ revealSecret: true });
     res.setHeader("Content-Disposition", `attachment; filename=cameras-${Date.now()}.json`);
@@ -30,7 +30,7 @@ cameraRoutes.get("/bulk/export", requireRole("admin", "teknisi"), async (_req, r
   } catch (err) { next(err); }
 });
 
-cameraRoutes.post("/bulk/import", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/bulk/import", requirePermission("canAddCamera"), async (req, res, next) => {
   try {
     const payload = Array.isArray(req.body) ? req.body : req.body?.cameras;
     const mode = req.body?.mode === "append" ? "append" : "replace";
@@ -38,7 +38,7 @@ cameraRoutes.post("/bulk/import", requireRole("admin", "teknisi"), async (req, r
   } catch (err) { next(err); }
 });
 
-cameraRoutes.post("/", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/", requirePermission("canAddCamera"), async (req, res, next) => {
   try {
     if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
       if (!req.auth.allowedGroups.includes(req.body?.site)) {
@@ -64,7 +64,7 @@ cameraRoutes.post("/", requireRole("admin", "teknisi"), async (req, res, next) =
   }
 });
 
-cameraRoutes.put("/:id", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, next) => {
   try {
     if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
       const existing = await getCamera(req.params.id);
@@ -118,7 +118,7 @@ cameraRoutes.put("/:id", requireRole("admin", "teknisi"), async (req, res, next)
   }
 });
 
-cameraRoutes.delete("/:id", requireRole("admin"), async (req, res, next) => {
+cameraRoutes.delete("/:id", requirePermission("canDeleteCamera"), async (req, res, next) => {
   try {
     const camera = await getCamera(req.params.id);
     await stopCameraStreams(req.params.id);
@@ -142,7 +142,7 @@ cameraRoutes.delete("/:id", requireRole("admin"), async (req, res, next) => {
   }
 });
 
-cameraRoutes.post("/:id/restart", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/:id/restart", requirePermission("canRestartStream"), async (req, res, next) => {
   try {
     await stopCameraStreams(req.params.id);
     res.json({ ok: true });
@@ -150,7 +150,7 @@ cameraRoutes.post("/:id/restart", requireRole("admin", "teknisi"), async (req, r
 });
 
 
-cameraRoutes.post("/:id/ptz", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/:id/ptz", requirePermission("canControlPTZ"), async (req, res, next) => {
   let camera = null;
   const action = req.body?.action;
   try {
@@ -204,7 +204,7 @@ cameraRoutes.post("/:id/ptz", requireRole("admin", "teknisi"), async (req, res, 
 
 
 
-cameraRoutes.post("/:id/ptz/test", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/:id/ptz/test", requirePermission("canControlPTZ"), async (req, res, next) => {
   try {
     const camera = await getCamera(req.params.id, { revealSecret: true });
     if (!camera) return res.status(404).json({ error: "Camera not found" });
@@ -212,7 +212,7 @@ cameraRoutes.post("/:id/ptz/test", requireRole("admin", "teknisi"), async (req, 
   } catch (err) { next(err); }
 });
 
-cameraRoutes.post("/:id/probe", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/:id/probe", requirePermission("canEditCamera"), async (req, res, next) => {
   try {
     const result = await probeCamera(req.params.id, { deep: req.query.deep === "1" });
     if (!result) return res.status(404).json({ error: "Camera not found" });
@@ -220,11 +220,11 @@ cameraRoutes.post("/:id/probe", requireRole("admin", "teknisi"), async (req, res
   } catch (err) { next(err); }
 });
 
-cameraRoutes.post("/probe-all", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/probe-all", requirePermission("canEditCamera"), async (req, res, next) => {
   try { res.json(await probeAll({ deep: req.query.deep === "1" })); } catch (err) { next(err); }
 });
 
-cameraRoutes.post("/probe-test", requireRole("admin", "teknisi"), async (req, res, next) => {
+cameraRoutes.post("/probe-test", requirePermission("canEditCamera"), async (req, res, next) => {
   try {
     const result = await probeTransientCamera(req.body);
     res.json(result);

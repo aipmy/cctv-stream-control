@@ -27,10 +27,10 @@ interface SidebarItem {
 }
 
 const items: SidebarItem[] = [
-  { titleKey: "dashboard", url: "/", icon: LayoutDashboard, roles: ["admin", "teknisi", "guest"] },
-  { titleKey: "cameras", url: "/cameras", icon: Cctv, roles: ["admin", "teknisi", "guest"] },
+  { titleKey: "dashboard", url: "/", icon: LayoutDashboard, roles: ["admin", "teknisi", "guest", "internal", "external"] },
+  { titleKey: "cameras", url: "/cameras", icon: Cctv, roles: ["admin", "teknisi", "guest", "internal", "external"] },
   { titleKey: "users", url: "/users", icon: Users, roles: ["admin"] },
-  { titleKey: "settings", url: "/settings", icon: SettingsIcon, roles: ["admin", "teknisi", "guest"] },
+  { titleKey: "settings", url: "/settings", icon: SettingsIcon, roles: ["admin", "teknisi", "guest", "internal", "external"] },
 ];
 
 export function AppSidebar() {
@@ -73,7 +73,12 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items
-                .filter((i) => !user || i.roles.includes(user.role))
+                .filter((item) => {
+                  if (!user) return false;
+                  if (item.url === "/users") return user.role === "admin";
+                  if (item.url === "/cameras") return user.role === "admin" || !!user.permissions?.canViewManagement;
+                  return item.roles.includes(user.role);
+                })
                 .map((item) => {
                   const active = pathname === item.url;
                   const title = t(item.titleKey);

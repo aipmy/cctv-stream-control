@@ -59,7 +59,7 @@ ffprobe -version
 #### 1. Clone the Repository
 ```bash
 git clone https://github.com/aipmy/cctv-stream-control.git
-cd demo_cctv_dashboad
+cd cctv-stream-control
 ```
 
 #### 2. Install Dependencies & Start Backend
@@ -192,7 +192,7 @@ ffprobe -version
 #### 1. Kloning Repositori
 ```bash
 git clone https://github.com/aipmy/cctv-stream-control.git
-cd demo_cctv_dashboad
+cd cctv-stream-control
 ```
 
 #### 2. Instalasi Dependensi & Jalankan Backend

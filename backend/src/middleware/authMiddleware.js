@@ -16,6 +16,7 @@ export async function requireAuth(req, res, next) {
       ...user,
       allowedGroups: dbUser.allowedGroups || [],
       role: dbUser.role,
+      permissions: dbUser.permissions || {},
     };
     req.authToken = token;
     return next();
@@ -30,5 +31,15 @@ export function requireRole(...roles) {
     if (!req.auth) return res.status(401).json({ error: "Unauthorized" });
     if (!roles.includes(req.auth.role)) return res.status(403).json({ error: "Role tidak diizinkan" });
     return next();
+  };
+}
+
+export function requirePermission(permissionKey) {
+  return (req, res, next) => {
+    if (!config.requireAuth) return next();
+    if (!req.auth) return res.status(401).json({ error: "Unauthorized" });
+    if (req.auth.role === "admin") return next();
+    if (req.auth.permissions?.[permissionKey]) return next();
+    return res.status(403).json({ error: "Aksi tidak diizinkan untuk akun Anda" });
   };
 }

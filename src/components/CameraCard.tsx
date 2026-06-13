@@ -98,16 +98,16 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const role = user?.role;
   const perms = user?.permissions;
   
-  const canEdit = role === "admin" || role === "teknisi" || !!perms?.canEditCamera;
+  const canEdit = role === "admin" || !!perms?.canEditCamera;
   const canDelete = role === "admin" || !!perms?.canDeleteCamera;
-  const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
+  const canRestart = role === "admin" || !!perms?.canRestartStream;
 
   const { t, tError } = useTranslation();
   const latestError = camera.errorHistory?.[camera.errorHistory.length - 1];
   const isError = camera.status === "offline" && !!latestError;
   const badgeTooltip = isError ? (tError(latestError?.message) || "") : "";
-  const canUseAudio = role === "admin" || role === "teknisi";
-  const canUsePtz = role === "admin" || role === "teknisi";
+  const canUseAudio = role === "admin" || !!perms?.canPlayAudio;
+  const canUsePtz = role === "admin" || !!perms?.canControlPTZ;
   const canSeeIp = role !== "guest";
   const isDisabled = !camera.enabled;
   const ptzAvailable = canUsePtz && camera.enabled && camera.enablePTZ && camera.sourceType === "RTSP+ONVIF";
