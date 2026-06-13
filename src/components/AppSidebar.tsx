@@ -56,7 +56,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-primary shadow-glow">
-            <ShieldCheck className="h-5 w-5 text-primary-foreground" />
+            <Cctv className="h-5 w-5 text-primary-foreground" />
           </div>
           {!collapsed && (
             <div className="leading-tight">

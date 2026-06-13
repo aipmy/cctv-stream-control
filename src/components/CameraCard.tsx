@@ -91,6 +91,8 @@ function statusLabel(camera: Camera) {
 
 type PtzFeedback = "sending" | "success" | "warning" | "failure";
 
+import { useTranslation } from "@/hooks/useTranslation";
+
 export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin }: Props) {
   const user = useAuth((s) => s.user);
   const role = user?.role;
@@ -100,9 +102,10 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const canDelete = role === "admin" || !!perms?.canDeleteCamera;
   const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
 
+  const { t, tError } = useTranslation();
   const latestError = camera.errorHistory?.[camera.errorHistory.length - 1];
   const isError = camera.status === "offline" && !!latestError;
-  const badgeTooltip = isError ? (latestError?.message || "") : "";
+  const badgeTooltip = isError ? (tError(latestError?.message) || "") : "";
   const canUseAudio = role === "admin" || role === "teknisi";
   const canUsePtz = role === "admin" || role === "teknisi";
   const canSeeIp = role !== "guest";

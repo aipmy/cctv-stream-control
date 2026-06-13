@@ -3,9 +3,10 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Cctv, User, Lock, Eye, EyeOff } from "lucide-react";
+import { Cctv, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/features/auth/store";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function Login() {
   const [p, setP] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { t, lang } = useTranslation();
 
   if (user) return <Navigate to="/" replace />;
 
@@ -22,10 +24,18 @@ export default function Login() {
     setSubmitting(true);
     try {
       const found = await loginWithPassword(u, p);
-      toast.success(`Selamat datang, ${found.username}`);
+      toast.success(
+        lang === "id" 
+          ? `Selamat datang, ${found.username}` 
+          : `Welcome, ${found.username}`
+      );
       navigate("/");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Username atau password salah");
+      toast.error(
+        err instanceof Error 
+          ? err.message 
+          : (lang === "id" ? "Username atau password salah" : t("loginFailed"))
+      );
     } finally {
       setSubmitting(false);
     }
@@ -39,16 +49,20 @@ export default function Login() {
         <div className="relative z-10 p-12 flex flex-col justify-between text-primary-foreground">
           <div className="flex items-center gap-2">
             <div className="h-10 w-10 rounded-md bg-background/15 backdrop-blur flex items-center justify-center">
-              <ShieldCheck className="h-5 w-5" />
+              <Cctv className="h-5 w-5" />
             </div>
             <div className="font-semibold tracking-tight">CCTV Monitoring Lite</div>
           </div>
           <div>
             <h1 className="text-4xl font-semibold tracking-tight leading-tight max-w-md">
-              Pantau seluruh kamera CCTV anda dari satu dashboard ringan.
+              {lang === "id" 
+                ? "Pantau seluruh kamera CCTV anda dari satu dashboard ringan." 
+                : "Monitor all your CCTV cameras from a single lightweight dashboard."}
             </h1>
             <p className="mt-4 text-primary-foreground/85 max-w-md">
-              Multi-site, multi-brand, multi-stream. Dirancang untuk operator yang butuh respon cepat dan tampilan yang tidak berisik.
+              {lang === "id"
+                ? "Multi-site, multi-brand, multi-stream. Dirancang untuk operator yang butuh respon cepat dan tampilan yang tidak berisik."
+                : "Multi-site, multi-brand, multi-stream. Designed for operators needing fast response times and clean visuals."}
             </p>
             <div className="mt-8 grid grid-cols-3 gap-3 max-w-md">
               {["Universal", "Bardi", "EZVIZ", "Hikvision", "HLS", "MJPEG"].map((b) => (
@@ -67,19 +81,19 @@ export default function Login() {
             <Cctv className="h-5 w-5 text-primary" />
             <span className="font-semibold">CCTV Monitoring Lite</span>
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight">Masuk ke konsol</h2>
-          <p className="text-sm text-muted-foreground mt-1">Gunakan akun yang dibuat oleh administrator.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">{t("loginTitle")}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t("loginSub")}</p>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
-              <Label className="text-xs uppercase tracking-wider">Username</Label>
+              <Label className="text-xs uppercase tracking-wider">{t("username")}</Label>
               <div className="relative mt-1.5">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={u} onChange={(e) => setU(e.target.value)} placeholder="Masukkan username" className="pl-10" autoFocus />
+                <Input value={u} onChange={(e) => setU(e.target.value)} placeholder={lang === "id" ? "Masukkan username" : "Enter username"} className="pl-10" autoFocus />
               </div>
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wider">Password</Label>
+              <Label className="text-xs uppercase tracking-wider">{t("password")}</Label>
               <div className="relative mt-1.5">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -100,7 +114,7 @@ export default function Login() {
               </div>
             </div>
             <Button type="submit" disabled={submitting} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-95 shadow-glow">
-              {submitting ? "Memvalidasi..." : "Masuk"}
+              {submitting ? (lang === "id" ? "Memvalidasi..." : t("loading")) : t("loginButton")}
             </Button>
           </form>
         </div>

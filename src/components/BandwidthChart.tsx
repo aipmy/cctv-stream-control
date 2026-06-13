@@ -9,6 +9,7 @@ import { useSettings } from "@/features/settings/store";
 import { statsApi, type TrafficRates } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { bytesFromKbps, formatByteRateFromBytes } from "@/lib/bandwidth";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type Range = "1m" | "1h" | "24h";
 
@@ -47,6 +48,8 @@ export function BandwidthChart() {
     placeholderData: (previous) => previous,
   });
 
+  const { t } = useTranslation();
+
   const data = useMemo(() => {
     return (historyQuery.data?.points || [])
       .map(toPoint)
@@ -76,10 +79,10 @@ export function BandwidthChart() {
             <Activity className="h-4 w-4" />
           </div>
           <div>
-            <div className="text-sm font-semibold">Grafik Bandwidth Real-time</div>
+            <div className="text-sm font-semibold">{t("bandwidthChartTitle")}</div>
             <div className="text-xs text-muted-foreground">
-              History backend tersimpan 24 jam · Data yang sama untuk seluruh pengguna
-              {!autoRefresh && <span className="ml-1 text-warning">(auto-refresh nonaktif)</span>}
+              {t("bandwidthChartDesc")}
+              {!autoRefresh && <span className="ml-1 text-warning">{t("autoRefreshOff")}</span>}
             </div>
           </div>
         </div>
@@ -109,15 +112,15 @@ export function BandwidthChart() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-xs">
-        <Mini label="Pull CCTV" value={formatByteRateFromBytes(current.cctvPullBps)} />
-        <Mini label="CCTV keluar" value={formatByteRateFromBytes(current.cctvOutBps)} />
+        <Mini label={t("cctvPull")} value={formatByteRateFromBytes(current.cctvPullBps)} />
+        <Mini label={t("cctvOut")} value={formatByteRateFromBytes(current.cctvOutBps)} />
         <Mini label="API" value={formatByteRateFromBytes(current.apiBps)} />
         <Mini label="Web" value={formatByteRateFromBytes(current.webBps)} />
       </div>
 
       <div className="h-56 -ml-2">
         {historyQuery.isError && (
-          <div className="absolute text-xs text-destructive">History bandwidth belum dapat dimuat.</div>
+          <div className="absolute text-xs text-destructive">{t("bandwidthChartError")}</div>
         )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
@@ -130,8 +133,8 @@ export function BandwidthChart() {
               formatter={(value: number, name) => [formatByteRateFromBytes(Number(value)), String(name)]}
             />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line type="monotone" dataKey="cctvPullBps" name="Pull CCTV" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} isAnimationActive={false} />
-            <Line type="monotone" dataKey="cctvOutBps" name="CCTV keluar" stroke="hsl(var(--warning))" dot={false} strokeWidth={2} isAnimationActive={false} />
+            <Line type="monotone" dataKey="cctvPullBps" name={t("cctvPull")} stroke="hsl(var(--primary))" dot={false} strokeWidth={2} isAnimationActive={false} />
+            <Line type="monotone" dataKey="cctvOutBps" name={t("cctvOut")} stroke="hsl(var(--warning))" dot={false} strokeWidth={2} isAnimationActive={false} />
             <Line type="monotone" dataKey="apiBps" name="API" stroke="hsl(var(--info))" dot={false} strokeWidth={1.7} isAnimationActive={false} />
             <Line type="monotone" dataKey="webBps" name="Web" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1.5} isAnimationActive={false} />
           </LineChart>

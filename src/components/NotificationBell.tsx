@@ -9,6 +9,7 @@ import { useCamerasQuery } from "@/features/cameras/queries";
 import { useNavigate } from "react-router-dom";
 import { streamApi } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function NotificationBell() {
   const { data: cameras = [] } = useCamerasQuery();
@@ -19,6 +20,8 @@ export function NotificationBell() {
   });
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const { t, tError, lang } = useTranslation();
 
   const notifications = useMemo(() => {
     const items: Array<{ id: string; type: "error" | "warning"; title: string; message: string; cameraId: string; site: string; time: number }> = [];
@@ -44,7 +47,7 @@ export function NotificationBell() {
         id: `offline_${cam.id}`,
         type: "error",
         title: `Offline: ${cam.name}`,
-        message: reason,
+        message: tError(reason),
         cameraId: cam.id,
         site: cam.site,
         time: timestamp,
@@ -52,7 +55,7 @@ export function NotificationBell() {
     }
 
     return items.sort((a, b) => b.time - a.time);
-  }, [cameras, streamStatus]);
+  }, [cameras, streamStatus, tError]);
 
   const offlineCount = notifications.length;
 
@@ -73,9 +76,9 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <div className="font-semibold text-sm">Notifikasi</div>
+          <div className="font-semibold text-sm">{t("notifications")}</div>
           {offlineCount > 0 && (
-            <Badge variant="destructive" className="text-[10px] px-1.5">{offlineCount} Kamera Offline</Badge>
+            <Badge variant="destructive" className="text-[10px] px-1.5">{offlineCount} {lang === "id" ? "Kamera Offline" : "Offline"}</Badge>
           )}
         </div>
         
@@ -83,8 +86,8 @@ export function NotificationBell() {
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6 text-center space-y-2">
               <Bell className="h-8 w-8 opacity-20" />
-              <div className="text-sm">Tidak ada notifikasi</div>
-              <div className="text-xs opacity-70">Semua kamera berjalan normal</div>
+              <div className="text-sm">{t("noNotifications")}</div>
+              <div className="text-xs opacity-70">{t("allCamerasNormal")}</div>
             </div>
           ) : (
             <div className="flex flex-col">

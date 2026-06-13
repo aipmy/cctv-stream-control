@@ -252,7 +252,7 @@ export default function Cameras() {
                         {c.errorHistory && c.errorHistory.length > 0 && (
                           <div className="mt-2">
                             <div className="font-medium text-destructive">{t("lastError")}</div>
-                            <div className="text-destructive/80">{c.errorHistory[c.errorHistory.length - 1]?.message}</div>
+                            <div className="text-destructive/80">{tError(c.errorHistory[c.errorHistory.length - 1]?.message)}</div>
                           </div>
                         )}
                       </div>

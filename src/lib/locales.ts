@@ -89,6 +89,11 @@ export const translations = {
     deleteFailed: "Failed to delete camera",
     cameraDeleted: "Camera deleted",
 
+    // Notification Panel
+    notifications: "Notifications",
+    noNotifications: "No notifications",
+    allCamerasNormal: "All cameras are running normally",
+
     // Cameras Page
     cameraManagement: "Camera Management",
     camerasSubtitle: "Complete list of registered CCTV devices.",
@@ -235,6 +240,11 @@ export const translations = {
     restartFailed: "Gagal restart stream",
     deleteFailed: "Gagal menghapus kamera",
     cameraDeleted: "Kamera dihapus",
+
+    // Notification Panel
+    notifications: "Notifikasi",
+    noNotifications: "Tidak ada notifikasi",
+    allCamerasNormal: "Semua kamera berjalan normal",
 
     // Cameras Page
     cameraManagement: "Manajemen Kamera",

@@ -73,10 +73,30 @@ export function Topbar() {
       </div>
       
       <div className="flex items-center gap-2 pr-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLang(lang === "id" ? "en" : "id")} title={lang === "id" ? "Switch to English" : "Ganti ke Bahasa Indonesia"}>
-          <Globe className="h-4 w-4" />
-          <span className="sr-only">Toggle Language</span>
-        </Button>
+        <div className="inline-flex rounded-md border bg-muted/30 p-0.5 select-none shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setLang("en")}
+            className={cn(
+              "h-7 px-2 text-[10px] font-semibold uppercase rounded-sm",
+              lang === "en" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+            )}
+          >
+            EN
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setLang("id")}
+            className={cn(
+              "h-7 px-2 text-[10px] font-semibold uppercase rounded-sm",
+              lang === "id" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+            )}
+          >
+            ID
+          </Button>
+        </div>
         <NotificationBell />
         <GlobalThemeToggle />
         
