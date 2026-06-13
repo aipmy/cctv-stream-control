@@ -62,6 +62,13 @@ git clone https://github.com/aipmy/cctv-stream-control.git
 cd cctv-stream-control
 ```
 
+### 🔄 Updating Existing Installation
+To update your dashboard to the latest version, navigate to your root project folder and run:
+```bash
+git pull
+./deploy.sh
+```
+
 #### 2. Install Dependencies & Start Backend
 Open a terminal directory and navigate to `backend`:
 ```bash
@@ -116,14 +123,11 @@ To update in the future, run:
 ---
 
 ### 🛡️ Permissions & Access Control
+The system supports 5 roles: `admin`, `teknisi`, `guest`, `internal`, and `external`. It features a granular, Popover-based Specific Permissions checklist:
+- **Dashboard Permissions:** Allow Statistics (charts & rates).
+- **Camera Management Permissions:** View Camera Management, Add Camera, Edit Camera, Delete Camera, Restart Stream, PTZ Control, Play Audio.
 
-| Action | Admin | Technician | Guest |
-| :--- | :---: | :---: | :---: |
-| View Cameras & Live Stream | ✅ | ✅ | ✅ |
-| Add/Edit/Probe/Restart Stream | ✅ | ✅ | ❌ |
-| PTZ Camera Control | ✅ | ✅ | ❌ |
-| Delete Camera | ✅ | ❌ | ❌ |
-| User & Audit Log Management | ✅ | ❌ | ❌ |
+Admins have all permissions implicitly allowed. Other users can be granted specific permissions on demand.
 
 ---
 
@@ -195,6 +199,13 @@ git clone https://github.com/aipmy/cctv-stream-control.git
 cd cctv-stream-control
 ```
 
+### 🔄 Memperbarui Instalasi yang Ada
+Untuk memperbarui dashboard Anda ke versi terbaru, masuk ke direktori utama proyek Anda dan jalankan:
+```bash
+git pull
+./deploy.sh
+```
+
 #### 2. Instalasi Dependensi & Jalankan Backend
 Buka terminal dan masuk ke direktori `backend`:
 ```bash
@@ -249,14 +260,11 @@ Untuk memperbarui di masa mendatang, jalankan:
 ---
 
 ### 🛡️ Hak Akses Peran
+Sistem ini mendukung 5 peran: `admin`, `teknisi`, `guest`, `internal`, dan `external`. Sistem ini memiliki daftar Izin Spesifik berbasis Popover checklist yang terperinci:
+- **Izin Dashboard:** Izinkan Statistik (grafik & bandwidth).
+- **Izin Manajemen Kamera:** Lihat Manajemen Kamera, Tambah Kamera, Edit Kamera, Hapus Kamera, Restart Stream, Izinkan Kontrol PTZ, Izinkan Audio.
 
-| Tindakan | Admin | Teknisi | Guest |
-| :--- | :---: | :---: | :---: |
-| Lihat Kamera & Live Stream | ✅ | ✅ | ✅ |
-| Tambah/Edit/Probe/Restart Stream | ✅ | ✅ | ❌ |
-| Kontrol Kamera PTZ | ✅ | ✅ | ❌ |
-| Hapus Kamera | ✅ | ❌ | ❌ |
-| Kelola Pengguna & Log Audit | ✅ | ❌ | ❌ |
+Admin memiliki seluruh izin yang diizinkan secara default. Pengguna lain dapat diberikan izin spesifik sesuai kebutuhan.
 
 ---
 
