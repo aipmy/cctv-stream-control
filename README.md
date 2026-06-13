@@ -1,54 +1,83 @@
-# CCTV Monitoring Lite
+# CCTV Monitoring Lite 🎥
 
-Dashboard CCTV untuk LAN/VPN dengan React/Vite, Express, penyimpanan JSON, FFmpeg, dan kontrol PTZ ONVIF.
+A lightweight, robust, and modern CCTV Dashboard designed for LAN/VPN environments. Built with React, Vite, Express, JSON storage, FFmpeg, and ONVIF PTZ controls.
 
-## Fitur
+---
 
-- Setup instalasi baru melalui wizard administrator pertama.
-- Role `admin`, `teknisi`, dan `guest`.
-- Kamera dan pengguna berasal dari backend, tanpa seed atau fallback dummy.
-- Restream RTSP ke HLS/MJPEG agar dapat diputar browser.
-- Probe kamera, metrik bandwidth, dan manajemen stream.
-- PTZ ONVIF dengan koneksi standar dan fallback WS-Security time-shift.
-- Credential kamera dan password pengguna tidak dikirim kembali melalui API.
+### Language / Bahasa
+🌐 **[English](#-english-default)** | 🇮🇩 **[Bahasa Indonesia](#-bahasa-indonesia)**
 
-## Kebutuhan
+---
 
-- Node.js 20 atau lebih baru
-- npm
-- FFmpeg dan FFprobe
-- PM2 untuk production
+## 🇺🇸 English (Default)
 
+### 🌟 Features
+- **First-Run Admin Wizard:** Seamless initial setup with zero default credentials.
+- **Role-Based Access Control (RBAC):** Three distinct roles (`admin`, `teknisi`, `guest`) with granular action permissions.
+- **RTSP Restreaming:** Efficiently transcodes/demuxes RTSP camera feeds into browser-friendly HLS Stable, HLS Low Latency, or MJPEG formats.
+- **Dynamic Stream Restarting:** Server automatically restarts the stream process when key parameters (credentials, quality, type) are modified.
+- **Audio Fallback Support:** Gracefully retries streaming without audio (`-an`) if FFmpeg crashes while transcoding audio.
+- **Interactive Live View:**
+  - Control overlays only show on mouse hover.
+  - Double-click/button fullscreen toggle (with ESC sync).
+  - Custom ONVIF PTZ controls.
+- **Smart Notification System:** Bell badge dynamically monitors enabled cameras, displaying active offline statuses and real-world error reasons.
+- **User Activity Audit Log:** Detailed auditing of configuration changes, user management actions, and stream requests.
+- **User Last Login Tracker:** Real-time relative duration display of user logins ("5 minutes ago", "Yesterday", etc.).
+
+---
+
+### 📋 Prerequisites
+Ensure you have the following installed on your host system:
+- **Node.js** (v20 or higher)
+- **npm** (v10 or higher)
+- **FFmpeg & FFprobe** (available in system PATH)
+
+Verify installation using terminal:
 ```bash
 node --version
 ffmpeg -version
 ffprobe -version
 ```
 
-## Development
+---
 
-Siapkan backend:
+### ⚙️ Installation & Getting Started
 
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/aipmy/cctv-stream-control.git
+cd demo_cctv_dashboad
+```
+
+#### 2. Install Dependencies & Start Backend
+Open a terminal directory and navigate to `backend`:
 ```bash
 cd backend
-cp .env.example .env
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-Jalankan frontend dari terminal lain:
-
+#### 3. Install Dependencies & Start Frontend
+Open a separate terminal window at the project root directory:
 ```bash
 npm install
 npm run dev:frontend
 ```
 
-Buka `http://localhost:8080`. Pada instalasi kosong, aplikasi meminta pembuatan akun pertama. Role akun tersebut selalu `admin`; tidak ada username atau password default.
+#### 4. Initial Setup
+1. Open your browser and navigate to `http://localhost:8080`.
+2. As a new installation, you will be automatically redirected to the **Admin Setup Wizard**.
+3. Create your first administrative account. No default accounts or passwords exist.
 
-## Production
+---
 
-Edit `backend/.env`, terutama `AUTH_SECRET`, `CORS_ORIGIN`, dan lokasi data bila diperlukan.
+### 🚀 Production Deployment
+For production, use **PM2** to manage processes and `deploy.sh` for automated deployments.
 
+1. Configure `backend/.env` (set `AUTH_SECRET`, `CORS_ORIGIN`, etc.).
+2. Build the application and start PM2:
 ```bash
 npm install
 npm --prefix backend install
@@ -56,124 +85,138 @@ npm run build
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
+3. Access the production build at `http://YOUR_SERVER_IP:4200`.
 
-Buka `http://IP_SERVER:4200`.
-
-Deploy berikutnya dapat memakai:
-
+To update in the future, run:
 ```bash
 ./deploy.sh
 ```
+*Note: This script automatically backs up `backend/data/` to `backend/backups/` before rebuilding and restarting the PM2 instances.*
 
-Script tersebut membackup `backend/data` ke `backend/backups/data_YYYYMMDD_HHMMSS` sebelum build dan restart PM2.
+---
 
-## Data Dan Migrasi
+### 📂 Directory & Data Storage
+- **Camera Configurations:** `backend/data/cameras.json`
+- **User Database:** `backend/data/users.json`
+- **Temporary HLS Cache:** `backend/storage/hls`
+- **FFmpeg Logs:** `backend/logs/ffmpeg-stream.log`
 
-- Kamera: `backend/data/cameras.json`
-- Pengguna: `backend/data/users.json`
-- HLS sementara: `backend/storage/hls`
-- Log FFmpeg: `backend/logs/ffmpeg-stream.log`
+---
 
-Instalasi baru membuat file kamera dan pengguna sebagai array kosong. File lama tetap dibaca tanpa reset atau seed ulang.
+### 🛡️ Permissions & Access Control
 
-Backup manual:
+| Action | Admin | Technician | Guest |
+| :--- | :---: | :---: | :---: |
+| View Cameras & Live Stream | ✅ | ✅ | ✅ |
+| Add/Edit/Probe/Restart Stream | ✅ | ✅ | ❌ |
+| PTZ Camera Control | ✅ | ✅ | ❌ |
+| Delete Camera | ✅ | ❌ | ❌ |
+| User & Audit Log Management | ✅ | ❌ | ❌ |
 
+---
+
+---
+
+## 🇮🇩 Bahasa Indonesia
+
+### 🌟 Fitur
+- **Wizard Admin Pertama:** Setup awal instalasi yang aman tanpa username/password bawaan.
+- **Kontrol Akses Berbasis Role (RBAC):** Tiga peran berbeda (`admin`, `teknisi`, `guest`) dengan hak akses yang terperinci.
+- **Restream RTSP:** Mengonversi feed RTSP kamera menjadi format HLS Stable, HLS Low Latency, atau MJPEG yang didukung browser.
+- **Restart Stream Dinamis:** Server otomatis me-restart proses stream ketika parameter penting kamera (password, kualitas, tipe) diubah.
+- **Dukungan Audio Fallback:** Secara otomatis mencoba kembali streaming tanpa audio (`-an`) jika FFmpeg crash saat memproses audio.
+- **Live View Interaktif:**
+  - Kontrol overlay hanya muncul saat kursor berada di atas kartu kamera.
+  - Toggle fullscreen mudah melalui tombol atau klik ganda (sinkron dengan tombol ESC).
+  - Kontrol ONVIF PTZ terintegrasi.
+- **Notifikasi Offline Cerdas:** Lonceng notifikasi memantau status kamera secara real-time, menampilkan status offline beserta alasan error aslinya.
+- **Log Audit Aktivitas:** Pencatatan aktivitas konfigurasi sistem, manajemen pengguna, dan permintaan stream.
+- **Pelacak Login Terakhir Pengguna:** Kolom login terakhir di manajemen pengguna dengan format waktu relatif ("5 menit lalu", "Kemarin", dll).
+
+---
+
+### 📋 Kebutuhan Sistem
+Pastikan perangkat Anda telah terinstall:
+- **Node.js** (v20 atau lebih baru)
+- **npm** (v10 atau lebih baru)
+- **FFmpeg & FFprobe** (terdaftar di system PATH)
+
+Verifikasi instalasi melalui terminal:
 ```bash
-cp -a backend/data "backend/data_backup_$(date +%Y%m%d_%H%M%S)"
+node --version
+ffmpeg -version
+ffprobe -version
 ```
 
-Format password lama tetap didukung. Password masih disimpan dalam format legacy di file JSON, tetapi tidak dikeluarkan lewat respons API atau log. Batasi akses file data pada user service dan gunakan LAN/VPN.
+---
 
-## Kamera
+### ⚙️ Instalasi & Memulai Penggunaan
 
-Tambahkan kamera dari menu **Kamera**. Contoh umum:
-
-```text
-Source Type : RTSP+ONVIF
-RTSP Port  : 554 atau 8554
-ONVIF Port : 80 atau 8000
-Path       : /Streaming/Channels/101
-Output     : HLS Stable
-```
-
-Password kosong saat mengedit berarti password tersimpan tidak berubah. Gunakan opsi **Hapus password kamera** untuk menghapusnya secara eksplisit.
-
-Browser tidak membuka RTSP langsung. Endpoint restream:
-
-```text
-/api/streams/:cameraId/index.m3u8
-/api/streams/:cameraId/video.mjpg
-```
-
-Jika HLS gagal karena codec, pilih HLS mode `transcode`. Default `copy` lebih ringan. Jangan mengaktifkan opsi timeout FFmpeg yang tidak didukung build server; default `RTSP_TIMEOUT_OPTION=none`.
-
-## PTZ ONVIF
-
-Aktifkan `RTSP+ONVIF` dan PTZ pada kamera. Tombol **Test ONVIF/PTZ** di form edit menampilkan:
-
-- mode `standard` atau `ws-security-time-shift`
-- jumlah profil
-- profile token
-- warning terstruktur
-
-Backend mencoba koneksi standar lebih dulu. Jika discovery awal diputus kamera, backend membuat client terautentikasi dengan time-shift server, menemukan service/profile, lalu menyimpan Promise koneksi berdasarkan konfigurasi kamera. Cache dibuang saat kamera berubah, dihapus, atau koneksi gagal. Command move dan stop diserialkan per kamera.
-
-Tuning tersedia di `backend/.env`:
-
-```env
-PTZ_CONNECT_TIMEOUT_MS=9000
-PTZ_SOCKET_TIMEOUT_MS=5000
-PTZ_COMMAND_TIMEOUT_MS=1800
-PTZ_MOVE_DURATION_MS=650
-PTZ_SPEED=0.35
-PTZ_CLIENT_CACHE_MS=600000
-```
-
-## Hak Akses
-
-| Aksi | Admin | Teknisi | Guest |
-| --- | --- | --- | --- |
-| Lihat kamera | Ya | Ya | Ya |
-| Tambah/edit/probe/restart kamera | Ya | Ya | Tidak |
-| PTZ | Ya | Ya | Tidak |
-| Hapus kamera | Ya | Tidak | Tidak |
-| Kelola pengguna | Ya | Tidak | Tidak |
-
-Query `/api/users` hanya dijalankan untuk admin.
-
-## API Setup Dan Sesi
-
-```text
-GET  /api/setup/status
-POST /api/setup/admin
-POST /api/auth/login
-GET  /api/auth/me
-```
-
-`POST /api/setup/admin` hanya berhasil ketika storage pengguna benar-benar kosong. Percobaan kedua ditolak dengan HTTP `409`.
-
-## Verifikasi
-
+#### 1. Kloning Repositori
 ```bash
-npm test
-npm --prefix backend test
-./node_modules/.bin/tsc -p tsconfig.app.json --noEmit
-find backend/src -name '*.js' -print0 | xargs -0 -n1 node --check
+git clone https://github.com/aipmy/cctv-stream-control.git
+cd demo_cctv_dashboad
+```
+
+#### 2. Instalasi Dependensi & Jalankan Backend
+Buka terminal dan masuk ke direktori `backend`:
+```bash
+cd backend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+#### 3. Instalasi Dependensi & Jalankan Frontend
+Buka jendela terminal baru di direktori utama proyek (root):
+```bash
+npm install
+npm run dev:frontend
+```
+
+#### 4. Setup Awal
+1. Buka browser Anda dan akses `http://localhost:8080`.
+2. Pada instalasi kosong, Anda akan diarahkan ke halaman **Setup Admin**.
+3. Buat akun admin pertama Anda. Tidak ada akun bawaan demi keamanan.
+
+---
+
+### 🚀 Penyebaran Production
+Untuk lingkungan production, disarankan menggunakan **PM2** dan script `deploy.sh`.
+
+1. Konfigurasikan file `backend/.env` (atur `AUTH_SECRET`, `CORS_ORIGIN`, dll.).
+2. Build aplikasi dan jalankan PM2:
+```bash
+npm install
+npm --prefix backend install
 npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
 ```
+3. Akses dashboard production di `http://IP_SERVER_ANDA:4200`.
 
-Status runtime:
-
+Untuk memperbarui di masa mendatang, jalankan:
 ```bash
-curl http://127.0.0.1:4200/api/health
-pm2 logs cctv-monitoring-lite --lines 150
-tail -f backend/logs/ffmpeg-stream.log
+./deploy.sh
 ```
+*Catatan: Script ini mencadangkan database `backend/data/` ke folder `backend/backups/` sebelum melakukan kompilasi ulang dan me-restart instance PM2.*
 
-## Keamanan
+---
 
-- Gunakan `AUTH_SECRET` acak dan panjang.
-- Gunakan HTTPS/reverse proxy jika diakses di luar jaringan lokal.
-- Batasi `CORS_ORIGIN`, firewall, dan permission `backend/data`.
-- Token stream di query URL disensor dari access log.
-- URL ber-credential, password, token, dan Bearer token disensor dari error/log.
+### 📂 Struktur Direktori & Data
+- **Konfigurasi Kamera:** `backend/data/cameras.json`
+- **Database Pengguna:** `backend/data/users.json`
+- **Cache Sementara HLS:** `backend/storage/hls`
+- **Log FFmpeg:** `backend/logs/ffmpeg-stream.log`
+
+---
+
+### 🛡️ Hak Akses Peran
+
+| Tindakan | Admin | Teknisi | Guest |
+| :--- | :---: | :---: | :---: |
+| Lihat Kamera & Live Stream | ✅ | ✅ | ✅ |
+| Tambah/Edit/Probe/Restart Stream | ✅ | ✅ | ❌ |
+| Kontrol Kamera PTZ | ✅ | ✅ | ❌ |
+| Hapus Kamera | ✅ | ❌ | ❌ |
+| Kelola Pengguna & Log Audit | ✅ | ❌ | ❌ |
