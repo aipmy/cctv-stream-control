@@ -5,6 +5,7 @@ import type { Camera, StreamType } from "@/types";
 import { streamApi, streamUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Props {
   camera: Camera;
@@ -16,20 +17,20 @@ interface Props {
   controls?: boolean;
 }
 
-function playbackErrorMessage(details?: string, type?: string) {
+function playbackErrorMessage(t: (key: any) => string, details?: string, type?: string) {
   if (details === "bufferAppendError") {
-    return "Browser gagal memproses potongan video kamera. Stream akan dimulai ulang.";
+    return t("bufferAppendError");
   }
   if (/manifest/i.test(details || "")) {
-    return "Playlist stream belum tersedia. Periksa koneksi kamera dan coba beberapa saat lagi.";
+    return t("manifestError");
   }
   if (/frag/i.test(details || "")) {
-    return "Potongan video dari kamera gagal dimuat. Periksa koneksi jaringan kamera.";
+    return t("fragError");
   }
   if (type === "mediaError") {
-    return "Browser gagal memproses format video kamera.";
+    return t("mediaError");
   }
-  return "Stream video terputus. Periksa koneksi dan konfigurasi kamera.";
+  return t("streamDisconnectedGeneric");
 }
 
 export function CameraLiveView({ camera, output = camera.streamType, className, muted = true, volume = 1, showErrorUrl = false, controls = false }: Props) {
@@ -39,6 +40,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
   const [error, setError] = useState<string | null>(null);
   const [mjpegSrc, setMjpegSrc] = useState<string | null>(null);
   const src = useMemo(() => streamUrl(camera, output), [camera.id, output]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const video = videoRef.current;
@@ -71,7 +73,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       } catch (err) {
         if (disposed) return;
         setLoading(false);
-        setError(err instanceof Error ? err.message : "MJPEG gagal dibuka. Cek IP/RTSP/path/username/password.");
+        setError(err instanceof Error ? err.message : t("mjpegFailedToOpen"));
       }
     }
 
@@ -80,7 +82,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       disposed = true;
       setMjpegSrc(null);
     };
-  }, [camera.id, camera.enabled, output, src]);
+  }, [camera.id, camera.enabled, output, src, t]);
 
   useEffect(() => {
     if (!camera.enabled) return;
@@ -138,7 +140,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             if (!disposed) {
               setLoading(false);
               const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
-              setError(`${output} gagal dimuat oleh browser. ${errMsg || "Cek codec H.264/AAC atau ubah HLS Mode ke transcode."}`);
+              setError(t("streamFailedToLoadInBrowser", { output, errMsg: errMsg || t("checkCodecOrTranscode") }));
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
@@ -148,7 +150,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         }
 
         if (!useHlsJs) {
-          throw new Error("Browser ini tidak mendukung HLS. Coba gunakan Chrome, Firefox, atau Safari.");
+          throw new Error(t("hlsNotSupported"));
         }
 
         hls = new HlsLib({
@@ -188,7 +190,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             }
           }
           setLoading(false);
-          const base = playbackErrorMessage(data.details, data.type);
+          const base = playbackErrorMessage(t, data.details, data.type);
           void streamApi.status()
             .then((items) => {
               if (disposed) return;
@@ -200,7 +202,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       } catch (err) {
         if (!disposed) {
           setLoading(false);
-          setError(err instanceof Error ? err.message : `${output} gagal dimuat`);
+          setError(err instanceof Error ? err.message : t("streamFailedToLoad", { output }));
         }
       }
     }
@@ -213,14 +215,14 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       video.removeAttribute("src");
       video.load();
     };
-  }, [camera.id, camera.enabled, output, src]);
+  }, [camera.id, camera.enabled, output, src, muted, volume, queryClient, t]);
 
   if (!camera.enabled) {
     return (
       <div className={cn("absolute inset-0 flex flex-col items-center justify-center bg-black text-white/75", className)}>
         <PowerOff className="h-6 w-6 mb-2 text-white/50" />
-        <div className="text-xs font-medium">Kamera nonaktif</div>
-        <div className="text-[11px] text-white/45 mt-1">Aktifkan dari Manajemen Kamera untuk membuka stream.</div>
+        <div className="text-xs font-medium">{t("cameraDisabled")}</div>
+        <div className="text-[11px] text-white/45 mt-1">{t("cameraDisabledHelp")}</div>
       </div>
     );
   }
@@ -234,7 +236,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             src={mjpegSrc}
             alt={`Live ${camera.name}`}
             className="absolute inset-0 h-full w-full object-contain bg-black"
-            onError={() => { setLoading(false); setError("MJPEG gagal dimuat setelah stream siap. Cek browser/network dan log backend."); }}
+            onError={() => { setLoading(false); setError(t("mjpegLoadFailedAfterReady")); }}
           />
         ) : null
       ) : (
@@ -251,14 +253,14 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
 
       {loading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black text-white/70 text-xs z-10">
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Membuka stream {output}...
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("openingStream", { output })}
         </div>
       )}
 
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 bg-black text-white z-20">
           <AlertTriangle className="h-6 w-6 text-warning mb-2" />
-          <div className="text-xs font-medium">Stream gagal</div>
+          <div className="text-xs font-medium">{t("streamFailed")}</div>
           <div className="text-[11px] text-white/65 mt-1 max-w-md">{error}</div>
           {showErrorUrl && <div className="text-[10px] text-white/45 mt-2 font-mono break-all">{src}</div>}
         </div>

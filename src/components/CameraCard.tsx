@@ -43,12 +43,12 @@ interface Props {
   onTogglePin: (c: Camera) => void;
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: (key: any, params?: any) => string) {
   const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (d < 60) return `${d} dtk lalu`;
-  if (d < 3600) return `${Math.floor(d / 60)} mnt lalu`;
-  if (d < 86400) return `${Math.floor(d / 3600)} jam lalu`;
-  return `${Math.floor(d / 86400)} hari lalu`;
+  if (d < 60) return t("secAgo", { n: d });
+  if (d < 3600) return t("minAgo", { n: Math.floor(d / 60) });
+  if (d < 86400) return t("hourAgo", { n: Math.floor(d / 3600) });
+  return t("dayAgo", { n: Math.floor(d / 86400) });
 }
 
 const streamColors: Record<Camera["streamType"], string> = {
@@ -175,7 +175,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         await cardRef.current?.requestFullscreen?.();
       }
     } catch {
-      toast.error("Browser menolak fullscreen");
+      toast.error(t("browserDeniedFullscreen"));
     }
   };
 
@@ -256,7 +256,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           )}
           <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
           <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[camera.status])}>
-            {statusLabel(camera)}
+            {isDisabled ? t("inactive") : camera.status === "online" ? t("online") : camera.status === "offline" ? t("offline") : camera.status}
           </Badge>
         </div>
       </div>
@@ -280,10 +280,10 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               ptzFeedback === "sending" && "border-info/50 text-info",
             )}
           >
-            {ptzFeedback === "sending" ? "Mengirim"
-              : ptzFeedback === "success" ? "Berhasil"
-                : ptzFeedback === "warning" ? "Warning"
-                  : "Gagal"}
+            {ptzFeedback === "sending" ? t("ptzSending")
+              : ptzFeedback === "success" ? t("ptzSuccess")
+                : ptzFeedback === "warning" ? t("ptzWarning")
+                  : t("ptzFailed")}
           </Badge>
         )}
 
@@ -295,18 +295,18 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
             {ptzAvailable && (
               <div className="grid grid-cols-3 gap-1">
                 <span />
-                {ptzButton("up", <ArrowUp className="h-3.5 w-3.5" />, "PTZ atas")}
+                {ptzButton("up", <ArrowUp className="h-3.5 w-3.5" />, t("ptzUp"))}
                 <span />
-                {ptzButton("left", <ArrowLeft className="h-3.5 w-3.5" />, "PTZ kiri")}
-                <button type="button" title="PTZ home" onClick={() => void sendPtz("home").catch(() => undefined)} className="h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75">
+                {ptzButton("left", <ArrowLeft className="h-3.5 w-3.5" />, t("ptzLeft"))}
+                <button type="button" title={t("ptzHome")} onClick={() => void sendPtz("home").catch(() => undefined)} className="h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75">
                   <Home className="h-3.5 w-3.5" />
                 </button>
-                {ptzButton("right", <ArrowRight className="h-3.5 w-3.5" />, "PTZ kanan")}
+                {ptzButton("right", <ArrowRight className="h-3.5 w-3.5" />, t("ptzRight"))}
                 <span />
-                {ptzButton("down", <ArrowDown className="h-3.5 w-3.5" />, "PTZ bawah")}
+                {ptzButton("down", <ArrowDown className="h-3.5 w-3.5" />, t("ptzDown"))}
                 <span />
-                {ptzButton("zoomIn", <Plus className="h-3.5 w-3.5" />, "Zoom in", "col-start-1")}
-                {ptzButton("zoomOut", <Minus className="h-3.5 w-3.5" />, "Zoom out", "col-start-3")}
+                {ptzButton("zoomIn", <Plus className="h-3.5 w-3.5" />, t("ptzZoomIn"), "col-start-1")}
+                {ptzButton("zoomOut", <Minus className="h-3.5 w-3.5" />, t("ptzZoomOut"), "col-start-3")}
               </div>
             )}
           </div>
@@ -341,12 +341,12 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
                   return { ...v, muted: true };
                 });
               }}
-              title={!audioAvailable ? "Audio hanya admin dan bukan MJPEG" : effectiveMuted ? "Unmute" : "Mute"}
+              title={!audioAvailable ? t("audioAdminOnly") : effectiveMuted ? t("unmute") : t("mute")}
               disabled={!audioAvailable}
             >
               {effectiveMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </Button>
-            <Button size="icon" variant="secondary" className="h-8 w-8 bg-black/55 text-white hover:bg-black/75 border border-white/15" onClick={toggleFullscreen} title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+            <Button size="icon" variant="secondary" className="h-8 w-8 bg-black/55 text-white hover:bg-black/75 border border-white/15" onClick={toggleFullscreen} title={isFullscreen ? t("exitFullscreen") : t("fullscreen")}>
               {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </Button>
           </div>
@@ -369,27 +369,27 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Users className="h-3 w-3" />{camera.viewerCount || 0} viewer</span>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Gauge className="h-3 w-3" />out {outRate}</span>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Radio className="h-3 w-3" />pull {pullRate}</span>
-              {camera.status === "offline" && camera.enabled && <span className="inline-flex items-center gap-1 text-muted-foreground"><Activity className="h-3 w-3" />last {timeAgo(camera.lastSeen)}</span>}
+              {camera.status === "offline" && camera.enabled && <span className="inline-flex items-center gap-1 text-muted-foreground"><Activity className="h-3 w-3" />last {timeAgo(camera.lastSeen, t)}</span>}
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
-          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? "Lepas pin kamera" : "Pin kamera sebagai prioritas"}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? t("unpinCamera") : t("pinCameraPriority")}>
             {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
           </Button>
           {canRestart && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title="Restart stream">
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title={t("restartStream")}>
                 <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
               </Button>
           )}
           {canEdit && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title="Edit kamera">
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title={t("editCameraTitle")}>
                 <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
               </Button>
           )}
           {canDelete && (
-            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title="Hapus kamera">
+            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title={t("deleteCameraTitleLabel")}>
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
