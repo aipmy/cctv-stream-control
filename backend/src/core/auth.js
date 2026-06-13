@@ -18,6 +18,7 @@ export function createToken(user) {
     sub: user.id,
     username: user.username,
     role: user.role,
+    allowedGroups: user.allowedGroups || [],
     iat: Math.floor(Date.now() / 1000),
   };
   const body = base64url(JSON.stringify(payload));

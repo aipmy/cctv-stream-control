@@ -1,14 +1,27 @@
 import { getBearerToken, verifyToken } from "../core/auth.js";
 import { config } from "../core/config.js";
+import { getUserById } from "../services/userService.js";
 
-export function requireAuth(req, res, next) {
-  if (!config.requireAuth) return next();
-  const token = getBearerToken(req);
-  const user = verifyToken(token);
-  if (!user) return res.status(401).json({ error: "Unauthorized. Login ulang atau sertakan token stream." });
-  req.auth = user;
-  req.authToken = token;
-  return next();
+export async function requireAuth(req, res, next) {
+  try {
+    if (!config.requireAuth) return next();
+    const token = getBearerToken(req);
+    const user = verifyToken(token);
+    if (!user) return res.status(401).json({ error: "Unauthorized. Login ulang atau sertakan token stream." });
+    
+    const dbUser = await getUserById(user.sub);
+    if (!dbUser || !dbUser.active) return res.status(401).json({ error: "Sesi tidak valid" });
+    
+    req.auth = {
+      ...user,
+      allowedGroups: dbUser.allowedGroups || [],
+      role: dbUser.role,
+    };
+    req.authToken = token;
+    return next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 export function requireRole(...roles) {
