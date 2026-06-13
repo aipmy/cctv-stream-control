@@ -23,4 +23,5 @@ frontend/dist/
 
 # agent artifacts
 artifacts/
+test-preview.js
 
