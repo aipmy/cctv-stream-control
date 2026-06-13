@@ -127,6 +127,19 @@ To update in the future, run:
 
 ---
 
+### 🔌 Brand Compatibility
+This dashboard is designed to work with any IP camera supporting standard RTSP and ONVIF profiles, and has been verified with:
+
+- **Bardi CCTV:**
+  - Fully supports streaming via local networks (LAN/VPN) without cloud dependencies.
+  - Fully supports ONVIF PTZ camera controls (pan, tilt, zoom).
+- **EZVIZ CCTV:**
+  - Fully supports audio transmission (RTSP audio stream).
+  - Fully supports streaming via local networks (LAN/VPN).
+  - Fully supports ONVIF PTZ camera controls.
+
+---
+
 ---
 
 ## 🇮🇩 Bahasa Indonesia
@@ -244,3 +257,16 @@ Untuk memperbarui di masa mendatang, jalankan:
 | Kontrol Kamera PTZ | ✅ | ✅ | ❌ |
 | Hapus Kamera | ✅ | ❌ | ❌ |
 | Kelola Pengguna & Log Audit | ✅ | ❌ | ❌ |
+
+---
+
+### 🔌 Kompatibilitas Merk CCTV
+Dashboard ini dirancang untuk bekerja dengan kamera IP apa pun yang mendukung profil standar RTSP dan ONVIF, dan telah diverifikasi secara luas dengan merk berikut:
+
+- **Bardi CCTV:**
+  - Mendukung penuh streaming melalui jaringan lokal (LAN/VPN) tanpa ketergantungan cloud.
+  - Mendukung penuh kontrol kamera ONVIF PTZ (pan, tilt, zoom).
+- **EZVIZ CCTV:**
+  - Mendukung penuh transmisi audio (RTSP audio stream).
+  - Mendukung penuh streaming melalui jaringan lokal (LAN/VPN).
+  - Mendukung penuh kontrol kamera ONVIF PTZ.
