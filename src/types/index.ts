@@ -37,7 +37,7 @@ export interface Camera {
   username?: string;
   password?: string;
   hasPassword: boolean;
-  enableAudio: boolean;
+  audioMode: "Auto" | "Enable" | "Disable";
   enablePTZ: boolean;
   lastSeen: string; // ISO
   viewerCount: number;
@@ -77,6 +77,7 @@ export interface UserSummary {
   preferences: {
     pinnedCameraIds: string[];
   };
+  lastLoginAt?: string;
 }
 
 export interface CreateUserInput {

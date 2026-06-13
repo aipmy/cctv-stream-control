@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useCameraActions, useCamerasQuery } from "@/features/cameras/queries";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, RefreshCw, Search, Radar, Eye, EyeOff, Users, Gauge } from "lucide-react";
 import { CameraFormDialog } from "@/components/CameraFormDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { CameraLiveView } from "@/components/CameraLiveView";
+import { CameraCard } from "@/components/CameraCard";
 import { useAuth } from "@/features/auth/store";
 import type { Camera } from "@/types";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatByteRateFromKbps } from "@/lib/bandwidth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSearchParams } from "react-router-dom";
 
 export default function Cameras() {
   const camerasQuery = useCamerasQuery();
@@ -30,14 +31,32 @@ export default function Cameras() {
   const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
   const canSeeIp = role !== "guest";
 
-  const [q, setQ] = useState("");
-  const [siteFilter, setSiteFilter] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [q, setQ] = useState(searchParams.get("q") || "");
+  const [siteFilter, setSiteFilter] = useState(searchParams.get("site") || "all");
   const [sort, setSort] = useState("site-asc");
+  const highlightId = searchParams.get("highlight");
+
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Camera | null>(null);
   const [del, setDel] = useState<Camera | null>(null);
   const [restart, setRestart] = useState<Camera | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (highlightId) {
+      const el = document.getElementById(`cam-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete("highlight");
+          return next;
+        }, { replace: true }), 3000);
+      }
+    }
+  }, [highlightId, setSearchParams]);
+
   const sites = useMemo(
     () => [...new Set(cameras.map((camera) => camera.site).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [cameras],
@@ -77,9 +96,19 @@ export default function Cameras() {
       <Card className="grid gap-2 p-3 md:grid-cols-[minmax(240px,1fr)_200px_200px]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9 h-9" placeholder="Cari kamera…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className="pl-9 h-9" placeholder="Cari kamera…" value={q} onChange={(e) => {
+            setQ(e.target.value);
+            if (e.target.value) searchParams.set("q", e.target.value);
+            else searchParams.delete("q");
+            setSearchParams(searchParams, { replace: true });
+          }} />
         </div>
-        <Select value={siteFilter} onValueChange={setSiteFilter}>
+        <Select value={siteFilter} onValueChange={(v) => {
+          setSiteFilter(v);
+          if (v && v !== "all") searchParams.set("site", v);
+          else searchParams.delete("site");
+          setSearchParams(searchParams, { replace: true });
+        }}>
           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Site / Group</SelectItem>
@@ -114,7 +143,7 @@ export default function Cameras() {
           <TableBody>
             {filtered.map((c) => (
               <Fragment key={c.id}>
-              <TableRow>
+              <TableRow className={cn(highlightId === c.id && "bg-primary/10 border-l-2 border-l-primary")} id={`cam-${c.id}`}>
                 <TableCell className="font-medium">{c.name}</TableCell>
                 <TableCell className="text-muted-foreground">{c.site}</TableCell>
                 <TableCell>{c.brand}</TableCell>
@@ -166,15 +195,28 @@ export default function Cameras() {
               {previewId === c.id && (
                 <TableRow>
                   <TableCell colSpan={8} className="bg-muted/15 p-3">
-                    <div className="grid gap-3 md:grid-cols-[360px_1fr] items-start">
-                      <div className="relative aspect-video overflow-hidden rounded-lg border bg-black">
-                        <CameraLiveView camera={c} muted volume={0} />
-                      </div>
+                    <div className="grid gap-3 md:grid-cols-[400px_1fr] items-start">
+                      <CameraCard
+                        camera={c}
+                        onRestart={() => setRestart(c)}
+                        onEdit={() => { setEdit(c); setOpen(true); }}
+                        onDelete={() => setDel(c)}
+                        pinned={false}
+                        onTogglePin={() => {}}
+                      />
                       <div className="text-xs text-muted-foreground space-y-1 pt-1">
                         <div className="font-medium text-foreground">Preview Manajemen Kamera</div>
                         <div>Preview ini hanya aktif saat tombol mata dibuka. Tutup preview agar FFmpeg idle dan berhenti otomatis.</div>
-                        <div>Stream: <span className="font-mono">{c.streamType}</span> · Status: <span className="font-mono">{c.status}</span> · Viewer: <span className="font-mono">{c.viewerCount || 0}</span></div>
+                        <div>Stream: <span className="font-mono">{c.streamType}</span> · HLS Mode: <span className="font-mono">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono">{c.streamQuality || "Auto"}</span></div>
+                        <div>Audio: <span className="font-mono">{c.audioMode}</span> · PTZ: <span className="font-mono">{c.enablePTZ ? "Aktif" : "Nonaktif"}</span></div>
+                        <div>Status: <span className="font-mono">{c.status}</span> · Viewer: <span className="font-mono">{c.viewerCount || 0}</span></div>
                         <div>Pull CCTV: <span className="font-mono">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span> · Output viewer: <span className="font-mono">{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span></div>
+                        {c.errorHistory && c.errorHistory.length > 0 && (
+                          <div className="mt-2">
+                            <div className="font-medium text-destructive">Error Terakhir:</div>
+                            <div className="text-destructive/80">{c.errorHistory[c.errorHistory.length - 1]?.message}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </TableCell>

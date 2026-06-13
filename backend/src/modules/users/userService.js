@@ -29,6 +29,7 @@ export function publicUser(user) {
     permissions: user.permissions || {},
     allowedGroups: user.allowedGroups || [],
     preferences: normalizePreferences(user.preferences),
+    lastLoginAt: user.lastLoginAt,
   };
 }
 
@@ -46,12 +47,17 @@ export function createUserService({ store }) {
   }
 
   async function login(username, password) {
-    const users = await store.read();
-    const user = users.find((item) => item.username === username && item.password === password);
-    if (!user) return { ok: false, error: "Username atau password salah" };
-    if (!user.active) return { ok: false, error: "Akun nonaktif" };
-    const safeUser = publicUser(user);
-    return { ok: true, user: safeUser, token: createToken(user) };
+    let safeUser, tokenStr;
+    await store.update((users) => {
+      const user = users.find((item) => item.username === username && item.password === password);
+      if (!user) throw httpError("Username atau password salah", 401);
+      if (!user.active) throw httpError("Akun nonaktif", 403);
+      user.lastLoginAt = new Date().toISOString();
+      safeUser = publicUser(user);
+      tokenStr = createToken(user);
+      return users;
+    });
+    return { ok: true, user: safeUser, token: tokenStr };
   }
 
   async function createInitialAdmin(payload) {

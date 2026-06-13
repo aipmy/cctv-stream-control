@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/store";
 import { useAuditQuery, useUserActions, useUsersQuery } from "@/features/users/queries";
+import { useCamerasQuery } from "@/features/cameras/queries";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Plus, Pencil, Trash2, ScrollText, Loader2, Download, Trash } from "lucide-react";
 import type { AuditOutcome, CreateUserInput, Role, UserSummary } from "@/types";
@@ -25,9 +27,22 @@ const roleColors: Record<Role, string> = {
   guest: "bg-muted text-muted-foreground border-border",
 };
 
+function formatLastLogin(iso: string) {
+  const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (d < 60) return "Baru saja";
+  if (d < 3600) return `${Math.floor(d / 60)} menit lalu`;
+  if (d < 86400) return `${Math.floor(d / 3600)} jam lalu`;
+  if (d < 172800) return `Kemarin ${new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export default function Users() {
   const role = useAuth((s) => s.user?.role);
-  const users = useUsersQuery(role === "admin").data || [];
+  const { data: usersData } = useUsersQuery(role === "admin");
+  const users = useMemo(() => usersData || [], [usersData]);
+  const { data: camerasData } = useCamerasQuery();
+  const cameras = useMemo(() => camerasData || [], [camerasData]);
+  const siteOptions = useMemo(() => Array.from(new Set(cameras.map((c) => c.site).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [cameras]);
   const { addUser, updateUser, deleteUser } = useUserActions();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<UserSummary | null>(null);
@@ -35,7 +50,6 @@ export default function Users() {
   const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false };
   const [form, setForm] = useState<CreateUserInput>({ username: "", password: "", role: "guest", active: true, permissions: emptyPermissions, allowedGroups: [] });
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState("users");
   const [auditActor, setAuditActor] = useState("");
   const [auditAction, setAuditAction] = useState("");
   const [auditOutcome, setAuditOutcome] = useState<AuditOutcome | "all">("all");
@@ -45,7 +59,7 @@ export default function Users() {
     action: auditAction.trim() || undefined,
     outcome: auditOutcome,
   }), [auditAction, auditActor, auditOutcome]);
-  const audit = useAuditQuery(auditFilters, role === "admin" && tab === "audit");
+  const audit = useAuditQuery(auditFilters, role === "admin");
   const auditItems = audit.data?.pages.flatMap((page) => page.items) || [];
 
   if (role !== "admin") return <Navigate to="/" replace />;
@@ -79,26 +93,22 @@ export default function Users() {
           <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Manajemen Pengguna</h1>
           <p className="text-sm text-muted-foreground">Kelola akun operator dan hak akses.</p>
         </div>
-        <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-95" disabled={tab !== "users"}>
+        <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-95">
           <Plus className="h-4 w-4" /> Tambah Pengguna
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="users">Pengguna</TabsTrigger>
-          <TabsTrigger value="audit"><ScrollText className="mr-1.5 h-4 w-4" />Audit Log</TabsTrigger>
-        </TabsList>
-
-      <TabsContent value="users">
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
+      <div className="grid md:grid-cols-[1fr_350px] gap-5 items-start">
+        <div className="space-y-4">
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Login</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -119,6 +129,9 @@ export default function Users() {
                     }}
                   />
                 </TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  {u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : <span className="text-muted-foreground/50">Belum pernah</span>}
+                </TableCell>
                 <TableCell className="text-right">
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDel(u)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -126,93 +139,69 @@ export default function Users() {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-      </Card>
-      </TabsContent>
-
-      <TabsContent value="audit" className="space-y-3">
-        <div className="flex flex-col md:flex-row gap-2 justify-between items-start md:items-center">
-          <Card className="grid gap-2 p-3 md:grid-cols-[1fr_1fr_180px] flex-1 w-full">
-            <Input
-              value={auditActor}
-              onChange={(event) => setAuditActor(event.target.value)}
-              placeholder="Filter actor/username"
-            />
-            <Input
-              value={auditAction}
-              onChange={(event) => setAuditAction(event.target.value)}
-              placeholder="Filter action, contoh: ptz.command"
-            />
-            <Select value={auditOutcome} onValueChange={(value) => setAuditOutcome(value as AuditOutcome | "all")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua hasil</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="failure">Failure</SelectItem>
-              </SelectContent>
-            </Select>
+            </Table>
           </Card>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.open(auditApi.exportUrl(), "_blank")}><Download className="h-4 w-4 mr-2" /> Export</Button>
-            <Button variant="destructive" onClick={async () => {
-              if (confirm("Hapus semua log audit?")) {
-                try {
-                  await auditApi.clear();
-                  toast.success("Audit log dibersihkan");
-                  audit.refetch();
-                } catch (err) {
-                  toast.error("Gagal menghapus log");
-                }
-              }
-            }}><Trash className="h-4 w-4 mr-2" /> Clear</Button>
-          </div>
         </div>
-        <Card className="overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Waktu</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Hasil</TableHead>
-                <TableHead>Detail aman</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {auditItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="whitespace-nowrap text-xs">{new Date(item.ts).toLocaleString("id-ID")}</TableCell>
-                  <TableCell>
-                    <div className="text-xs font-medium">{item.actor.username}</div>
-                    <div className="text-[10px] capitalize text-muted-foreground">{item.actor.role || "-"} · {item.ip || "-"}</div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{item.action}</TableCell>
-                  <TableCell className="text-xs">{item.target?.label || item.target?.id || "-"}</TableCell>
-                  <TableCell><AuditOutcomeBadge outcome={item.outcome} /></TableCell>
-                  <TableCell className="max-w-xs truncate font-mono text-[10px]" title={JSON.stringify(item.details)}>
-                    {Object.keys(item.details || {}).length ? JSON.stringify(item.details) : "-"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!audit.isPending && auditItems.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Belum ada audit log untuk filter ini.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-          {audit.isPending && <div className="flex items-center justify-center p-8 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memuat audit...</div>}
-          {audit.isError && <div className="p-4 text-sm text-destructive">{audit.error instanceof Error ? audit.error.message : "Audit log gagal dimuat"}</div>}
-          {audit.hasNextPage && (
-            <div className="border-t p-3 text-center">
-              <Button variant="outline" onClick={() => void audit.fetchNextPage()} disabled={audit.isFetchingNextPage}>
-                {audit.isFetchingNextPage ? "Memuat..." : "Muat lebih lama"}
-              </Button>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold flex items-center"><ScrollText className="mr-1.5 h-4 w-4" /> Recent Activity</h2>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => window.open(auditApi.exportUrl(), "_blank")}><Download className="h-3 w-3 mr-1.5" /> Export</Button>
+          </div>
+          <Card className="flex flex-col h-[500px]">
+            <div className="p-3 border-b space-y-2">
+              <Input
+                value={auditActor}
+                onChange={(event) => setAuditActor(event.target.value)}
+                placeholder="Filter actor/username"
+                className="h-8 text-xs"
+              />
+              <Select value={auditOutcome} onValueChange={(value) => setAuditOutcome(value as AuditOutcome | "all")}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua hasil</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </Card>
-      </TabsContent>
-      </Tabs>
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Waktu</TableHead>
+                    <TableHead>Actor/Action</TableHead>
+                    <TableHead>Hasil</TableHead>
+                  </TableRow>
+                </TableHeader>
+              <TableBody>
+                {auditItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(item.ts).toLocaleTimeString("id-ID")}</TableCell>
+                    <TableCell>
+                      <div className="text-xs font-medium truncate max-w-[120px]">{item.actor.username}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">{item.action}</div>
+                    </TableCell>
+                    <TableCell><AuditOutcomeBadge outcome={item.outcome} /></TableCell>
+                  </TableRow>
+                ))}
+                  {!audit.isPending && auditItems.length === 0 && (
+                    <TableRow><TableCell colSpan={3} className="py-12 text-center text-sm text-muted-foreground">Belum ada audit log.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              {audit.isPending && <div className="flex items-center justify-center p-8 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memuat...</div>}
+              {audit.isError && <div className="p-4 text-sm text-destructive">{audit.error instanceof Error ? audit.error.message : "Gagal memuat log"}</div>}
+              {audit.hasNextPage && (
+                <div className="border-t p-3 text-center">
+                  <Button variant="outline" size="sm" onClick={() => void audit.fetchNextPage()} disabled={audit.isFetchingNextPage}>
+                    {audit.isFetchingNextPage ? "Memuat..." : "Muat lebih lama"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 flex flex-col">
@@ -248,13 +237,31 @@ export default function Users() {
             
             {form.role !== "admin" && (
               <div className="space-y-4 pt-4 border-t mt-4">
-                <Label className="text-xs uppercase tracking-wider">Group/Site yang diizinkan</Label>
-                <p className="text-xs text-muted-foreground -mt-3 mb-2">Pisahkan dengan koma. Kosongkan untuk menolak akses ke semua grup.</p>
-                <Input 
-                  value={(form.allowedGroups || []).join(", ")}
-                  onChange={(e) => setForm({ ...form, allowedGroups: e.target.value.split(",").map(g => g.trim()).filter(Boolean) })}
-                  placeholder="Gudang, Lobby, Pusat" 
-                />
+                <div>
+                  <Label className="text-xs uppercase tracking-wider block mb-3">Group/Site yang diizinkan</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border rounded-md p-3 max-h-48 overflow-y-auto">
+                    {siteOptions.length === 0 && <div className="text-xs text-muted-foreground col-span-full">Belum ada site.</div>}
+                    {siteOptions.map((site) => (
+                      <div key={site} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`site-${site}`}
+                          checked={(form.allowedGroups || []).includes(site)}
+                          onCheckedChange={(checked) => {
+                            const prev = form.allowedGroups || [];
+                            if (checked) {
+                              setForm({ ...form, allowedGroups: [...prev, site] });
+                            } else {
+                              setForm({ ...form, allowedGroups: prev.filter((s) => s !== site) });
+                            }
+                          }}
+                        />
+                        <label htmlFor={`site-${site}`} className="text-xs font-medium leading-none cursor-pointer">
+                          {site}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <Label className="text-xs uppercase tracking-wider block mt-4 mb-2">Izin Spesifik</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -269,7 +276,7 @@ export default function Users() {
                       <Label className="text-xs font-normal">{p.label}</Label>
                       <Switch 
                         checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
-                        onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as any })} 
+                        onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as unknown as typeof emptyPermissions })} 
                       />
                     </div>
                   ))}

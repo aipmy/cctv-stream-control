@@ -25,6 +25,7 @@ const mjpegStartLocks = new Map();  // cameraId -> Promise<session|null>
 const streamViewers = new Map();       // cameraId -> Map(viewerId -> { lastSeen, output })
 const cameraTrafficTotals = new Map(); // cameraId -> { pullBytes, outBytes }
 const cameraTrafficLast = new Map();   // cameraId -> { at, pullBytes, outBytes }
+const audioFailures = new Set();       // cameraId
 const VIEWER_TTL_MS = 18_000;
 
 function cameraTraffic(id) {
@@ -218,7 +219,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
     const dir = streamDir(id, output);
     await cleanDir(dir);
-    const args = buildHlsArgs({ camera, output, dir, options: config });
+    const audioFallback = audioFailures.has(id);
+    const args = buildHlsArgs({ camera, output, dir, options: config, audioFallback });
     const child = spawn(config.ffmpegBin, args, { stdio: ["ignore", "ignore", "pipe"] });
     const session = {
       id,
@@ -258,6 +260,10 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       session.closedAt = nowIso();
       logLifecycle(session, `closed: code=${code} signal=${signal || "-"}`);
       if (!wasRequestedStop && code !== 0 && signal !== "SIGTERM") {
+        if (camera.audioMode === "Auto" && !audioFailures.has(id)) {
+          audioFailures.add(id);
+          session.rawError += "\n[Audio Fallback] FFmpeg crashed. Mematikan audio untuk percobaan berikutnya.";
+        }
         await markCameraStatus(id, { status: "offline" });
         await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
       }

@@ -83,7 +83,10 @@ export function normalizeCamera(input, existing = {}) {
     sourcePath: normalizePath(input.sourcePath ?? existing.sourcePath ?? defaultPath(sourceType)),
     username: input.username ?? existing.username ?? "",
     password,
-    enableAudio: Boolean(input.enableAudio ?? existing.enableAudio ?? false),
+    audioMode: ["Auto", "Enable", "Disable"].includes(input.audioMode ?? existing.audioMode)
+      ? (input.audioMode ?? existing.audioMode)
+      : (input.enableAudio ?? existing.enableAudio) ? "Enable" : "Auto",
+    enableAudio: Boolean(input.enableAudio ?? existing.enableAudio ?? (input.audioMode ?? existing.audioMode) !== "Disable"),
     enablePTZ: Boolean(input.enablePTZ ?? existing.enablePTZ ?? false),
     lastSeen: input.lastSeen || existing.lastSeen || now,
     viewerCount: Number(input.viewerCount ?? existing.viewerCount ?? 0),
