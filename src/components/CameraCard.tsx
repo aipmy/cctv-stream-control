@@ -268,7 +268,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
       >
-        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} />
+        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} />
         {ptzFeedback && (
           <Badge
             variant="outline"

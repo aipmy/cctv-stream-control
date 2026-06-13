@@ -16,6 +16,7 @@ import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, default
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useTranslation, type TranslationKey } from "@/hooks/useTranslation";
 
 interface Props {
   open: boolean;
@@ -44,16 +45,16 @@ const empty = {
   enabled: true,
 };
 
-const sourceHelp: Record<SourceType, string> = {
-  RTSP: "Stream H.264/H.265 standar. Tidak mendukung kontrol PTZ.",
-  "RTSP+ONVIF": "RTSP untuk video + ONVIF untuk kontrol kamera. PTZ dapat diaktifkan jika kamera mendukungnya.",
-  MJPEG: "Cocok untuk kamera lama / IP cam ringan. Tidak mendukung PTZ.",
-  HLS: "Sumber HLS yang sudah ter-transcode. Hanya playback, tanpa PTZ.",
+const sourceHelpKeys: Record<SourceType, TranslationKey> = {
+  RTSP: "sourceHelpRTSP",
+  "RTSP+ONVIF": "sourceHelpRTSPONVIF",
+  MJPEG: "sourceHelpMJPEG",
+  HLS: "sourceHelpHLS",
 };
 
 interface Preset {
-  name: string;
-  description: string;
+  nameKey: TranslationKey;
+  descKey: TranslationKey;
   streamType: StreamType;
   rtspTransport: RtspTransport;
   hlsMode: HlsMode;
@@ -62,32 +63,32 @@ interface Preset {
 
 const PRESETS: Preset[] = [
   {
-    name: "Ultra Performance (Copy)",
-    description: "Sangat hemat CPU. Menggunakan stream H.264 asli tanpa audio. Latency sangat rendah.",
+    nameKey: "preset0Name",
+    descKey: "preset0Desc",
     streamType: "HLS Low Latency",
     rtspTransport: "tcp",
     hlsMode: "copy",
     audioMode: "Disable",
   },
   {
-    name: "Compatibility (Transcode)",
-    description: "Kompatibilitas browser tinggi. Transcode video ke H.264, audio dimatikan.",
+    nameKey: "preset1Name",
+    descKey: "preset1Desc",
     streamType: "HLS Stable",
     rtspTransport: "tcp",
     hlsMode: "transcode",
     audioMode: "Disable",
   },
   {
-    name: "Full Stream + Audio",
-    description: "Transcode video ke H.264 dengan audio menyala. Cocok untuk monitoring penuh.",
+    nameKey: "preset2Name",
+    descKey: "preset2Desc",
     streamType: "HLS Stable",
     rtspTransport: "tcp",
     hlsMode: "transcode",
     audioMode: "Enable",
   },
   {
-    name: "Low Bandwidth (MJPEG)",
-    description: "Streaming berbasis gambar berurutan. Sangat ringan untuk koneksi lambat.",
+    nameKey: "preset3Name",
+    descKey: "preset3Desc",
     streamType: "MJPEG",
     rtspTransport: "tcp",
     hlsMode: "copy",
@@ -96,6 +97,7 @@ const PRESETS: Preset[] = [
 ];
 
 export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user);
   const { data: camerasData } = useCamerasQuery();
   const cameras = useMemo(() => camerasData || [], [camerasData]);
@@ -154,7 +156,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
   const runAutoDetect = async () => {
     if (!form.ip.trim()) {
-      toast.error("IP / Host wajib diisi untuk melakukan deteksi");
+      toast.error(t("ipRequiredForDetect"));
       return;
     }
     setProbing(true);
@@ -191,54 +193,58 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         const audioCodec = audioStream?.codec_name || "none";
         
         let recIndex = 0;
-        let explanation = "";
+        let explanationKey: TranslationKey = "probeExplH264None";
+        let explanationParams: Record<string, string> = {};
         
         if (videoCodec === "h264") {
           if (audioCodec === "aac") {
             recIndex = 2;
-            explanation = "Kamera mengirimkan video H.264 dan audio AAC secara native. Rekomendasi: Gunakan preset 'Full Stream + Audio' (Anda juga bisa mengubah HLS Mode ke 'Copy' agar hemat CPU).";
+            explanationKey = "probeExplH264Aac";
           } else if (audioCodec === "none") {
             recIndex = 0;
-            explanation = "Kamera menggunakan video H.264 standar tanpa audio. Rekomendasi: Gunakan preset 'Ultra Performance (Copy)' untuk performa terbaik dan hemat CPU.";
+            explanationKey = "probeExplH264None";
           } else {
             recIndex = 1;
-            explanation = `Kamera menggunakan video H.264 standar, tetapi audio menggunakan codec '${audioCodec}' yang tidak didukung langsung oleh browser. Rekomendasi: Gunakan preset 'Compatibility (Transcode)' atau matikan audio.`;
+            explanationKey = "probeExplH264Other";
+            explanationParams = { codec: audioCodec };
           }
         } else if (videoCodec === "hevc" || videoCodec === "h265") {
           if (audioCodec === "none") {
             recIndex = 1;
-            explanation = "Kamera menggunakan video H.265 (HEVC) yang tidak didukung langsung oleh sebagian besar browser. Rekomendasi: Gunakan preset 'Compatibility (Transcode)' agar video di-transcode ke H.264.";
+            explanationKey = "probeExplH265None";
           } else {
             recIndex = 2;
-            explanation = `Kamera menggunakan video H.265 (HEVC) dan audio '${audioCodec}'. Rekomendasi: Gunakan preset 'Compatibility (Transcode)' atau 'Full Stream + Audio' agar video di-transcode ke format ramah browser (H.264).`;
+            explanationKey = "probeExplH265Other";
+            explanationParams = { codec: audioCodec };
           }
         } else {
           recIndex = 1;
-          explanation = `Kamera menggunakan codec video '${videoCodec}' yang tidak dikenal. Rekomendasi: Gunakan preset 'Compatibility (Transcode)'.`;
+          explanationKey = "probeExplUnknown";
+          explanationParams = { codec: videoCodec };
         }
         
         setProbeDetectResult({
           success: true,
-          message: explanation,
+          message: t(explanationKey, explanationParams),
           videoCodec,
           audioCodec,
           recommendedIndex: recIndex,
         });
-        toast.success("Deteksi codec berhasil!");
+        toast.success(t("probeSuccess"));
       } else {
-        const errMsg = res.probe?.error || "Gagal menghubungi kamera.";
+        const errMsg = res.probe?.error || t("probeFailedLabel");
         setProbeDetectResult({
           success: false,
-          message: `Gagal mendeteksi kamera. Error: ${errMsg}`,
+          message: `${t("probeFailedLabel")} Error: ${errMsg}`,
         });
-        toast.error("Deteksi codec gagal.");
+        toast.error(t("probeFailedLabel"));
       }
     } catch (err) {
       setProbeDetectResult({
         success: false,
-        message: err instanceof Error ? err.message : "Terjadi kesalahan koneksi ke backend.",
+        message: err instanceof Error ? err.message : t("probeRequestFailed"),
       });
-      toast.error("Gagal melakukan probe.");
+      toast.error(t("probeRequestFailed"));
     } finally {
       setProbing(false);
     }
@@ -255,7 +261,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           hlsMode: p.hlsMode,
           audioMode: p.audioMode,
         }));
-        toast.success(`Preset '${p.name}' berhasil diterapkan!`);
+        toast.success(t("presetApplied", { name: t(p.nameKey) }));
       }
     }
   };
@@ -306,8 +312,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   };
 
   const sourceUrlPreview = useMemo(
-    () => buildSourceUrl(form, { maskPassword: !showPassword }),
-    [form, showPassword]
+     () => buildSourceUrl(form, { maskPassword: !showPassword }),
+     [form, showPassword]
   );
   const onvifUrlPreview = useMemo(() => buildOnvifUrl(form), [form]);
   const restreamUrl = useMemo(
@@ -317,13 +323,13 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
   const submit = async () => {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = "Nama wajib diisi";
-    if (!form.ip.trim()) e.ip = "IP/Host wajib diisi";
-    if (!form.site.trim()) e.site = "Site/group wajib diisi";
-    if (!form.sourcePath.trim()) e.sourcePath = "Path wajib diisi";
-    if (isRtspFamily && (!form.rtspPort || form.rtspPort < 1)) e.rtspPort = "Port RTSP tidak valid";
-    if (form.sourceType === "RTSP+ONVIF" && (!form.onvifPort || form.onvifPort < 1)) e.onvifPort = "Port ONVIF tidak valid";
-    if (!isRtspFamily && (!form.httpPort || form.httpPort < 1)) e.httpPort = "Port tidak valid";
+    if (!form.name.trim()) e.name = t("nameRequired");
+    if (!form.ip.trim()) e.ip = t("ipRequired");
+    if (!form.site.trim()) e.site = t("siteRequired");
+    if (!form.sourcePath.trim()) e.sourcePath = t("pathRequired");
+    if (isRtspFamily && (!form.rtspPort || form.rtspPort < 1)) e.rtspPort = t("invalidRtspPort");
+    if (form.sourceType === "RTSP+ONVIF" && (!form.onvifPort || form.onvifPort < 1)) e.onvifPort = t("invalidOnvifPort");
+    if (!isRtspFamily && (!form.httpPort || form.httpPort < 1)) e.httpPort = t("invalidHttpPort");
     if (Object.keys(e).length) { setErrors(e); return; }
 
     const payload: CameraInput = {
@@ -351,14 +357,14 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     try {
       if (camera) {
         await updateCamera(camera.id, payload);
-        toast.success("Kamera berhasil diperbarui");
+        toast.success(t("cameraUpdated"));
       } else {
         await addCamera(payload);
-        toast.success("Kamera baru ditambahkan");
+        toast.success(t("cameraAdded"));
       }
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan kamera");
+      toast.error(err instanceof Error ? err.message : t("saveCameraFailed"));
     } finally {
       setSaving(false);
     }
@@ -371,9 +377,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     try {
       const result = await cameraApi.testPtz(camera.id);
       setPtzResult(result);
-      toast.success(`ONVIF terhubung via ${result.mode || "standard"}`);
+      toast.success(t("onvifConnected", { mode: result.mode || "standard" }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Uji ONVIF/PTZ gagal");
+      toast.error(error instanceof Error ? error.message : t("ptzTestFailed"));
     } finally {
       setTestingPtz(false);
     }
@@ -383,16 +389,16 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[min(90vh,850px)] p-0 gap-0 overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
-          <DialogTitle>{camera ? "Edit Kamera" : "Tambah Kamera"}</DialogTitle>
-          <DialogDescription>Konfigurasi koneksi dan stream untuk kamera CCTV.</DialogDescription>
+          <DialogTitle>{camera ? t("editCamera") : t("addCamera")}</DialogTitle>
+          <DialogDescription>{t("cameraFormDesc")}</DialogDescription>
         </DialogHeader>
 
         <div data-testid="camera-form-scroll" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Nama Kamera" error={errors.name}>
+          <Field label={t("cameraName")} error={errors.name}>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Lobby 01" />
           </Field>
-          <Field label="Brand">
+          <Field label={t("brand")}>
             <Select value={form.brand} onValueChange={(v) => setForm({ ...form, brand: v as Brand })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -400,23 +406,23 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="IP / Host" error={errors.ip}>
+          <Field label={t("ipHost")} error={errors.ip}>
             <Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.10" />
           </Field>
-          <Field label="Site / Group" error={errors.site}>
+          <Field label={t("siteGroup")} error={errors.site}>
             {user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0 ? (
               <Popover open={siteOpen} onOpenChange={setSiteOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" aria-expanded={siteOpen} className="w-full justify-between font-normal">
-                    {form.site || "Pilih site"}
+                    {form.site || t("selectSite")}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0">
                   <Command>
-                    <CommandInput placeholder="Cari site..." />
+                    <CommandInput placeholder={t("searchSite")} />
                     <CommandList>
-                      <CommandEmpty>Tidak ada site ditemukan.</CommandEmpty>
+                      <CommandEmpty>{t("noSiteFound")}</CommandEmpty>
                       <CommandGroup>
                         {user.allowedGroups.map((g) => (
                           <CommandItem
@@ -442,15 +448,15 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   <Popover open={siteOpen} onOpenChange={setSiteOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" aria-expanded={siteOpen} className="w-full justify-between font-normal">
-                        {form.site || "Pilih site"}
+                        {form.site || t("selectSite")}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-0">
                       <Command>
-                        <CommandInput placeholder="Cari site..." />
+                        <CommandInput placeholder={t("searchSite")} />
                         <CommandList>
-                          <CommandEmpty>Tidak ada site ditemukan.</CommandEmpty>
+                          <CommandEmpty>{t("noSiteFound")}</CommandEmpty>
                           <CommandGroup>
                             {siteOptions.map((s) => (
                               <CommandItem
@@ -476,7 +482,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                                 setSiteOpen(false);
                               }}
                             >
-                              + Tambah Site Baru...
+                              {t("addNewSite")}
                             </CommandItem>
                           </CommandGroup>
                         </CommandList>
@@ -488,41 +494,41 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     <Input
                       value={form.site}
                       onChange={(e) => setForm({ ...form, site: e.target.value })}
-                      placeholder="Ketik nama site baru"
+                      placeholder={t("typeNewSite")}
                       className="flex-1"
                       autoFocus
                     />
-                    <Button variant="outline" size="sm" type="button" onClick={() => setIsNewSite(false)}>Batal</Button>
+                    <Button variant="outline" size="sm" type="button" onClick={() => setIsNewSite(false)}>{t("cancel")}</Button>
                   </div>
                 )}
               </div>
             )}
           </Field>
 
-          <Field label="Stream Source" className="md:col-span-2">
+          <Field label={t("streamSource")} className="md:col-span-2">
             <Select value={form.sourceType} onValueChange={(v) => handleSourceChange(v as SourceType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="RTSP">RTSP — video saja</SelectItem>
-                <SelectItem value="RTSP+ONVIF">RTSP + ONVIF — mendukung PTZ</SelectItem>
-                <SelectItem value="MJPEG">MJPEG — kamera ringan / lawas</SelectItem>
-                <SelectItem value="HLS">HLS — sumber sudah ter-transcode</SelectItem>
+                <SelectItem value="RTSP">{t("rtspVideoOnly")}</SelectItem>
+                <SelectItem value="RTSP+ONVIF">{t("rtspOnvifPtz")}</SelectItem>
+                <SelectItem value="MJPEG">{t("mjpegLegacy")}</SelectItem>
+                <SelectItem value="HLS">{t("hlsTranscoded")}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1.5 flex items-start gap-1.5">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>{sourceHelp[form.sourceType]}</span>
+              <span>{t(sourceHelpKeys[form.sourceType])}</span>
             </p>
           </Field>
 
           {isRtspFamily ? (
             <>
-              <Field label="RTSP Port" error={errors.rtspPort}>
+              <Field label={t("rtspPortLabel")} error={errors.rtspPort}>
                 <Input type="number" min={1} max={65535} value={form.rtspPort}
                   onChange={(e) => setForm({ ...form, rtspPort: Number(e.target.value) })} placeholder="554" />
               </Field>
               {form.sourceType === "RTSP+ONVIF" ? (
-                <Field label="ONVIF Port" error={errors.onvifPort}>
+                <Field label={t("onvifPortLabel")} error={errors.onvifPort}>
                   <Input type="number" min={1} max={65535} value={form.onvifPort}
                     onChange={(e) => setForm({ ...form, onvifPort: Number(e.target.value) })} placeholder="80" />
                 </Field>
@@ -531,14 +537,14 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               )}
             </>
           ) : (
-            <Field label={form.sourceType === "HLS" ? "HTTP(S) Port" : "HTTP Port"} error={errors.httpPort}>
+            <Field label={form.sourceType === "HLS" ? t("httpsPortLabel") : t("httpPortLabel")} error={errors.httpPort}>
               <Input type="number" min={1} max={65535} value={form.httpPort}
                 onChange={(e) => setForm({ ...form, httpPort: Number(e.target.value) })}
                 placeholder={form.sourceType === "HLS" ? "443" : "80"} />
             </Field>
           )}
 
-          <Field label="Stream Path" className="md:col-span-2" error={errors.sourcePath}>
+          <Field label={t("streamPath")} className="md:col-span-2" error={errors.sourcePath}>
             <Input
               value={form.sourcePath}
               onChange={(e) => setForm({ ...form, sourcePath: e.target.value })}
@@ -546,14 +552,14 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               className="font-mono text-xs"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Path saja (tanpa protokol/host). Contoh: <code>/Streaming/Channels/101</code>
+              {t("streamPathHelp")}
             </p>
           </Field>
 
-          <Field label="Username">
+          <Field label={t("username")}>
             <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} autoComplete="off" />
           </Field>
-          <Field label="Password">
+          <Field label={t("password")}>
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
@@ -568,22 +574,22 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 type="button" size="icon" variant="ghost"
                 className="absolute right-0 top-0 h-full w-9 hover:bg-transparent text-muted-foreground hover:text-foreground"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                aria-label={showPassword ? t("hidePasswordLabel") : t("showPasswordLabel")}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
             {camera?.hasPassword && !form.password && (
-              <p className="text-[11px] text-muted-foreground mt-1">Password tersimpan. Kosongkan untuk tetap menggunakan password lama.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t("passwordHelp")}</p>
             )}
           </Field>
 
           <div className="md:col-span-2 border-t pt-4 mt-2">
-            <h3 className="text-sm font-semibold tracking-tight">Pengaturan Stream & Preset</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Pilih preset cepat atau lakukan auto-detect untuk konfigurasi streaming yang optimal.</p>
+            <h3 className="text-sm font-semibold tracking-tight">{t("streamSettingsHeader")}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("streamSettingsSub")}</p>
           </div>
 
-          <Field label="Stream Preset (Rekomendasi)" className="md:col-span-2">
+          <Field label={t("streamPresetLabel")} className="md:col-span-2">
             <div className="flex gap-2">
               <div className="flex-1">
                 <Select value={activePresetValue} onValueChange={handlePresetChange}>
@@ -591,10 +597,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   <SelectContent>
                     {PRESETS.map((p, idx) => (
                       <SelectItem key={idx} value={String(idx)}>
-                        {p.name}
+                        {t(p.nameKey)}
                       </SelectItem>
                     ))}
-                    <SelectItem value="custom">Kustom (Ubah manual)</SelectItem>
+                    <SelectItem value="custom">{t("customPreset")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -606,12 +612,12 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 className="shrink-0 flex gap-1.5"
               >
                 <Activity className={cn("h-4 w-4", probing && "animate-pulse")} />
-                {probing ? "Mendeteksi..." : "Deteksi Codec"}
+                {probing ? t("detecting") : t("detectCodec")}
               </Button>
             </div>
             {activePresetIndex !== -1 && (
               <p className="text-[11px] text-muted-foreground mt-1.5">
-                {PRESETS[activePresetIndex].description}
+                {t(PRESETS[activePresetIndex].descKey)}
               </p>
             )}
           </Field>
@@ -624,7 +630,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               <div className="flex items-center justify-between">
                 <div className="font-semibold flex items-center gap-1.5">
                   <Wand2 className="h-4 w-4 text-primary" />
-                  Hasil Deteksi Kamera
+                  {t("probeResultsHeader")}
                 </div>
                 {probeDetectResult.success && (
                   <Button
@@ -633,15 +639,15 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     onClick={applyRecommendation}
                     className="h-7 text-[11px] bg-gradient-primary hover:opacity-90 text-primary-foreground font-medium"
                   >
-                    Terapkan Rekomendasi
+                    {t("applyRecommendation")}
                   </Button>
                 )}
               </div>
               {probeDetectResult.success ? (
                 <div className="space-y-1 mt-1">
                   <div className="grid grid-cols-2 gap-2 font-mono text-[11px] bg-muted/30 p-2 rounded">
-                    <div>Codec Video: <span className="font-bold text-primary">{probeDetectResult.videoCodec}</span></div>
-                    <div>Codec Audio: <span className="font-bold text-primary">{probeDetectResult.audioCodec}</span></div>
+                    <div>{t("videoCodec")} <span className="font-bold text-primary">{probeDetectResult.videoCodec}</span></div>
+                    <div>{t("audioCodec")} <span className="font-bold text-primary">{probeDetectResult.audioCodec}</span></div>
                   </div>
                   <p className="text-muted-foreground mt-2 leading-relaxed">{probeDetectResult.message}</p>
                 </div>
@@ -653,7 +659,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
           <div className="md:col-span-2 grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output Format</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("outputFormat")}</Label>
               <Select value={form.streamType} onValueChange={(v) => setForm({ ...form, streamType: v as StreamType })}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -666,7 +672,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stream Quality</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("streamQuality")}</Label>
               <Select value={form.streamQuality} onValueChange={(v) => setForm({ ...form, streamQuality: v as Camera["streamQuality"] })}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -684,7 +690,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           </div>
 
           {isRtspFamily && (
-            <Field label="RTSP Transport">
+            <Field label={t("rtspTransportLabel")}>
               <Select value={form.rtspTransport} onValueChange={(v) => setForm({ ...form, rtspTransport: v as RtspTransport })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -693,12 +699,12 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   <SelectItem value="auto">Auto — default FFmpeg</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground mt-1">Untuk kamera yang VLC/FFmpeg manual jalan dengan TCP, pilih TCP.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t("rtspTransportHelp")}</p>
             </Field>
           )}
 
           {form.streamType !== "MJPEG" && isRtspFamily && (
-            <Field label="HLS Mode">
+            <Field label={t("hlsModeLabel")}>
               <Select value={form.hlsMode} onValueChange={(v) => setForm({ ...form, hlsMode: v as HlsMode })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -706,20 +712,20 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   <SelectItem value="transcode">Transcode — kompatibel, CPU lebih berat</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground mt-1">Copy memakai -vcodec copy. Transcode memakai libx264 browser-friendly.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{t("hlsModeHelp")}</p>
             </Field>
           )}
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div className="min-w-0 pr-2">
-              <Label className="text-sm">Kamera Aktif</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Status online/offline dihitung otomatis dari probe/stream.</p>
+              <Label className="text-sm">{t("cameraActiveLabel")}</Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t("cameraActiveHelp")}</p>
             </div>
             <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
           </div>
 
           <div className="flex items-center justify-between">
-            <Label className="text-sm">Pengaturan Audio</Label>
+            <Label className="text-sm">{t("audioSettings")}</Label>
             <Select value={form.audioMode} onValueChange={(v) => setForm({ ...form, audioMode: v as Camera["audioMode"] })}>
               <SelectTrigger className="w-[120px] h-8 text-xs">
                 <SelectValue />
@@ -733,9 +739,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           </div>
           <div className={cn("flex items-center justify-between rounded-md border p-3", !ptzSupported && "opacity-60")}>
             <div className="min-w-0 pr-2">
-              <Label className="text-sm">Aktifkan PTZ</Label>
+              <Label className="text-sm">{t("enablePtzLabel")}</Label>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                {ptzSupported ? "Sumber mendukung ONVIF — kontrol PTZ tersedia." : "Hanya tersedia untuk sumber RTSP + ONVIF."}
+                {ptzSupported ? t("ptzSupportedHelp") : t("ptzUnsupportedHelp")}
               </p>
             </div>
             <Switch checked={form.enablePTZ} disabled={!ptzSupported}
@@ -743,8 +749,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           </div>
 
           <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 space-y-2.5">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Pratinjau URL</div>
-            <UrlRow icon={<Link2 className="h-3.5 w-3.5" />} label="Source Asli" value={sourceUrlPreview} tone="primary" />
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t("urlPreview")}</div>
+            <UrlRow icon={<Link2 className="h-3.5 w-3.5" />} label={t("originalSource")} value={sourceUrlPreview} tone="primary" />
             {form.sourceType === "RTSP+ONVIF" && (
               <UrlRow icon={<Link2 className="h-3.5 w-3.5" />} label="ONVIF Endpoint" value={onvifUrlPreview} />
             )}
@@ -755,12 +761,12 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             <div className="md:col-span-2 rounded-md border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-sm font-medium">Diagnostik ONVIF/PTZ</div>
-                  <p className="text-[11px] text-muted-foreground">Pengujian memakai konfigurasi terakhir yang sudah disimpan.</p>
+                  <div className="text-sm font-medium">{t("ptzDiagnostic")}</div>
+                  <p className="text-[11px] text-muted-foreground">{t("ptzDiagnosticHelp")}</p>
                 </div>
                 <Button type="button" variant="outline" onClick={testPtz} disabled={testingPtz}>
                   <TestTube2 className="h-4 w-4" />
-                  {testingPtz ? "Menguji..." : "Test ONVIF/PTZ"}
+                  {testingPtz ? t("ptzSending") : "Test ONVIF/PTZ"}
                 </Button>
               </div>
               {ptzResult && (
@@ -780,8 +786,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         </div>
 
         <DialogFooter data-testid="camera-form-footer" className="shrink-0 border-t bg-background px-6 py-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Batal</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? "Menyimpan…" : camera ? "Simpan" : "Tambah"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("cancel")}</Button>
+          <Button onClick={submit} disabled={saving}>{saving ? t("savingEllipsis") : camera ? t("save") : t("add")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -799,12 +805,13 @@ function Field({ label, error, children, className }: { label: string; error?: s
 }
 
 function UrlRow({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone?: "primary" | "success" }) {
+  const { t } = useTranslation();
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(value);
-      toast.success(`${label} disalin`);
+      toast.success(t("copied", { label }));
     } catch {
-      toast.error("Gagal menyalin");
+      toast.error(t("copyFailed"));
     }
   };
   return (
