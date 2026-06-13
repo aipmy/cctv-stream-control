@@ -28,3 +28,7 @@ test-preview.js
 # agent superpowers
 .agent/
 
+# package locks
+package-lock.json
+**/package-lock.json
+
