@@ -14,7 +14,7 @@ A lightweight, robust, and modern CCTV Dashboard designed for LAN/VPN environmen
 ### 🌟 Features
 - **First-Run Admin Wizard:** Seamless initial setup with zero default credentials.
 - **Role-Based Access Control (RBAC):** Three distinct roles (`admin`, `teknisi`, `guest`) with granular action permissions.
-- **RTSP Restreaming:** Efficiently transcodes/demuxes RTSP camera feeds into browser-friendly HLS Stable, HLS Low Latency, or MJPEG formats.
+- **RTSP Restreaming & Proxying:** Efficiently transcodes/demuxes RTSP camera feeds into browser-friendly HLS Stable, HLS Low Latency, or MJPEG formats. The system acts as a restreaming proxy—multiple viewers can watch a stream concurrently, but the backend only establishes a single connection process to the camera, protecting network and hardware resources.
 - **Dynamic Stream Restarting:** Server automatically restarts the stream process when key parameters (credentials, quality, type) are modified.
 - **Audio Fallback Support:** Gracefully retries streaming without audio (`-an`) if FFmpeg crashes while transcoding audio.
 - **Interactive Live View:**
@@ -147,7 +147,7 @@ This dashboard is designed to work with any IP camera supporting standard RTSP a
 ### 🌟 Fitur
 - **Wizard Admin Pertama:** Setup awal instalasi yang aman tanpa username/password bawaan.
 - **Kontrol Akses Berbasis Role (RBAC):** Tiga peran berbeda (`admin`, `teknisi`, `guest`) dengan hak akses yang terperinci.
-- **Restream RTSP:** Mengonversi feed RTSP kamera menjadi format HLS Stable, HLS Low Latency, atau MJPEG yang didukung browser.
+- **Restream & Proxy RTSP:** Mengonversi feed RTSP kamera menjadi format HLS Stable, HLS Low Latency, atau MJPEG yang didukung browser. Sistem bertindak sebagai proxy restream—beberapa pengguna dapat menonton satu stream secara bersamaan, tetapi backend hanya membuat satu koneksi ke kamera fisik, menghemat bandwidth jaringan lokal dan beban perangkat kamera.
 - **Restart Stream Dinamis:** Server otomatis me-restart proses stream ketika parameter penting kamera (password, kualitas, tipe) diubah.
 - **Dukungan Audio Fallback:** Secara otomatis mencoba kembali streaming tanpa audio (`-an`) jika FFmpeg crash saat memproses audio.
 - **Live View Interaktif:**
