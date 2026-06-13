@@ -43,6 +43,12 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
   const src = useMemo(() => streamUrl(camera, output), [camera.id, output]);
   const { t } = useTranslation();
 
+  // Keep t in a ref to prevent HLS and MJPEG effects from restarting on every render
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (video) {
@@ -75,7 +81,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       } catch (err) {
         if (disposed) return;
         setLoading(false);
-        setError(err instanceof Error ? err.message : t("mjpegFailedToOpen"));
+        setError(err instanceof Error ? err.message : tRef.current("mjpegFailedToOpen"));
       }
     }
 
@@ -84,7 +90,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       disposed = true;
       setMjpegSrc(null);
     };
-  }, [camera.id, camera.enabled, output, src, t]);
+  }, [camera.id, camera.enabled, output, src]);
 
   useEffect(() => {
     if (!camera.enabled) return;
@@ -138,7 +144,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             if (!disposed) {
               setLoading(false);
               const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
-              setError(t("streamFailedToLoadInBrowser", { output, errMsg: errMsg || t("checkCodecOrTranscode") }));
+              setError(tRef.current("streamFailedToLoadInBrowser", { output, errMsg: errMsg || tRef.current("checkCodecOrTranscode") }));
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
@@ -160,7 +166,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         }
 
         if (!useHlsJs) {
-          throw new Error(t("hlsNotSupported"));
+          throw new Error(tRef.current("hlsNotSupported"));
         }
 
         hls = new HlsLib({
@@ -215,7 +221,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
             }
           }
           setLoading(false);
-          const base = playbackErrorMessage(t, data.details, data.type);
+          const base = playbackErrorMessage(tRef.current, data.details, data.type);
           void streamApi.status()
             .then((items) => {
               if (disposed) return;
@@ -227,7 +233,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       } catch (err) {
         if (!disposed) {
           setLoading(false);
-          setError(err instanceof Error ? err.message : t("streamFailedToLoad", { output }));
+          setError(err instanceof Error ? err.message : tRef.current("streamFailedToLoad", { output }));
         }
       }
     }
@@ -241,7 +247,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       video.removeAttribute("src");
       video.load();
     };
-  }, [camera.id, camera.enabled, output, src, muted, volume, queryClient, t]);
+  }, [camera.id, camera.enabled, output, src]);
 
   if (!camera.enabled) {
     return (
