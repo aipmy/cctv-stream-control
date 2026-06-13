@@ -7,6 +7,9 @@ import { Cctv, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/features/auth/store";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/useTranslation";
+import { GlobalThemeToggle } from "@/components/GlobalThemeToggle";
+import { useLangStore } from "@/features/ui/useLangStore";
+import { cn } from "@/lib/utils";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -16,6 +19,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { t, lang } = useTranslation();
+  const setLang = useLangStore((s) => s.setLang);
 
   if (user) return <Navigate to="/" replace />;
 
@@ -42,7 +46,38 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full grid lg:grid-cols-2 bg-background">
+    <div className="min-h-screen w-full grid lg:grid-cols-2 bg-background relative">
+      {/* Top right language and theme selectors */}
+      <div className="fixed top-2.5 right-24 z-[70] flex items-center gap-3">
+        <div className="inline-flex rounded-md border bg-card/90 backdrop-blur p-0.5 select-none shrink-0 shadow-sm border-border/70">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setLang("en")}
+            className={cn(
+              "h-7 px-2.5 text-[10px] font-semibold uppercase rounded-sm",
+              lang === "en" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+            )}
+          >
+            EN
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setLang("id")}
+            className={cn(
+              "h-7 px-2.5 text-[10px] font-semibold uppercase rounded-sm",
+              lang === "id" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+            )}
+          >
+            ID
+          </Button>
+        </div>
+      </div>
+      <GlobalThemeToggle />
+
       {/* Brand panel */}
       <div className="hidden lg:flex relative overflow-hidden bg-gradient-primary">
         <div className="absolute inset-0 cctv-feed opacity-40" />

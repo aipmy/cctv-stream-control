@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatByteRateFromKbps } from "@/lib/bandwidth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Navigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export default function Cameras() {
@@ -25,11 +25,16 @@ export default function Cameras() {
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
+
+  const canView = role === "admin" || !!perms?.canViewManagement;
+  if (!canView) {
+    return <Navigate to="/" replace />;
+  }
   
-  const canAdd = role === "admin" || role === "teknisi" || !!perms?.canAddCamera;
-  const canEdit = role === "admin" || role === "teknisi" || !!perms?.canEditCamera;
+  const canAdd = role === "admin" || !!perms?.canAddCamera;
+  const canEdit = role === "admin" || !!perms?.canEditCamera;
   const canDelete = role === "admin" || !!perms?.canDeleteCamera;
-  const canRestart = role === "admin" || role === "teknisi" || !!perms?.canRestartStream;
+  const canRestart = role === "admin" || !!perms?.canRestartStream;
   const canSeeIp = role !== "guest";
 
   const [searchParams, setSearchParams] = useSearchParams();

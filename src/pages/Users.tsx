@@ -14,17 +14,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Plus, Pencil, Trash2, ScrollText, Loader2, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, ScrollText, Loader2, Download, ChevronsUpDown } from "lucide-react";
 import type { AuditOutcome, CreateUserInput, Role, UserSummary } from "@/types";
 import { auditApi } from "@/lib/api";
 import { toast } from "sonner";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 import { useTranslation } from "@/hooks/useTranslation";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const roleColors: Record<Role, string> = {
   admin: "bg-primary/15 text-primary border-primary/30",
   teknisi: "bg-info/15 text-info border-info/30",
   guest: "bg-muted text-muted-foreground border-border",
+  internal: "bg-success/15 text-success border-success/30",
+  external: "bg-warning/15 text-warning border-warning/30",
 };
 
 export default function Users() {
@@ -38,7 +41,7 @@ export default function Users() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<UserSummary | null>(null);
   const [del, setDel] = useState<UserSummary | null>(null);
-  const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false };
+  const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false, canPlayAudio: false, canViewStats: false, canControlPTZ: false };
   const [form, setForm] = useState<CreateUserInput>({ username: "", password: "", role: "guest", active: true, permissions: emptyPermissions, allowedGroups: [] });
   const [saving, setSaving] = useState(false);
   const [auditActor, setAuditActor] = useState("");
@@ -91,11 +94,29 @@ export default function Users() {
     }
     setSaving(true);
     try {
+      const finalPermissions = form.role === "admin"
+        ? {
+            canAddCamera: true,
+            canEditCamera: true,
+            canDeleteCamera: true,
+            canRestartStream: true,
+            canViewManagement: true,
+            canPlayAudio: true,
+            canViewStats: true,
+            canControlPTZ: true,
+          }
+        : form.permissions;
+
+      const payload = {
+        ...form,
+        permissions: finalPermissions,
+      };
+
       if (edit) { 
-        await updateUser(edit.id, form); 
+        await updateUser(edit.id, payload); 
         toast.success(lang === "id" ? "Pengguna diperbarui" : "User updated successfully"); 
       } else { 
-        await addUser(form); 
+        await addUser(payload); 
         toast.success(lang === "id" ? "Pengguna ditambahkan" : "User added successfully"); 
       }
       setOpen(false);
@@ -135,7 +156,7 @@ export default function Users() {
                 {users.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.username}</TableCell>
-                    <TableCell><Badge variant="outline" className={roleColors[u.role]}>{u.role}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={roleColors[u.role]}>{t(u.role)}</Badge></TableCell>
                     <TableCell>
                       <Switch
                         checked={u.active}
@@ -249,8 +270,10 @@ export default function Users() {
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="teknisi">{t("technician")}</SelectItem>
+                  <SelectItem value="teknisi">{t("teknisi")}</SelectItem>
                   <SelectItem value="guest">{t("guest")}</SelectItem>
+                  <SelectItem value="internal">{t("internal")}</SelectItem>
+                  <SelectItem value="external">{t("external")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -262,48 +285,137 @@ export default function Users() {
             {form.role !== "admin" && (
               <div className="space-y-4 pt-4 border-t mt-4">
                 <div>
-                  <Label className="text-xs uppercase tracking-wider block mb-3">{t("allowedGroups")}</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border rounded-md p-3 max-h-48 overflow-y-auto">
-                    {siteOptions.length === 0 && <div className="text-xs text-muted-foreground col-span-full">{lang === "id" ? "Belum ada site." : "No sites available."}</div>}
-                    {siteOptions.map((site) => (
-                      <div key={site} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`site-${site}`}
-                          checked={(form.allowedGroups || []).includes(site)}
-                          onCheckedChange={(checked) => {
-                            const prev = form.allowedGroups || [];
-                            if (checked) {
-                              setForm({ ...form, allowedGroups: [...prev, site] });
-                            } else {
-                              setForm({ ...form, allowedGroups: prev.filter((s) => s !== site) });
-                            }
-                          }}
-                        />
-                        <label htmlFor={`site-${site}`} className="text-xs font-medium leading-none cursor-pointer">
-                          {site}
-                        </label>
+                  <Label className="text-xs uppercase tracking-wider block mb-2">{t("allowedGroups")}</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between mt-1.5 text-left font-normal h-10 bg-background hover:bg-background border-border">
+                        <span className="truncate text-xs">
+                          {(form.allowedGroups || []).length === 0
+                            ? (lang === "id" ? "Pilih grup..." : "Select groups...")
+                            : (form.allowedGroups || []).length === siteOptions.length
+                            ? (lang === "id" ? "Semua grup" : "All groups")
+                            : (form.allowedGroups || []).join(", ")}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-3" align="start">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2 pb-2 border-b">
+                          <Checkbox
+                            id="site-select-all"
+                            checked={siteOptions.length > 0 && (form.allowedGroups || []).length === siteOptions.length}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setForm({ ...form, allowedGroups: [...siteOptions] });
+                              } else {
+                                setForm({ ...form, allowedGroups: [] });
+                              }
+                            }}
+                          />
+                          <label htmlFor="site-select-all" className="text-xs font-semibold leading-none cursor-pointer flex-1 py-1">
+                            {t("selectAll")}
+                          </label>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-2 pt-1">
+                          {siteOptions.length === 0 && (
+                            <div className="text-xs text-muted-foreground p-2 text-center">
+                              {lang === "id" ? "Belum ada site." : "No sites available."}
+                            </div>
+                          )}
+                          {siteOptions.map((site) => (
+                            <div key={site} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`site-${site}`}
+                                checked={(form.allowedGroups || []).includes(site)}
+                                onCheckedChange={(checked) => {
+                                  const prev = form.allowedGroups || [];
+                                  if (checked) {
+                                    setForm({ ...form, allowedGroups: [...prev, site] });
+                                  } else {
+                                    setForm({ ...form, allowedGroups: prev.filter((s) => s !== site) });
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`site-${site}`} className="text-xs font-medium leading-none cursor-pointer flex-1 py-1">
+                                {site}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="flex items-center justify-between border-b pb-2 mt-4 mb-3">
+                  <Label className="text-xs uppercase tracking-wider font-semibold">{t("specificPermissions")}</Label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{t("allPermissions")}</span>
+                    <Switch
+                      checked={
+                        Object.keys(emptyPermissions).length > 0 &&
+                        Object.keys(emptyPermissions).every((k) => !!form.permissions?.[k as keyof typeof emptyPermissions])
+                      }
+                      onCheckedChange={(checked) => {
+                        const updated = {
+                          canAddCamera: checked,
+                          canEditCamera: checked,
+                          canDeleteCamera: checked,
+                          canRestartStream: checked,
+                          canViewManagement: checked,
+                          canPlayAudio: checked,
+                          canViewStats: checked,
+                          canControlPTZ: checked,
+                        };
+                        setForm({ ...form, permissions: updated });
+                      }}
+                    />
                   </div>
                 </div>
 
-                <Label className="text-xs uppercase tracking-wider block mt-4 mb-2">{t("specificPermissions")}</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { key: "canAddCamera", label: t("addCamera") },
-                    { key: "canEditCamera", label: t("editCamera") },
-                    { key: "canDeleteCamera", label: t("deleteCameraTitle") },
-                    { key: "canRestartStream", label: "Restart Stream" },
-                    { key: "canViewManagement", label: lang === "id" ? "Lihat Manajemen Kamera" : "View Camera Management" }
-                  ].map((p) => (
-                    <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
-                      <Label className="text-xs font-normal">{p.label}</Label>
-                      <Switch 
-                        checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
-                        onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as unknown as typeof emptyPermissions })} 
-                      />
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("dashboardPermissions")}</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { key: "canViewStats", label: t("allowStats") },
+                      ].map((p) => (
+                        <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
+                          <Label className="text-xs font-normal cursor-pointer flex-1" htmlFor={`perm-${p.key}`}>{p.label}</Label>
+                          <Switch 
+                            id={`perm-${p.key}`}
+                            checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
+                            onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as unknown as typeof emptyPermissions })} 
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-1">{t("cameraManagementPermissions")}</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { key: "canViewManagement", label: lang === "id" ? "Lihat Manajemen Kamera" : "View Camera Management" },
+                        { key: "canAddCamera", label: t("addCamera") },
+                        { key: "canEditCamera", label: t("editCamera") },
+                        { key: "canDeleteCamera", label: t("deleteCameraTitle") },
+                        { key: "canRestartStream", label: "Restart Stream" },
+                        { key: "canControlPTZ", label: t("allowPTZ") },
+                        { key: "canPlayAudio", label: t("allowAudio") },
+                      ].map((p) => (
+                        <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
+                          <Label className="text-xs font-normal cursor-pointer flex-1" htmlFor={`perm-${p.key}`}>{p.label}</Label>
+                          <Switch 
+                            id={`perm-${p.key}`}
+                            checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
+                            onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as unknown as typeof emptyPermissions })} 
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

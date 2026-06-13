@@ -1,4 +1,4 @@
-export type Role = "admin" | "teknisi" | "guest";
+export type Role = "admin" | "teknisi" | "guest" | "internal" | "external";
 export type StreamType = "HLS Stable" | "HLS Low Latency" | "MJPEG";
 export type RtspTransport = "tcp" | "udp" | "auto";
 export type HlsMode = "copy" | "transcode";
@@ -65,6 +65,9 @@ export interface UserPermissions {
   canDeleteCamera: boolean;
   canRestartStream: boolean;
   canViewManagement: boolean;
+  canPlayAudio?: boolean;
+  canViewStats?: boolean;
+  canControlPTZ?: boolean;
 }
 
 export interface UserSummary {

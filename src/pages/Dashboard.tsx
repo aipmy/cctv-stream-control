@@ -42,6 +42,7 @@ export default function Dashboard() {
   const pinnedCameraIds = user?.preferences?.pinnedCameraIds || [];
   
   const { t, lang } = useTranslation();
+  const canViewStats = user?.role === "admin" || !!user?.permissions?.canViewStats;
 
   const filtered = useMemo(() => {
     return filterDashboardCameras(cameras, {
@@ -120,33 +121,37 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
-        <StatCard 
-          label={t("camerasOnline")} 
-          value={online} 
-          hint={t("camerasOnlineHint", { n: Math.round((online / Math.max(enabled, 1)) * 100) })} 
-          icon="online" 
-          tone="success" 
-        />
-        <StatCard 
-          label={t("camerasOffline")} 
-          value={offline} 
-          hint={t("camerasOfflineHint", { starting, disabled })} 
-          icon="offline" 
-          tone="destructive" 
-        />
-        <StatCard 
-          label={t("camerasStreamingActive")} 
-          value={streaming} 
-          hint={t("camerasStreamingHint", { n: totalViewers })} 
-          icon="stream" 
-          tone="info" 
-        />
-        <StatCard label={t("cctvBandwidth")} value={formatByteRateFromKbps(totalBw)} icon="bandwidth" tone="warning" />
-      </div>
+      {canViewStats && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
+            <StatCard 
+              label={t("camerasOnline")} 
+              value={online} 
+              hint={t("camerasOnlineHint", { n: Math.round((online / Math.max(enabled, 1)) * 100) })} 
+              icon="online" 
+              tone="success" 
+            />
+            <StatCard 
+              label={t("camerasOffline")} 
+              value={offline} 
+              hint={t("camerasOfflineHint", { starting, disabled })} 
+              icon="offline" 
+              tone="destructive" 
+            />
+            <StatCard 
+              label={t("camerasStreamingActive")} 
+              value={streaming} 
+              hint={t("camerasStreamingHint", { n: totalViewers })} 
+              icon="stream" 
+              tone="info" 
+            />
+            <StatCard label={t("cctvBandwidth")} value={formatByteRateFromKbps(totalBw)} icon="bandwidth" tone="warning" />
+          </div>
 
-      <BandwidthChart />
+          <BandwidthChart />
+        </>
+      )}
 
       <Card className="p-3 flex flex-col gap-2">
         <div className="flex flex-col md:flex-row gap-2 items-stretch md:items-center">
