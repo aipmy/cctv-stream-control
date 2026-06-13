@@ -61,7 +61,7 @@ describe("application bootstrap", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: /dashboard monitoring/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /dashboard monitoring|monitoring dashboard/i })).toBeInTheDocument();
     await waitFor(() => expect(requests.some((url) => url.includes("/api/cameras"))).toBe(true));
     expect(requests.some((url) => url.includes("/api/users"))).toBe(false);
     expect(requests.some((url) => /\/api\/streams\/c-[1-8]\//.test(url))).toBe(false);

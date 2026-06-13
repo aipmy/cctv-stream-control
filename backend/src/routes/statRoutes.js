@@ -25,7 +25,14 @@ function enrichCameras(cameras) {
 statRoutes.get("/", async (req, res, next) => {
   try {
     const revealSecret = req.auth?.role === "admin" || req.auth?.role === "teknisi";
-    const cameras = await listCameras({ revealSecret });
+    let cameras = await listCameras({ revealSecret });
+    if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
+      if (req.auth.allowedGroups.length > 0) {
+        cameras = cameras.filter((cam) => req.auth.allowedGroups.includes(cam.site));
+      } else {
+        cameras = [];
+      }
+    }
     const enriched = enrichCameras(cameras);
     const enabled = enriched.filter((c) => c.enabled).length;
     const disabled = enriched.length - enabled;

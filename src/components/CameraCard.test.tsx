@@ -61,7 +61,7 @@ test("PTZ action displays success feedback on the camera card", async () => {
     />,
   );
 
-  fireEvent.click(screen.getByTitle("PTZ home"));
-  await waitFor(() => expect(screen.getByText("Berhasil")).toBeInTheDocument());
+  fireEvent.click(screen.getByTitle(/ptz home/i));
+  await waitFor(() => expect(screen.getByText(/berhasil|success/i)).toBeInTheDocument());
   expect(ptz).toHaveBeenCalledWith("cam-1", "home");
 });

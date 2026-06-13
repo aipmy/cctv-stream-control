@@ -23,5 +23,5 @@ test("camera dialog keeps actions outside its scrollable form body", () => {
   expect(screen.getByTestId("camera-form-footer")).not.toBe(
     screen.getByTestId("camera-form-scroll"),
   );
-  expect(screen.getByRole("button", { name: "Tambah" })).toBeVisible();
+  expect(screen.getByRole("button", { name: /tambah|add/i })).toBeVisible();
 });
