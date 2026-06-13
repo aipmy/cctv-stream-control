@@ -19,11 +19,11 @@ if [[ -d backend/data ]]; then
 fi
 
 echo "==> Installing frontend deps"
-npm ci --no-audit --no-fund --progress=false || npm install --no-audit --no-fund --progress=false
+npm ci --no-audit --no-fund --progress=false --loglevel=info || npm install --no-audit --no-fund --progress=false --loglevel=info
 
 echo "==> Installing backend deps"
 cd backend
-npm ci --no-audit --no-fund --progress=false || npm install --no-audit --no-fund --progress=false
+npm ci --no-audit --no-fund --progress=false --loglevel=info || npm install --no-audit --no-fund --progress=false --loglevel=info
 cd "$ROOT_DIR"
 
 echo "==> Building frontend"
