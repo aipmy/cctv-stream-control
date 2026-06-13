@@ -39,6 +39,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
   const [loading, setLoading] = useState(Boolean(camera.enabled));
   const [error, setError] = useState<string | null>(null);
   const [mjpegSrc, setMjpegSrc] = useState<string | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
   const src = useMemo(() => streamUrl(camera, output), [camera.id, output]);
   const { t } = useTranslation();
 
@@ -55,6 +56,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     setLoading(Boolean(camera.enabled));
     setError(null);
     setMjpegSrc(null);
+    setLatency(null);
   }, [camera.id, camera.enabled, output]);
 
   useEffect(() => {
@@ -104,6 +106,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     let disposed = false;
     let hls: Hls | null = null;
     let mediaRecoveryAttempts = 0;
+    let latencyInterval: number | null = null;
     const video = videoRef.current;
     if (!video) return;
 
@@ -114,8 +117,6 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     video.load();
 
     // Detect Safari — only Safari should use native HLS.
-    // Chrome/Edge report canPlayType support but their native demuxer
-    // often fails with DEMUXER_ERROR_COULD_NOT_PARSE on live HLS streams.
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
     async function attachHls() {
@@ -123,9 +124,6 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         await streamApi.start(camera.id, output);
         if (disposed) return;
 
-        // Prefer hls.js on all browsers except Safari.
-        // Safari's native HLS is more reliable and supports features
-        // like Low-Latency HLS natively.
         const mod = await import("hls.js");
         const HlsLib = mod.default;
         const useNative = isSafari && video.canPlayType("application/vnd.apple.mpegurl");
@@ -145,6 +143,18 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           };
           video.volume = Math.max(0, Math.min(1, volume));
           video.muted = muted || video.volume <= 0.02;
+
+          // Track latency for native player (Safari)
+          latencyInterval = window.setInterval(() => {
+            if (!disposed && video.seekable && video.seekable.length > 0) {
+              const end = video.seekable.end(video.seekable.length - 1);
+              const lat = end - video.currentTime;
+              if (lat >= 0 && lat < 60) {
+                setLatency(lat);
+              }
+            }
+          }, 1000);
+
           await video.play().catch(() => undefined);
           return;
         }
@@ -172,6 +182,22 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           video.muted = muted || video.volume <= 0.02;
           void video.play().catch(() => undefined);
         });
+
+        // Track latency for hls.js player
+        latencyInterval = window.setInterval(() => {
+          if (!disposed && hls && video) {
+            const lat = hls.latency;
+            if (typeof lat === "number" && isFinite(lat) && lat > 0) {
+              setLatency(lat);
+            } else if (hls.liveSyncPosition) {
+              const diff = hls.liveSyncPosition - video.currentTime;
+              if (diff >= 0) {
+                setLatency(diff);
+              }
+            }
+          }
+        }, 1000);
+
         hls.on(HlsLib.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string; type?: string }) => {
           if (!data?.fatal || disposed) return;
           if (data.type === "mediaError") {
@@ -181,7 +207,6 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
               return;
             }
             if (!disposed && output !== "MJPEG") {
-              // Fatal media error, probably codec issue (e.g. H.265 in copy mode).
               void streamApi.fallback(camera.id).then(() => {
                 if (!disposed) {
                   void queryClient.invalidateQueries({ queryKey: ["cameras"] });
@@ -210,6 +235,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     void attachHls();
     return () => {
       disposed = true;
+      if (latencyInterval) clearInterval(latencyInterval);
       hls?.destroy();
       video.pause();
       video.removeAttribute("src");
@@ -249,6 +275,19 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           controls={controls}
           crossOrigin="anonymous"
         />
+      )}
+
+      {/* Latency overlay */}
+      {camera.enabled && output !== "MJPEG" && latency !== null && !error && !loading && (
+        <div className="absolute left-2 top-2 z-30 flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px] font-mono text-white/90 border border-white/10 select-none transition-all duration-300">
+          <span className={cn(
+            "h-1.5 w-1.5 rounded-full animate-pulse",
+            latency < 4 ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" :
+            latency < 8 ? "bg-yellow-500 shadow-[0_0_8px_#f59e0b]" :
+            "bg-destructive shadow-[0_0_8px_#ef4444]"
+          )} />
+          <span>Lat: {Math.round(latency * 1000)} ms</span>
+        </div>
       )}
 
       {loading && !error && (
