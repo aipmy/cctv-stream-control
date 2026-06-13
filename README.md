@@ -27,6 +27,18 @@ A lightweight, robust, and modern CCTV Dashboard designed for LAN/VPN environmen
 
 ---
 
+### 📸 Previews
+#### Dashboard Live View
+![Dashboard Preview](docs/screenshots/dashboard.png)
+
+#### Camera Management
+![Camera Management Preview](docs/screenshots/cameras.png)
+
+#### User & Access Management
+![User Management Preview](docs/screenshots/users.png)
+
+---
+
 ### 📋 Prerequisites
 Ensure you have the following installed on your host system:
 - **Node.js** (v20 or higher)
@@ -132,6 +144,18 @@ To update in the future, run:
 - **Notifikasi Offline Cerdas:** Lonceng notifikasi memantau status kamera secara real-time, menampilkan status offline beserta alasan error aslinya.
 - **Log Audit Aktivitas:** Pencatatan aktivitas konfigurasi sistem, manajemen pengguna, dan permintaan stream.
 - **Pelacak Login Terakhir Pengguna:** Kolom login terakhir di manajemen pengguna dengan format waktu relatif ("5 menit lalu", "Kemarin", dll).
+
+---
+
+### 📸 Tampilan / Preview
+#### Live View Dashboard
+![Dashboard Preview](docs/screenshots/dashboard.png)
+
+#### Manajemen Kamera
+![Camera Management Preview](docs/screenshots/cameras.png)
+
+#### Manajemen Pengguna & Log Aktivitas
+![User Management Preview](docs/screenshots/users.png)
 
 ---
 
