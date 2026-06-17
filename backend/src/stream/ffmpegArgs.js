@@ -42,6 +42,15 @@ function audioArgs(camera, audioFallback) {
 function copyHlsArgs(camera, output, dir, options, audioFallback) {
   const source = buildSourceUrl(camera);
   const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
+  const flags = ["omit_endlist", "independent_segments", "temp_file"];
+  if (!camera.enableRecording) {
+    flags.push("delete_segments");
+  }
+
+  const detectFps = options.mjpegFps || 8;
+  const detectWidth = options.mjpegWidth || 640;
+  const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
+
   return [
     "-hide_banner", "-nostdin",
     "-fflags", "nobuffer+genpts+discardcorrupt",
@@ -49,17 +58,25 @@ function copyHlsArgs(camera, output, dir, options, audioFallback) {
     ...(isRtsp ? ["-use_wallclock_as_timestamps", "1"] : []),
     ...buildRtspInputArgs(camera, options),
     "-i", source,
-    "-map", "0:v:0",
+    "-filter_complex", `[0:v:0]split=2[vlive][vdet];[vdet]${detectFilter}[vdetout]`,
+    "-map", "[vlive]",
     "-vsync", "0",
     "-vcodec", "copy",
     ...audioArgs(camera, audioFallback),
-    "-hls_flags", "delete_segments+omit_endlist+independent_segments+temp_file",
+    "-hls_flags", flags.join("+"),
     "-f", "hls",
     "-hls_time", "1",
-    "-hls_list_size", "3",
+    "-hls_list_size", "20",
+    "-hls_delete_threshold", "3",
     "-hls_segment_type", "mpegts",
-    "-hls_segment_filename", path.join(dir, "%d.ts"),
+    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, "%d.ts")]),
     path.join(dir, "index.m3u8"),
+    "-map", "[vdetout]",
+    "-an",
+    "-vcodec", "mjpeg",
+    "-q:v", String(options.mjpegQuality || 7),
+    "-f", "image2pipe",
+    "pipe:1",
   ];
 }
 
@@ -76,10 +93,22 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
   const hlsTime = lowLatency ? "1" : "2";
-  const hlsListSize = lowLatency ? "4" : "8";
   const fps = lowLatency ? "12" : "10";
   const gop = String(Number(fps) * Number(hlsTime));
   const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
+
+  const flags = ["omit_endlist", "program_date_time", "independent_segments", "temp_file"];
+  if (!camera.enableRecording) {
+    flags.push("delete_segments");
+  }
+
+  const detectFps = options.mjpegFps || 8;
+  const detectWidth = options.mjpegWidth || 640;
+  const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
+  const scaleFilter = camera.streamQuality && camera.streamQuality !== "Auto"
+    ? `,scale=-2:${camera.streamQuality.replace("p", "")}`
+    : "";
+  const hlsFilter = `fps=${fps}${scaleFilter}`;
 
   return [
     "-hide_banner", "-nostdin",
@@ -89,13 +118,13 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
     ...(isRtsp ? ["-use_wallclock_as_timestamps", "1"] : []),
     ...buildRtspInputArgs(camera, options),
     "-i", source,
-    "-map", "0:v:0",
+    "-filter_complex", `[0:v:0]split=2[vhls][vdet];[vhls]${hlsFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`,
+    "-map", "[vhlsout]",
     "-c:v", "libx264",
     "-preset", lowLatency ? "ultrafast" : "veryfast",
     "-tune", "zerolatency",
     "-profile:v", "baseline",
     "-pix_fmt", "yuv420p",
-    ...videoScaleArgs(camera),
     "-vsync", "1",
     "-r", fps,
     "-g", gop,
@@ -107,13 +136,19 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
     ...audioArgs(camera, audioFallback),
     "-f", "hls",
     "-hls_time", hlsTime,
-    "-hls_list_size", hlsListSize,
+    "-hls_list_size", lowLatency ? "20" : "15",
     "-hls_delete_threshold", "2",
-    "-hls_flags", "delete_segments+omit_endlist+program_date_time+independent_segments+temp_file",
+    "-hls_flags", flags.join("+"),
     "-hls_allow_cache", "0",
     "-hls_segment_type", "mpegts",
-    "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
+    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, "seg_%06d.ts")]),
     path.join(dir, "index.m3u8"),
+    "-map", "[vdetout]",
+    "-an",
+    "-vcodec", "mjpeg",
+    "-q:v", String(options.mjpegQuality || 7),
+    "-f", "image2pipe",
+    "pipe:1",
   ];
 }
 

@@ -88,12 +88,66 @@ export function normalizeCamera(input, existing = {}) {
       : (input.enableAudio ?? existing.enableAudio) ? "Enable" : "Auto",
     enableAudio: Boolean(input.enableAudio ?? existing.enableAudio ?? (input.audioMode ?? existing.audioMode) !== "Disable"),
     enablePTZ: Boolean(input.enablePTZ ?? existing.enablePTZ ?? false),
+    enableRecording: Boolean(input.enableRecording ?? existing.enableRecording ?? false),
+    enableNotifications: Boolean(input.enableNotifications ?? existing.enableNotifications ?? false),
+    motionSensitivity: input.motionSensitivity !== undefined
+      ? (isNaN(input.motionSensitivity) ? (String(input.motionSensitivity).toLowerCase() === "high" ? 80 : String(input.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(input.motionSensitivity))
+      : (existing.motionSensitivity !== undefined ? (isNaN(existing.motionSensitivity) ? (String(existing.motionSensitivity).toLowerCase() === "high" ? 80 : String(existing.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(existing.motionSensitivity)) : 50),
+    detectResolution: ["Auto", "1080p", "720p", "480p", "360p", "144p"].includes(input.detectResolution || existing.detectResolution)
+      ? (input.detectResolution || existing.detectResolution)
+      : "480p",
+    recordingMode: String(input.recordingMode ?? existing.recordingMode ?? "continuous").toLowerCase() === "event" ? "event" : "continuous",
+    preMotionSeconds: Number(input.preMotionSeconds ?? existing.preMotionSeconds ?? 15),
+    postMotionSeconds: Number(input.postMotionSeconds ?? existing.postMotionSeconds ?? 15),
+    segmentDuration: Number(input.segmentDuration ?? existing.segmentDuration ?? 5),
+    enableAudioRecording: Boolean(input.enableAudioRecording ?? existing.enableAudioRecording ?? true),
+    sourceQualityRecording: Boolean(input.sourceQualityRecording ?? existing.sourceQualityRecording ?? true),
+    motionArea: input.motionArea !== undefined
+      ? (input.motionArea && typeof input.motionArea === "object"
+        ? {
+            x: Number(input.motionArea.x ?? 0),
+            y: Number(input.motionArea.y ?? 0),
+            w: Number(input.motionArea.w ?? 1),
+            h: Number(input.motionArea.h ?? 1),
+          }
+        : null)
+      : (existing.motionArea ?? null),
     lastSeen: input.lastSeen || existing.lastSeen || now,
     viewerCount: Number(input.viewerCount ?? existing.viewerCount ?? 0),
     bandwidthKbps: Number(input.bandwidthKbps ?? existing.bandwidthKbps ?? 0),
     latencyMs: Number(input.latencyMs ?? existing.latencyMs ?? 0),
     qualityProfile: input.qualityProfile || existing.qualityProfile || "Medium",
     errorHistory: Array.isArray(input.errorHistory) ? input.errorHistory : Array.isArray(existing.errorHistory) ? existing.errorHistory : [],
+    excludeAreas: Array.isArray(input.excludeAreas)
+      ? input.excludeAreas.map((area) => {
+          if (area.type === "polygon") {
+            return {
+              type: "polygon",
+              points: Array.isArray(area.points)
+                ? area.points.map((p) => ({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) }))
+                : [],
+              enabled: area.enabled !== false,
+              name: String(area.name || "Polygon"),
+            };
+          }
+          return {
+            type: "rect",
+            x: Number(area.x ?? 0),
+            y: Number(area.y ?? 0),
+            w: Number(area.w ?? 1),
+            h: Number(area.h ?? 1),
+            enabled: area.enabled !== false,
+            name: String(area.name || "Kotak"),
+          };
+        })
+      : Array.isArray(existing.excludeAreas)
+        ? existing.excludeAreas
+        : [],
+    detectionModes: Array.isArray(input.detectionModes)
+      ? input.detectionModes.map(String)
+      : Array.isArray(existing.detectionModes)
+        ? existing.detectionModes
+        : ["pixel", "human", "pet"],
   };
   if (!camera.enabled) camera.status = "offline";
   camera.rtspUrl = buildSourceUrl(camera);

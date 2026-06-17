@@ -65,10 +65,10 @@ export default function Users() {
     if (d < 3600) return t("relativeMinutes", { n: Math.floor(d / 60) });
     if (d < 86400) return t("relativeHours", { n: Math.floor(d / 3600) });
     if (d < 172800) {
-      const timeStr = new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
       return t("relativeYesterday", { time: timeStr });
     }
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
   if (role !== "admin") return <Navigate to="/" replace />;
@@ -221,7 +221,7 @@ export default function Users() {
                 <TableBody>
                   {auditItems.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(item.ts).toLocaleTimeString("id-ID")}</TableCell>
+                      <TableCell className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(item.ts).toLocaleTimeString("id-ID", { hour12: false })}</TableCell>
                       <TableCell>
                         <div className="text-xs font-medium truncate max-w-[120px]">{item.actor.username}</div>
                         <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">{item.action}</div>

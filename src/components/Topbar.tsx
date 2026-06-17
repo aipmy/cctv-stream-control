@@ -73,6 +73,8 @@ export function Topbar() {
       </div>
       
       <div className="flex items-center gap-2 pr-2">
+        <GlobalThemeToggle className="relative shrink-0" />
+        
         <div className="inline-flex rounded-md border bg-muted/30 p-0.5 select-none shrink-0">
           <Button
             size="sm"
@@ -97,9 +99,7 @@ export function Topbar() {
             ID
           </Button>
         </div>
-        <NotificationBell />
-        <GlobalThemeToggle />
-        
+
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -134,6 +134,8 @@ export function Topbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+
+        <NotificationBell />
       </div>
 
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />

@@ -1,6 +1,7 @@
 import { getBearerToken, verifyToken } from "../core/auth.js";
 import { config } from "../core/config.js";
 import { getUserById } from "../services/userService.js";
+import { isTokenRevoked } from "../core/tokenBlacklist.js";
 
 export async function requireAuth(req, res, next) {
   try {
@@ -8,6 +9,10 @@ export async function requireAuth(req, res, next) {
     const token = getBearerToken(req);
     const user = verifyToken(token);
     if (!user) return res.status(401).json({ error: "Unauthorized. Login ulang atau sertakan token stream." });
+    
+    if (await isTokenRevoked(user.jti)) {
+      return res.status(401).json({ error: "Sesi telah berakhir (Logout)" });
+    }
     
     const dbUser = await getUserById(user.sub);
     if (!dbUser || !dbUser.active) return res.status(401).json({ error: "Sesi tidak valid" });

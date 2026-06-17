@@ -43,7 +43,7 @@ interface Props {
   onTogglePin: (c: Camera) => void;
 }
 
-function timeAgo(iso: string, t: (key: any, params?: any) => string) {
+function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string) {
   const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (d < 60) return t("secAgo", { n: d });
   if (d < 3600) return t("minAgo", { n: Math.floor(d / 60) });

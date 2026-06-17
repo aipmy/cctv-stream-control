@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Cameras from "./pages/Cameras";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
+import Events from "./pages/Events";
+import Playback from "./pages/Playback";
 import NotFound from "./pages/NotFound.tsx";
 import { BootstrapGate } from "@/features/auth/BootstrapGate";
 const App = () => {
@@ -33,6 +35,8 @@ const App = () => {
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/cameras" element={<Cameras />} />
+                <Route path="/playback" element={<Playback />} />
+                <Route path="/events" element={<Events />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>

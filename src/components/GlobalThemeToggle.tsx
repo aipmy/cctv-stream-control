@@ -2,7 +2,11 @@ import { Moon, Sun } from "lucide-react";
 import { useSettings } from "@/features/settings/store";
 import { cn } from "@/lib/utils";
 
-export function GlobalThemeToggle() {
+interface Props {
+  className?: string;
+}
+
+export function GlobalThemeToggle({ className }: Props) {
   const { settings, setSettings } = useSettings();
   const dark = settings.theme === "dark";
 
@@ -14,7 +18,10 @@ export function GlobalThemeToggle() {
       aria-checked={dark}
       title={dark ? "Gunakan tema terang" : "Gunakan tema gelap"}
       onClick={() => setSettings({ theme: dark ? "light" : "dark" })}
-      className="fixed right-3 top-2.5 z-[70] h-9 w-[68px] rounded-full border border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur transition-colors hover:border-primary/50"
+      className={cn(
+        "h-9 w-[68px] rounded-full border border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur transition-colors hover:border-primary/50",
+        className || "fixed right-3 top-2.5 z-[70]"
+      )}
     >
       <span
         className={cn(

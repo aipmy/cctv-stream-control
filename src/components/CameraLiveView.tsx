@@ -6,6 +6,7 @@ import { streamApi, streamUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { TranslationKey } from "@/hooks/useTranslation";
 
 interface Props {
   camera: Camera;
@@ -18,7 +19,7 @@ interface Props {
   controlsVisible?: boolean;
 }
 
-function playbackErrorMessage(t: (key: any) => string, details?: string, type?: string) {
+function playbackErrorMessage(t: (key: TranslationKey) => string, details?: string, type?: string) {
   if (details === "bufferAppendError") {
     return t("bufferAppendError");
   }

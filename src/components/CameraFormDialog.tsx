@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import type { Camera, CameraInput, Brand, StreamType, SourceType, RtspTransport, HlsMode } from "@/types";
+import type { Camera, CameraInput, Brand, StreamType, SourceType, RtspTransport, HlsMode, MotionArea } from "@/types";
 import { SOURCE_SUPPORTS_PTZ } from "@/types";
 import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity, Check, ChevronsUpDown } from "lucide-react";
 import { cameraApi, type PtzResult } from "@/lib/api";
 import { useAuth } from "@/features/auth/store";
 import { useCamerasQuery, useCameraActions } from "@/features/cameras/queries";
 import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, defaultPath } from "@/lib/cctv";
+import { CameraLiveView } from "./CameraLiveView";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -43,6 +45,14 @@ const empty = {
   audioMode: "Auto" as Camera["audioMode"],
   enablePTZ: false,
   enabled: true,
+  enableRecording: false,
+  enableNotifications: false,
+  motionSensitivity: 50,
+  motionArea: null as MotionArea | null,
+  excludeAreas: [] as MotionArea[],
+  detectionModes: [] as string[],
+  detectResolution: "480p" as Camera["detectResolution"],
+  recordingMode: "continuous",
 };
 
 const sourceHelpKeys: Record<SourceType, TranslationKey> = {
@@ -285,11 +295,20 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         streamQuality: camera.streamQuality || "Auto",
         rtspTransport: camera.rtspTransport ?? "tcp",
         hlsMode: camera.hlsMode ?? "copy",
-        audioMode: camera.audioMode ?? "Auto", enablePTZ: camera.enablePTZ,
+        audioMode: camera.audioMode ?? "Auto",
+        enablePTZ: camera.enablePTZ,
         enabled: camera.enabled ?? true,
+        enableRecording: camera.enableRecording ?? false,
+        enableNotifications: camera.enableNotifications ?? false,
+        motionSensitivity: camera.motionSensitivity ?? 50,
+        motionArea: camera.motionArea ?? null,
+        excludeAreas: camera.excludeAreas ?? [],
+        detectionModes: camera.detectionModes ?? [],
+        detectResolution: camera.detectResolution ?? "480p",
+        recordingMode: camera.recordingMode ?? "continuous",
       });
     } else {
-      setForm(empty);
+      setForm(emptyWithSite);
     }
     setErrors({});
     setShowPassword(false);
@@ -350,6 +369,14 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       audioMode: form.audioMode,
       enablePTZ: form.enablePTZ,
       enabled: form.enabled,
+      enableRecording: form.enableRecording,
+      enableNotifications: form.enableNotifications,
+      motionSensitivity: form.motionSensitivity,
+      motionArea: form.motionArea,
+      excludeAreas: form.excludeAreas,
+      detectionModes: form.detectionModes,
+      detectResolution: form.detectResolution,
+      recordingMode: form.recordingMode ?? "continuous",
       ...(form.password ? { password: form.password } : {}),
     };
 
@@ -748,6 +775,188 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               onCheckedChange={(v) => setForm({ ...form, enablePTZ: v })} />
           </div>
 
+          {/* Recording Configuration Card */}
+          <div className="md:col-span-2 rounded-md border p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 pr-2">
+                <Label className="text-sm font-semibold">{t("enableRecording")}</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {t("enableRecordingHelp")}
+                </p>
+              </div>
+              <Switch checked={form.enableRecording}
+                onCheckedChange={(v) => setForm({ ...form, enableRecording: v })} />
+            </div>
+
+            {form.enableRecording && (
+              <div className="pt-3 border-t space-y-2 animate-fade-in">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">{t("recordingModeLabel")}</Label>
+                <Select
+                  value={form.recordingMode || "continuous"}
+                  onValueChange={(v) => setForm({ ...form, recordingMode: v })}
+                >
+                  <SelectTrigger className="w-full h-9 text-xs">
+                    <SelectValue placeholder={t("selectRecordingMode")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="continuous">{t("continuousMode")}</SelectItem>
+                    <SelectItem value="event">{t("eventMode")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  {form.recordingMode === "event"
+                    ? t("eventModeHelp")
+                    : t("continuousModeHelp")}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Notifications Switch */}
+          <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2">
+            <div className="min-w-0 pr-2">
+              <Label className="text-sm font-semibold">{t("enableNotifications")}</Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {t("enableNotificationsHelp")}
+              </p>
+            </div>
+            <Switch checked={form.enableNotifications}
+              onCheckedChange={(v) => setForm({ ...form, enableNotifications: v })} />
+          </div>
+
+          {/* Motion detection settings - displayed if notifications are enabled OR event-based recording is enabled */}
+          {(form.enableNotifications || form.enableRecording) && (
+            <>
+              {/* ──── Sensitivity Slider (1-100%) ──── */}
+              <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 pr-2 flex-1">
+                    <Label className="text-sm font-semibold">{t("motionSensitivity")}</Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {t("motionSensitivityDesc")}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 ml-2 tabular-nums">
+                    <span className="text-lg font-bold text-primary">{form.motionSensitivity ?? 50}%</span>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={form.motionSensitivity ?? 50}
+                  onChange={(e) => setForm({ ...form, motionSensitivity: Number(e.target.value) })}
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                />
+                <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
+                  <span>{t("sensLargeOnly")}</span>
+                  <span>{t("sensStandard")}</span>
+                  <span>{t("sensVerySensitive")}</span>
+                </div>
+              </div>
+
+              {/* ──── Detection Resolution ──── */}
+              <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2 animate-fade-in">
+                <div className="min-w-0 pr-2 flex-1">
+                  <Label className="text-sm font-semibold">{t("detectionResolution")}</Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {t("detectionResolutionHelp")}
+                  </p>
+                </div>
+                <Select value={form.detectResolution || "480p"} onValueChange={(v) => setForm({ ...form, detectResolution: v as Camera["detectResolution"] })}>
+                  <SelectTrigger className="w-[120px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Auto">{t("all")}</SelectItem>
+                    <SelectItem value="720p">720p</SelectItem>
+                    <SelectItem value="480p">{t("detectResStandard")}</SelectItem>
+                    <SelectItem value="360p">{t("detectResLight")}</SelectItem>
+                    <SelectItem value="144p">{t("detectResMinimal")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* ──── Smart Detection Modes ──── */}
+              <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
+                <div>
+                  <Label className="text-sm font-semibold">{t("smartDetectionType")}</Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{t("smartDetectionTypeHelp")}</p>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mode-pixel"
+                      checked={form.detectionModes?.includes("pixel")}
+                      onCheckedChange={(checked) => {
+                        const current = form.detectionModes || [];
+                        const next = checked
+                          ? [...current, "pixel"]
+                          : current.filter((m) => m !== "pixel");
+                        setForm({ ...form, detectionModes: next });
+                      }}
+                    />
+                    <label htmlFor="mode-pixel" className="text-xs font-medium leading-none cursor-pointer">
+                      {t("pixelBadge")}
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mode-human"
+                      checked={form.detectionModes?.includes("human")}
+                      onCheckedChange={(checked) => {
+                        const current = form.detectionModes || [];
+                        const next = checked
+                          ? [...current, "human"]
+                          : current.filter((m) => m !== "human");
+                        setForm({ ...form, detectionModes: next });
+                      }}
+                    />
+                    <label htmlFor="mode-human" className="text-xs font-medium leading-none cursor-pointer">
+                      {t("humanBadge")}
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mode-pet"
+                      checked={form.detectionModes?.includes("pet")}
+                      onCheckedChange={(checked) => {
+                        const current = form.detectionModes || [];
+                        const next = checked
+                          ? [...current, "pet"]
+                          : current.filter((m) => m !== "pet");
+                        setForm({ ...form, detectionModes: next });
+                      }}
+                    />
+                    <label htmlFor="mode-pet" className="text-xs font-medium leading-none cursor-pointer">
+                      {t("petBadge")}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* ──── Smart Detection Live View & Masking Area ──── */}
+              <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
+                <div>
+                  <Label className="text-sm font-semibold">{t("smartDetectionLiveView")}</Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {t("smartDetectionLiveViewHelp")}
+                  </p>
+                </div>
+                <UnifiedMotionEditor
+                  cameraId={camera?.id || ""}
+                  cameraEnabled={Boolean(camera?.enabled)}
+                  value={form.excludeAreas || []}
+                  onChange={(areas) => setForm({ ...form, excludeAreas: areas })}
+                />
+              </div>
+            </>
+          )}
+
           <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 space-y-2.5">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t("urlPreview")}</div>
             <UrlRow icon={<Link2 className="h-3.5 w-3.5" />} label={t("originalSource")} value={sourceUrlPreview} tone="primary" />
@@ -791,6 +1000,659 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RoiSelector({
+  value,
+  onChange,
+  camera,
+}: {
+  value: MotionArea | null;
+  onChange: (area: MotionArea | null) => void;
+  camera?: Camera | null;
+}) {
+  const { t } = useTranslation();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
+
+  const activeArea = value || { x: 0, y: 0, w: 1, h: 1 };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setStartPos({ x, y });
+    setCurrentPos({ x, y });
+    setIsDrawing(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDrawing || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setCurrentPos({ x, y });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const x = Math.min(startPos.x, currentPos.x);
+    const y = Math.min(startPos.y, currentPos.y);
+    const w = Math.max(0.05, Math.abs(startPos.x - currentPos.x));
+    const h = Math.max(0.05, Math.abs(startPos.y - currentPos.y));
+    onChange({ x, y, w, h });
+  };
+
+  const applyPreset = (preset: "whole" | "center" | "top" | "bottom") => {
+    if (preset === "whole") {
+      onChange(null);
+    } else if (preset === "center") {
+      onChange({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 });
+    } else if (preset === "top") {
+      onChange({ x: 0, y: 0, w: 1, h: 0.5 });
+    } else if (preset === "bottom") {
+      onChange({ x: 0, y: 0.5, w: 1, h: 0.5 });
+    }
+  };
+
+  const drawX = isDrawing ? Math.min(startPos.x, currentPos.x) : activeArea.x;
+  const drawY = isDrawing ? Math.min(startPos.y, currentPos.y) : activeArea.y;
+  const drawW = isDrawing ? Math.abs(startPos.x - currentPos.x) : activeArea.w;
+  const drawH = isDrawing ? Math.abs(startPos.y - currentPos.y) : activeArea.h;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset("whole")}
+          className={cn(!value && "border-primary text-primary bg-primary/5")}
+        >
+          {t("presetWholeScreen")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset("center")}
+          className={cn(value?.x === 0.25 && value?.y === 0.25 && "border-primary text-primary bg-primary/5")}
+        >
+          {t("presetCenter")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset("top")}
+          className={cn(value?.x === 0 && value?.y === 0 && value?.h === 0.5 && "border-primary text-primary bg-primary/5")}
+        >
+          {t("presetTopHalf")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset("bottom")}
+          className={cn(value?.x === 0 && value?.y === 0.5 && value?.h === 0.5 && "border-primary text-primary bg-primary/5")}
+        >
+          {t("presetBottomHalf")}
+        </Button>
+      </div>
+
+      <div
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        className="relative w-full aspect-video rounded border bg-slate-950/80 cursor-crosshair overflow-hidden border-dashed border-slate-700 select-none flex items-center justify-center"
+      >
+        {camera && camera.id && camera.enabled ? (
+          <div className="absolute inset-0 z-0 pointer-events-none w-full h-full">
+            <CameraLiveView camera={camera} className="w-full h-full" />
+          </div>
+        ) : (
+          <>
+            <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:14px_24px]" />
+            <div className="text-center text-slate-500 z-10 pointer-events-none space-y-1">
+              <div className="text-[11px] uppercase tracking-wider font-semibold">CCTV Feed Area</div>
+              <div className="text-[10px] opacity-75">Click & Drag to define custom ROI</div>
+            </div>
+          </>
+        )}
+
+        <div
+          className="absolute border-2 border-primary bg-primary/15 pointer-events-none transition-all duration-75 flex items-start p-1.5 z-20"
+          style={{
+            left: `${drawX * 100}%`,
+            top: `${drawY * 100}%`,
+            width: `${drawW * 100}%`,
+            height: `${drawH * 100}%`,
+          }}
+        >
+          <div className="bg-primary text-[9px] text-primary-foreground font-mono px-1 rounded font-semibold pointer-events-none select-none">
+            ROI ({(drawW * 100).toFixed(0)}% x {(drawH * 100).toFixed(0)}%)
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UnifiedMotionEditor({
+  cameraId,
+  cameraEnabled,
+  value,
+  onChange,
+}: {
+  cameraId: string;
+  cameraEnabled: boolean;
+  value: MotionArea[];
+  onChange: (areas: MotionArea[]) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [connected, setConnected] = useState(false);
+  const [activity, setActivity] = useState(0);
+  const [mode, setMode] = useState<"none" | "polygon" | "rect">("none");
+  const [isDrawingRect, setIsDrawingRect] = useState(false);
+  const [rectStart, setRectStart] = useState({ x: 0, y: 0 });
+  const [rectCurrent, setRectCurrent] = useState({ x: 0, y: 0 });
+  const [polyPoints, setPolyPoints] = useState<{ x: number; y: number }[]>([]);
+  const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
+  const [isHoveringZone, setIsHoveringZone] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const boxesRef = useRef<Array<{ x: number; y: number; w: number; h: number; blocks?: number }>>([]);
+  const frameDims = useRef({ width: 640, height: 480 });
+
+  // Build MJPEG src URL
+  const mjpegSrc = useMemo(() => {
+    const token = localStorage.getItem("cctv-lite-token") || "";
+    const base = (typeof window !== "undefined" && ["5173", "5174", "8080"].includes(window.location.port))
+      ? `${window.location.protocol}//${window.location.hostname}:4200`
+      : "";
+    return `${base}/api/streams/${cameraId}/video.mjpg?token=${encodeURIComponent(token)}`;
+  }, [cameraId]);
+
+  // Reset image loaded status on stream URL change
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [mjpegSrc]);
+
+  // SSE for motion events
+  useEffect(() => {
+    if (!cameraId || !cameraEnabled) return;
+    const token = localStorage.getItem("cctv-lite-token") || "";
+    const base = (typeof window !== "undefined" && ["5173", "5174", "8080"].includes(window.location.port))
+      ? `${window.location.protocol}//${window.location.hostname}:4200`
+      : "";
+    const url = `${base}/api/streams/${cameraId}/events?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    es.onopen = () => setConnected(true);
+    es.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.connected) return;
+        if (data.boxes) boxesRef.current = data.boxes;
+        if (data.frame) frameDims.current = data.frame;
+        if (data.activity != null) setActivity(data.activity);
+      } catch { /* ignore */ }
+    };
+    es.onerror = () => setConnected(false);
+    return () => es.close();
+  }, [cameraId, cameraEnabled]);
+
+  // Canvas overlay draw loop
+  useEffect(() => {
+    let raf: number;
+    const draw = () => {
+      const canvas = canvasRef.current;
+      const img = imgRef.current;
+      if (!canvas || !img) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
+      const rect = img.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+
+      if (w === 0 || h === 0) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. Draw existing exclusion zones (Red)
+      const activeAreas = value || [];
+      activeAreas.forEach((zone, idx) => {
+        if (zone.enabled === false) return;
+        if (zone.type === "polygon" && zone.points && zone.points.length > 2) {
+          ctx.fillStyle = "rgba(239, 68, 68, 0.22)";
+          ctx.strokeStyle = "rgba(239, 68, 68, 0.95)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(zone.points[0].x * w, zone.points[0].y * h);
+          for (let i = 1; i < zone.points.length; i++) {
+            ctx.lineTo(zone.points[i].x * w, zone.points[i].y * h);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw a small DELETE label
+          ctx.fillStyle = "#ff8888";
+          ctx.font = "bold 9px monospace";
+          ctx.fillText(`MASK ${idx + 1}`, zone.points[0].x * w + 5, zone.points[0].y * h + 12);
+        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+          ctx.fillStyle = "rgba(239, 68, 68, 0.18)";
+          ctx.strokeStyle = "rgba(239, 68, 68, 0.95)";
+          ctx.lineWidth = 1.5;
+          const zx = zone.x * w;
+          const zy = zone.y * h;
+          const zw = zone.w * w;
+          const zh = zone.h * h;
+          ctx.fillRect(zx, zy, zw, zh);
+          ctx.strokeRect(zx, zy, zw, zh);
+
+          ctx.fillStyle = "#ff8888";
+          ctx.font = "bold 9px monospace";
+          ctx.fillText(`MASK ${idx + 1}`, zx + 5, zy + 12);
+        }
+      });
+
+      // 2. Draw in-progress drawing polygon (Yellow/Orange)
+      if (mode === "polygon" && polyPoints.length > 0) {
+        const previewPoints = hoverPoint ? [...polyPoints, hoverPoint] : polyPoints;
+        ctx.fillStyle = "rgba(251, 191, 36, 0.12)";
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(previewPoints[0].x * w, previewPoints[0].y * h);
+        for (let i = 1; i < previewPoints.length; i++) {
+          ctx.lineTo(previewPoints[i].x * w, previewPoints[i].y * h);
+        }
+        if (previewPoints.length >= 3) {
+          ctx.closePath();
+        }
+        ctx.stroke();
+        if (previewPoints.length >= 3) {
+          ctx.fill();
+        }
+
+        // Draw dots
+        ctx.fillStyle = "#fcd34d";
+        for (const p of previewPoints) {
+          ctx.beginPath();
+          ctx.arc(p.x * w, p.y * h, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Highlight first point if hover is close (close indicator)
+        if (polyPoints.length >= 3 && hoverPoint) {
+          const first = polyPoints[0];
+          const dx = hoverPoint.x - first.x;
+          const dy = hoverPoint.y - first.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 0.03) {
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(first.x * w, first.y * h, 7, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 3. Draw in-progress rectangle (dashed Orange/Yellow)
+      if (mode === "rect" && isDrawingRect) {
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.9)";
+        ctx.fillStyle = "rgba(251, 191, 36, 0.15)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        const rx = Math.min(rectStart.x, rectCurrent.x) * w;
+        const ry = Math.min(rectStart.y, rectCurrent.y) * h;
+        const rw = Math.abs(rectStart.x - rectCurrent.x) * w;
+        const rh = Math.abs(rectStart.y - rectCurrent.y) * h;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.setLineDash([]); // Reset dash
+      }
+
+      // 4. Draw real-time motion bounding boxes (Green)
+      if (boxesRef.current.length > 0) {
+        const fw = frameDims.current.width || 640;
+        const fh = frameDims.current.height || 480;
+        const sx = w / fw;
+        const sy = h / fh;
+
+        ctx.strokeStyle = "rgba(34, 197, 94, 0.98)";
+        ctx.fillStyle = "rgba(34, 197, 94, 0.15)";
+        ctx.lineWidth = 2;
+        ctx.font = "bold 10px monospace";
+        for (const box of boxesRef.current) {
+          const bx = box.x * sx;
+          const by = box.y * sy;
+          const bw = box.w * sx;
+          const bh = box.h * sy;
+          ctx.strokeRect(bx, by, bw, bh);
+          ctx.fillRect(bx, by, bw, bh);
+
+          ctx.fillStyle = "rgba(22, 163, 74, 0.9)";
+          const labelWidth = Math.max(70, String(box.blocks || "").length * 6 + 45);
+          ctx.fillRect(bx, Math.max(0, by - 16), labelWidth, 16);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(`motion ${box.blocks || ""}`, bx + 4, Math.max(12, by - 4));
+          ctx.fillStyle = "rgba(34, 197, 94, 0.15)"; // restore fill
+        }
+      }
+
+      raf = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [value, mode, polyPoints, hoverPoint, isDrawingRect, rectStart, rectCurrent]);
+
+  if (!cameraId || !cameraEnabled) {
+    return (
+      <div className="relative w-full aspect-video rounded-md border border-dashed border-slate-700 bg-slate-950/80 flex items-center justify-center">
+        <div className="text-center text-slate-500 max-w-sm px-4 space-y-1">
+          <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Smart Preview & Masking</div>
+          <div className="text-[10px] opacity-75">
+            Simpan dan aktifkan kamera terlebih dahulu untuk menampilkan video pratinjau langsung & menggambar area masking.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const getRelativeCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    return { x, y };
+  };
+
+  const isPointInPolygon = (p: { x: number; y: number }, points: { x: number; y: number }[]) => {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i].x, yi = points[i].y;
+      const xj = points[j].x, yj = points[j].y;
+      const intersect = ((yi > p.y) !== (yj > p.y))
+          && (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
+  const removeArea = (index: number) => {
+    onChange(value.filter((_, i) => i !== index));
+  };
+
+  // Mouse handlers for drawing rect
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mode !== "rect") return;
+    const coords = getRelativeCoords(e);
+    if (!coords) return;
+    setRectStart(coords);
+    setRectCurrent(coords);
+    setIsDrawingRect(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getRelativeCoords(e);
+    if (!coords) return;
+
+    if (mode === "rect" && isDrawingRect) {
+      setRectCurrent(coords);
+    } else if (mode === "polygon") {
+      setHoverPoint(coords);
+    }
+
+    // Hover detection for existing zones
+    if (mode === "none" || (mode === "polygon" && polyPoints.length === 0)) {
+      let hovering = false;
+      for (const zone of value) {
+        if (zone.type === "polygon" && zone.points) {
+          if (isPointInPolygon(coords, zone.points)) {
+            hovering = true;
+            break;
+          }
+        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+          if (coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h) {
+            hovering = true;
+            break;
+          }
+        }
+      }
+      setIsHoveringZone(hovering);
+    } else {
+      setIsHoveringZone(false);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mode !== "rect" || !isDrawingRect) return;
+    setIsDrawingRect(false);
+    const coords = getRelativeCoords(e);
+    if (!coords) return;
+
+    const x = Math.min(rectStart.x, coords.x);
+    const y = Math.min(rectStart.y, coords.y);
+    const w = Math.max(0.01, Math.abs(rectStart.x - coords.x));
+    const h = Math.max(0.01, Math.abs(rectStart.y - coords.y));
+
+    if (w > 0.02 && h > 0.02) {
+      onChange([...value, { type: "rect", x, y, w, h, enabled: true, name: `Mask Kotak ${value.length + 1}` }]);
+    }
+  };
+
+  const finishPolygon = () => {
+    if (polyPoints.length < 3) return;
+    onChange([...value, { type: "polygon", points: polyPoints, enabled: true, name: `Mask Polygon ${value.length + 1}` }]);
+    setPolyPoints([]);
+    setHoverPoint(null);
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getRelativeCoords(e);
+    if (!coords) return;
+
+    if (mode === "polygon") {
+      // Check if clicking near first point to close
+      if (polyPoints.length >= 3) {
+        const first = polyPoints[0];
+        const dx = coords.x - first.x;
+        const dy = coords.y - first.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 0.03) {
+          finishPolygon();
+          return;
+        }
+      }
+      setPolyPoints((prev) => [...prev, coords]);
+    } else if (mode === "none" || (mode === "rect" && !isDrawingRect)) {
+      // Check if clicking existing zone to delete
+      for (let i = value.length - 1; i >= 0; i--) {
+        const zone = value[i];
+        let hit = false;
+        if (zone.type === "polygon" && zone.points) {
+          hit = isPointInPolygon(coords, zone.points);
+        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+          hit = coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h;
+        }
+        if (hit) {
+          removeArea(i);
+          return;
+        }
+      }
+    }
+  };
+
+  const undoPoint = () => {
+    setPolyPoints((prev) => prev.slice(0, -1));
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Drawing Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={mode === "polygon" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setPolyPoints([]);
+            setHoverPoint(null);
+            setMode(mode === "polygon" ? "none" : "polygon");
+          }}
+          className="text-[11px] h-7"
+        >
+          ✏️ Gambar Polygon
+        </Button>
+        <Button
+          type="button"
+          variant={mode === "rect" ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setMode(mode === "rect" ? "none" : "rect");
+          }}
+          className="text-[11px] h-7"
+        >
+          ▭ Gambar Kotak
+        </Button>
+
+        {mode === "polygon" && polyPoints.length > 0 && (
+          <>
+            <Button type="button" variant="outline" size="sm" onClick={undoPoint} className="text-[11px] h-7">
+              ↩ Undo
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={finishPolygon}
+              disabled={polyPoints.length < 3}
+              className="text-[11px] h-7 bg-green-600 hover:bg-green-700 text-white font-medium animate-pulse"
+            >
+              ✓ Simpan Polygon ({polyPoints.length} titik)
+            </Button>
+          </>
+        )}
+
+        <div className="flex-1" />
+        <span className="text-xs text-muted-foreground font-mono">
+          {value.length} Mask Active
+        </span>
+        {value.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange([])}
+            className="text-[11px] text-destructive hover:bg-destructive/10 h-7"
+          >
+            Hapus Semua
+          </Button>
+        )}
+      </div>
+
+      {/* Editor & Live Preview Stage */}
+      <div className="relative w-full aspect-video border bg-slate-950 rounded-lg overflow-hidden border-slate-800 select-none">
+        <img
+          ref={imgRef}
+          src={mjpegSrc}
+          alt="Live MJPEG"
+          className="w-full h-full object-contain block"
+          crossOrigin="anonymous"
+          onLoad={() => setImgLoaded(true)}
+        />
+        
+        {!imgLoaded && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-slate-400 gap-2 z-0">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-primary" />
+            <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Stream MJPEG...</span>
+          </div>
+        )}
+
+        <canvas
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onClick={handleCanvasClick}
+          className="absolute inset-0 w-full h-full z-10"
+          style={{
+            cursor: mode === "polygon" ? "crosshair" : mode === "rect" ? "crosshair" : isHoveringZone ? "pointer" : "default"
+          }}
+        />
+
+        {/* SSE connection indicator */}
+        <div className={cn(
+          "absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-mono font-bold z-20 transition-all",
+          connected ? "bg-green-600/80 text-white" : "bg-red-600/80 text-white"
+        )}>
+          {connected ? "● LIVE STREAM DETECT" : "○ RECONNECTING..."}
+        </div>
+        
+        <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
+          Activity: {activity} blocks
+        </div>
+
+        {/* Helper guide */}
+        {mode !== "none" && (
+          <div className="absolute bottom-2 left-2 right-2 bg-black/85 border border-slate-700/50 backdrop-blur-sm px-2 py-1.5 rounded text-[10px] text-yellow-200 z-20 animate-fade-in font-medium">
+            {mode === "polygon"
+              ? "💡 Klik pada video untuk menambah titik. Klik lingkaran titik awal (pertama) untuk menyimpan polygon mask."
+              : "💡 Klik dan seret mouse pada video untuk menggambar kotak mask."}
+          </div>
+        )}
+      </div>
+
+      {/* Ignore Areas list */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {value.map((area, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-1.5 text-[10px] bg-red-950/40 text-red-200 border border-red-500/30 px-2 py-0.5 rounded font-mono"
+            >
+              <span>{area.name || `Mask ${idx + 1}`} ({area.type === "polygon" ? `${area.points?.length}pt` : "rect"})</span>
+              <button
+                type="button"
+                onClick={() => removeArea(idx)}
+                className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs"
+                title="Hapus area ini"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

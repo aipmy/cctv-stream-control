@@ -14,12 +14,15 @@ function sign(value) {
 }
 
 export function createToken(user) {
+  const now = Math.floor(Date.now() / 1000);
   const payload = {
+    jti: crypto.randomUUID(),
     sub: user.id,
     username: user.username,
     role: user.role,
     allowedGroups: user.allowedGroups || [],
-    iat: Math.floor(Date.now() / 1000),
+    iat: now,
+    exp: now + (7 * 24 * 60 * 60), // 7 hari
   };
   const body = base64url(JSON.stringify(payload));
   return `${body}.${sign(body)}`;
@@ -30,9 +33,12 @@ export function verifyToken(token) {
   const [body, sig] = token.split(".");
   const expected = sign(body);
   try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     const payload = JSON.parse(fromBase64url(body));
     if (!payload?.username || !payload?.role) return null;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {
     return null;

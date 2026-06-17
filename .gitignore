@@ -32,3 +32,8 @@ test-preview.js
 package-lock.json
 **/package-lock.json
 
+# temporary files
+test-leak.js
+backend/custom_storage_test_dir/
+
+

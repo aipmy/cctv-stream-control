@@ -25,12 +25,8 @@ export default function Cameras() {
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
-
   const canView = role === "admin" || !!perms?.canViewManagement;
-  if (!canView) {
-    return <Navigate to="/" replace />;
-  }
-  
+
   const canAdd = role === "admin" || !!perms?.canAddCamera;
   const canEdit = role === "admin" || !!perms?.canEditCamera;
   const canDelete = role === "admin" || !!perms?.canDeleteCamera;
@@ -49,7 +45,7 @@ export default function Cameras() {
   const [restart, setRestart] = useState<Camera | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
 
-  const { t, lang } = useTranslation();
+  const { t, tError, lang } = useTranslation();
 
   useEffect(() => {
     if (highlightId) {
@@ -81,6 +77,10 @@ export default function Cameras() {
         return a.site.localeCompare(b.site) || a.name.localeCompare(b.name);
       });
   }, [cameras, q, siteFilter, sort]);
+
+  if (!canView) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="space-y-5">

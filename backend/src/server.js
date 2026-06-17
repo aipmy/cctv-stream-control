@@ -14,13 +14,18 @@ import { stopAllStreams, streamSystemMetrics } from "./stream/streamManager.js";
 import { statRoutes } from "./routes/statRoutes.js";
 import { systemRoutes } from "./routes/systemRoutes.js";
 import { auditRoutes } from "./routes/auditRoutes.js";
+import { eventRoutes } from "./routes/eventRoutes.js";
+import { runStorageCleanup } from "./services/recordingService.js";
+import { startMotionDetectionWorker, stopMotionDetectionWorker } from "./services/motionDetectionService.js";
 import { requireAuth } from "./middleware/authMiddleware.js";
 import { trafficMiddleware } from "./core/traffic.js";
 import { redactError, sanitizeRequestUrl } from "./core/redact.js";
 import { startTrafficHistory, stopTrafficHistory } from "./modules/stats/trafficHistoryService.js";
 import { closeAudit, initializeAudit } from "./modules/audit/auditService.js";
+import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
 
 const app = express();
+
 
 app.disable("x-powered-by");
 
@@ -75,6 +80,7 @@ app.use("/api/streams", streamRoutes);
 app.use("/api/stats", statRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/audit", auditRoutes);
+app.use("/api/events", eventRoutes);
 
 if (fs.existsSync(config.frontendDist)) {
   app.use(express.static(config.frontendDist));
@@ -92,7 +98,15 @@ app.use((err, _req, res, _next) => {
 });
 
 await initializeAudit();
+await initializeBlacklist();
 await startTrafficHistory(() => streamSystemMetrics());
+
+// Start automatic storage cleanup task
+void runStorageCleanup();
+const cleanupInterval = setInterval(() => void runStorageCleanup(), 30 * 60 * 1000);
+
+// Start background motion detection worker
+startMotionDetectionWorker();
 
 const server = app.listen(config.port, config.host, () => {
   console.log(`CCTV Monitoring Lite backend running on http://${config.host}:${config.port}`);
@@ -105,7 +119,10 @@ const server = app.listen(config.port, config.host, () => {
 
 async function shutdown(signal) {
   console.log(`Received ${signal}, stopping streams...`);
+  clearInterval(cleanupInterval);
+  stopMotionDetectionWorker();
   try { await closeAudit(); } catch (err) { console.error(err); }
+  try { await stopBlacklist(); } catch (err) { console.error(err); }
   try { await stopTrafficHistory(); } catch (err) { console.error(err); }
   try { await stopAllStreams(); } catch (err) { console.error(err); }
   server.close(() => process.exit(0));

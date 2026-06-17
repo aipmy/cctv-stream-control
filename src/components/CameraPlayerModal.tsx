@@ -52,7 +52,7 @@ export function CameraPlayerModal({ camera, open, onOpenChange }: Props) {
               </div>
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white/85 font-mono z-10 pointer-events-none">
                 <span>{camera.brand} · {camera.qualityProfile}</span>
-                <span>{now.toLocaleString("id-ID")}</span>
+                <span>{now.toLocaleString("id-ID", { hour12: false })}</span>
               </div>
             </>
           )}

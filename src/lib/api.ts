@@ -7,6 +7,7 @@ import type {
   StreamType,
   UpdateUserInput,
   UserSummary,
+  SmartEvent,
 } from "@/types";
 
 function devApiBaseFromBrowser() {
@@ -206,6 +207,20 @@ export interface StreamStatus {
   } | null;
 }
 
+export interface ServerSettings {
+  retentionDays: number;
+  maxStorageGb: number;
+  telegramBotToken: string;
+  telegramChatId: string;
+  recordingMode?: string;
+  preMotionSeconds?: number;
+  postMotionSeconds?: number;
+  segmentDuration?: number;
+  enableAudioRecording?: boolean;
+  sourceQualityRecording?: boolean;
+  customStorageDir?: string;
+}
+
 export const streamApi = {
   start: (id: string, output?: StreamType) => api<{ ok: boolean; ready: boolean; streamUrl: string }>(`/api/streams/${encodeURIComponent(id)}/start?vid=${encodeURIComponent(getViewerId())}`, { method: "POST", json: { output } }),
   stop: (id: string, output?: StreamType) => api<{ stopped: string[] }>(`/api/streams/${encodeURIComponent(id)}/stop`, { method: "POST", json: { output } }),
@@ -213,6 +228,19 @@ export const streamApi = {
   leave: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/leave?vid=${encodeURIComponent(getViewerId())}`, { method: "POST" }),
   fallback: (id: string) => api<{ ok: boolean; fallback: string }>(`/api/streams/${encodeURIComponent(id)}/fallback`, { method: "POST" }),
   status: () => api<StreamStatus[]>("/api/streams/status"),
+  playbackInfo: (id: string, date: string, start?: number, end?: number) => {
+    let url = `/api/streams/${encodeURIComponent(id)}/playback-info?date=${encodeURIComponent(date)}`;
+    if (start !== undefined) url += `&start=${start}`;
+    if (end !== undefined) url += `&end=${end}`;
+    return api<{ 
+      hasRecording: boolean; 
+      firstSegmentUnixTime?: number; 
+      lastSegmentUnixTime?: number;
+      segmentMappings?: Array<{ ts: number; offset: number; duration: number }>;
+    }>(url);
+  },
+  deleteTodayRecordings: (id: string, date: string) => api<{ ok: boolean; deletedCount: number }>(`/api/streams/${encodeURIComponent(id)}/recordings/today?date=${encodeURIComponent(date)}`, { method: "DELETE" }),
+  deleteAllRecordings: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/recordings/all`, { method: "DELETE" }),
 };
 
 function getViewerId() {
@@ -243,6 +271,36 @@ export function streamUrl(camera: Pick<Camera, "id" | "streamType">, output = ca
   return withToken(base);
 }
 
+export function playbackUrl(cameraId: string, date: string, start?: number, end?: number) {
+  const id = encodeURIComponent(cameraId);
+  let base = `${API_BASE}/api/streams/${id}/playback.m3u8?date=${encodeURIComponent(date)}`;
+  if (start !== undefined) base += `&start=${start}`;
+  if (end !== undefined) base += `&end=${end}`;
+  return withToken(base);
+}
+
+export function downloadUrl(cameraId: string, startUnix: number, endUnix: number) {
+  const id = encodeURIComponent(cameraId);
+  const base = `${API_BASE}/api/streams/${id}/download?start=${startUnix}&end=${endUnix}`;
+  return withToken(base);
+}
+
 export function streamInfoUrl(cameraId: string) {
   return withToken(`${API_BASE}/api/streams/${encodeURIComponent(cameraId)}/info`);
 }
+
+export const eventApi = {
+  getSettings: () => api<ServerSettings>("/api/events/settings"),
+  updateSettings: (payload: ServerSettings) =>
+    api<unknown>("/api/events/settings", { method: "POST", json: payload }),
+  list: () => api<SmartEvent[]>("/api/events"),
+  trigger: (cameraId: string, type: "motion" | "sound") =>
+    api<SmartEvent>("/api/events/trigger", { method: "POST", json: { cameraId, type } }),
+  remove: (id: string) => api<void>(`/api/events/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  clear: () => api<void>("/api/events/clear", { method: "POST" }),
+  videoUrl: (id: string) => withToken(`${API_BASE}/api/events/video/${encodeURIComponent(id)}`),
+  snapshotUrl: (id: string) => withToken(`${API_BASE}/api/events/snapshot/${encodeURIComponent(id)}`),
+  getStorageStatus: () => api<{ usedBytes: number; maxBytes: number; recordingMode: string; maxStorageGb: number; retentionDays: number }>("/api/events/storage-status"),
+  runStorageCleanup: () => api<{ ok: boolean }>("/api/events/cleanup", { method: "POST" }),
+  deleteSnapshot: (id: string) => api<{ ok: boolean }>(`/api/events/${encodeURIComponent(id)}/snapshot`, { method: "DELETE" }),
+};

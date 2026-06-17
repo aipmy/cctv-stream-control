@@ -81,9 +81,14 @@ cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, ne
     clearPtzCache(req.params.id);
 
     // Determine if stream needs restart based on changed fields
-    const streamFields = ["streamType", "hlsMode", "streamQuality", "audioMode", "sourcePath", "ip", "rtspPort", "rtspTransport", "sourceType", "username", "password"];
+    const streamFields = [
+      "streamType", "hlsMode", "streamQuality", "audioMode", "sourcePath",
+      "ip", "rtspPort", "rtspTransport", "sourceType", "username", "password",
+      "excludeAreas", "motionSensitivity", "motionArea", "detectionModes",
+      "enableNotifications", "enableRecording", "detectResolution"
+    ];
     const needsRestart = camera.enabled && oldCamera && streamFields.some(
-      (f) => oldCamera[f] !== camera[f]
+      (f) => JSON.stringify(oldCamera[f]) !== JSON.stringify(camera[f])
     );
 
     if (camera.enabled === false) {

@@ -49,6 +49,25 @@ export interface Camera {
   qualityProfile: "Low" | "Medium" | "High" | "4K";
   streamQuality: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   errorHistory?: Array<{ timestamp: string; message: string }>;
+  enableRecording?: boolean;
+  enableNotifications?: boolean;
+  motionSensitivity?: number;
+  motionArea?: MotionArea | null;
+  excludeAreas?: MotionArea[] | null;
+  detectionModes?: string[] | null;
+  detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
+  recordingMode?: string;
+}
+
+export interface MotionArea {
+  type?: "rect" | "polygon";
+  points?: { x: number; y: number }[];
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  name?: string;
+  enabled?: boolean;
 }
 
 export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassword">> {
@@ -57,7 +76,29 @@ export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassw
   ip: string;
   password?: string;
   clearPassword?: boolean;
+  enableRecording?: boolean;
+  enableNotifications?: boolean;
+  motionSensitivity?: number;
+  motionArea?: MotionArea | null;
+  excludeAreas?: MotionArea[] | null;
+  detectionModes?: string[] | null;
+  detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
 }
+
+export interface SmartEvent {
+  id: string;
+  cameraId: string;
+  cameraName: string;
+  site: string;
+  ts: string; // ISO
+  type: "motion" | "sound";
+  snapshotPath: string; // File name or relative URL path
+  videoPath: string; // File name or relative URL path
+  typeDescription?: string;
+  classification?: "human" | "pet" | "pixel";
+  score?: number;
+}
+
 
 export interface UserPermissions {
   canAddCamera: boolean;

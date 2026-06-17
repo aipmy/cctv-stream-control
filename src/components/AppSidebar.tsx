@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Cctv, Users, Settings as SettingsIcon, ShieldCheck, UserRound, KeyRound, LogOut, ChevronsUpDown } from "lucide-react";
+import { LayoutDashboard, Cctv, Users, Settings as SettingsIcon, ShieldCheck, UserRound, KeyRound, LogOut, ChevronsUpDown, Bell, PlayCircle } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
@@ -29,6 +29,8 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { titleKey: "dashboard", url: "/", icon: LayoutDashboard, roles: ["admin", "teknisi", "guest", "internal", "external"] },
   { titleKey: "cameras", url: "/cameras", icon: Cctv, roles: ["admin", "teknisi", "guest", "internal", "external"] },
+  { titleKey: "playback", url: "/playback", icon: PlayCircle, roles: ["admin", "teknisi", "guest", "internal", "external"] },
+  { titleKey: "events", url: "/events", icon: Bell, roles: ["admin", "teknisi", "guest", "internal", "external"] },
   { titleKey: "users", url: "/users", icon: Users, roles: ["admin"] },
   { titleKey: "settings", url: "/settings", icon: SettingsIcon, roles: ["admin", "teknisi", "guest", "internal", "external"] },
 ];

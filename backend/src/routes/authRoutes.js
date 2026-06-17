@@ -7,6 +7,7 @@ import {
 } from "../services/userService.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import { auditRequest } from "../modules/audit/auditService.js";
+import { revokeToken } from "../core/tokenBlacklist.js";
 
 export const authRoutes = Router();
 
@@ -98,6 +99,9 @@ authRoutes.post("/password", requireAuth, async (req, res, next) => {
 
 authRoutes.post("/logout", requireAuth, async (req, res, next) => {
   try {
+    if (req.auth && req.auth.jti && req.auth.exp) {
+      await revokeToken(req.auth.jti, req.auth.exp);
+    }
     await auditRequest(req, {
       action: "auth.logout",
       outcome: "success",

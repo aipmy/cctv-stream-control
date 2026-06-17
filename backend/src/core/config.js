@@ -8,6 +8,8 @@ const backendRoot = path.resolve(__dirname, "../..");
 
 dotenv.config({ path: path.join(backendRoot, ".env") });
 
+let dynamicStorageDir = null;
+
 function resolveFromBackend(p, fallback) {
   return path.resolve(backendRoot, p || fallback);
 }
@@ -19,7 +21,16 @@ export const config = {
   env: process.env.NODE_ENV || "development",
   frontendDist: resolveFromBackend(process.env.FRONTEND_DIST, "../dist"),
   dataDir: resolveFromBackend(process.env.DATA_DIR, "./data"),
-  storageDir: resolveFromBackend(process.env.STORAGE_DIR, "./storage"),
+  get storageDir() {
+    return dynamicStorageDir || resolveFromBackend(process.env.STORAGE_DIR, "./storage");
+  },
+  setStorageDir(dir) {
+    if (!dir) {
+      dynamicStorageDir = null;
+    } else {
+      dynamicStorageDir = path.isAbsolute(dir) ? dir : path.resolve(backendRoot, dir);
+    }
+  },
   logDir: resolveFromBackend(process.env.LOG_DIR, "./logs"),
   ffmpegBin: process.env.FFMPEG_BIN || "ffmpeg",
   ffprobeBin: process.env.FFPROBE_BIN || "ffprobe",

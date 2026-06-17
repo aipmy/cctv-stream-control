@@ -1,4 +1,4 @@
-import { Outlet, Navigate } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -12,7 +12,11 @@ export function AppLayout() {
   const user = useAuth((s) => s.user);
   const autoRefresh = useSettings((s) => s.settings.autoRefresh);
   const cameras = useCamerasQuery(Boolean(user));
-  useCameraStats(Boolean(user) && cameras.isSuccess, autoRefresh);
+  const location = useLocation();
+  
+  // Hanya fetch/poll stats jika user berada di Dashboard atau Manajemen Kamera
+  const isStatsNeeded = location.pathname === "/" || location.pathname === "/cameras";
+  useCameraStats(Boolean(user) && cameras.isSuccess && isStatsNeeded, autoRefresh);
   useUsersQuery(user?.role === "admin");
 
   if (!user) return <Navigate to="/login" replace />;
