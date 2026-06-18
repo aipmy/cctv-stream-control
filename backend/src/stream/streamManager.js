@@ -354,16 +354,20 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         session.lastFrame = frame;
         
         // Feed frame to pixel-diff motion engine (non-blocking)
-        try {
-          const engine = getMotionEngine(id);
-          const result = engine.processFrame(frame, {
-            sensitivity: camera.motionSensitivity ?? 50,
-            excludeAreas: camera.excludeAreas || [],
-          });
-          if (result && result.motion) {
-            void handleMotionDetected(camera);
-          }
-        } catch (e) { /* ignore */ }
+        const hasSmart = Boolean(camera.enableRecording || camera.enableNotifications);
+        const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
+        if (hasSmart || hasListeners) {
+          try {
+            const engine = getMotionEngine(id);
+            const result = engine.processFrame(frame, {
+              sensitivity: camera.motionSensitivity ?? 50,
+              excludeAreas: camera.excludeAreas || [],
+            });
+            if (result && result.motion && hasSmart) {
+              void handleMotionDetected(camera);
+            }
+          } catch (e) { /* ignore */ }
+        }
 
         // Feed frame to any registered MJPEG clients
         const mjpeg = mjpegSessions.get(id);
