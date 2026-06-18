@@ -54,18 +54,18 @@ export default function Dashboard() {
     diskAvailable?: number;
   } | null>(null);
 
+  const sites = useMemo(() => Array.from(new Set(cameras.map((c) => c.site))).sort(), [cameras]);
+  const pinnedCameraIds = user?.preferences?.pinnedCameraIds || [];
+  
+  const { t, lang } = useTranslation();
+  const canViewStats = user?.role === "admin" || !!user?.permissions?.canViewStats;
+
   useEffect(() => {
     if (!canViewStats) return;
     eventApi.getStorageStatus()
       .then((data) => setStorageStatus(data))
       .catch((err) => console.error("Failed to fetch storage status", err));
   }, [canViewStats]);
-
-  const sites = useMemo(() => Array.from(new Set(cameras.map((c) => c.site))).sort(), [cameras]);
-  const pinnedCameraIds = user?.preferences?.pinnedCameraIds || [];
-  
-  const { t, lang } = useTranslation();
-  const canViewStats = user?.role === "admin" || !!user?.permissions?.canViewStats;
 
   const filtered = useMemo(() => {
     return filterDashboardCameras(cameras, {
