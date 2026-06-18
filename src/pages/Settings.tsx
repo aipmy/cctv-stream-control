@@ -432,10 +432,19 @@ export default function Settings() {
                       : "Loading..."}
                   </span>
                 </div>
-                <div className="w-full bg-slate-900 border border-border/40 h-3.5 rounded-full overflow-hidden p-0.5 shadow-inner">
+                <div className="w-full bg-slate-950 border border-border/40 h-3.5 rounded-full overflow-hidden p-0.5 shadow-inner">
                   <div
-                    className="bg-primary h-full rounded-full transition-all duration-500 shadow-glow"
-                    style={{ width: `${storagePercentage}%` }}
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${storagePercentage}%`,
+                      background: "linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #ef4444 100%)",
+                      backgroundSize: `${100 / Math.max(0.1, storagePercentage / 100)}% 100%`,
+                      boxShadow: storagePercentage > 80 
+                        ? "0 0 10px rgba(239, 68, 68, 0.6)" 
+                        : storagePercentage > 50 
+                        ? "0 0 10px rgba(245, 158, 11, 0.5)" 
+                        : "0 0 10px rgba(16, 185, 129, 0.4)"
+                    }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
