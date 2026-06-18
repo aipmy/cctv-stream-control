@@ -18,6 +18,15 @@ import { formatByteRateFromKbps } from "@/lib/bandwidth";
 import { useAuth } from "@/features/auth/store";
 import { filterDashboardCameras, gridClassFor, paginateCameras } from "@/features/cameras/dashboardView";
 import { useTranslation } from "@/hooks/useTranslation";
+import { eventApi } from "@/lib/api";
+
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
 
 export default function Dashboard() {
   const camerasQuery = useCamerasQuery();
@@ -37,6 +46,20 @@ export default function Dashboard() {
   const [editCam, setEditCam] = useState<Camera | null>(null);
   const [deleteCam, setDeleteCam] = useState<Camera | null>(null);
   const [restartCam, setRestartCam] = useState<Camera | null>(null);
+
+  const [storageStatus, setStorageStatus] = useState<{
+    usedBytes: number;
+    maxBytes: number;
+    diskTotal?: number;
+    diskAvailable?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!canViewStats) return;
+    eventApi.getStorageStatus()
+      .then((data) => setStorageStatus(data))
+      .catch((err) => console.error("Failed to fetch storage status", err));
+  }, [canViewStats]);
 
   const sites = useMemo(() => Array.from(new Set(cameras.map((c) => c.site))).sort(), [cameras]);
   const pinnedCameraIds = user?.preferences?.pinnedCameraIds || [];
@@ -123,7 +146,7 @@ export default function Dashboard() {
 
       {canViewStats && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
             <StatCard 
               label={t("camerasOnline")} 
@@ -147,6 +170,13 @@ export default function Dashboard() {
               tone="info" 
             />
             <StatCard label={t("cctvBandwidth")} value={formatByteRateFromKbps(totalBw)} icon="bandwidth" tone="warning" />
+            <StatCard 
+              label={t("diskUsage").replace(":", "")} 
+              value={storageStatus ? formatSize(storageStatus.usedBytes) : "Loading..."} 
+              hint={storageStatus && storageStatus.diskTotal ? `${formatSize(storageStatus.diskAvailable || 0)} bebas / ${formatSize(storageStatus.diskTotal)}` : "Loading server disk..."}
+              icon="disk" 
+              tone="default" 
+            />
           </div>
 
           <BandwidthChart />
