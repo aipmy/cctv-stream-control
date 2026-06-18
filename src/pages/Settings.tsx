@@ -43,6 +43,8 @@ export default function Settings() {
     recordingMode: string;
     maxStorageGb: number;
     retentionDays: number;
+    diskTotal?: number;
+    diskAvailable?: number;
   } | null>(null);
   
   const [loadingServerSettings, setLoadingServerSettings] = useState(true);
@@ -440,6 +442,15 @@ export default function Settings() {
                   <span>{t("usedPercent").replace("{pct}", storagePercentage.toFixed(1))}</span>
                   <span>{t("autoCleanupNotice")}</span>
                 </div>
+                {storageStatus && storageStatus.diskTotal !== undefined && storageStatus.diskTotal > 0 && (
+                  <div className="text-[10px] text-muted-foreground/80 mt-1 flex justify-end">
+                    <span>
+                      {t("serverDiskSpace")
+                        .replace("{free}", formatSize(storageStatus.diskAvailable || 0))
+                        .replace("{total}", formatSize(storageStatus.diskTotal))}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-4 border-t pt-4">

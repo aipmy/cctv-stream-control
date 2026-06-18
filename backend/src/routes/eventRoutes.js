@@ -150,6 +150,16 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
     const hlsSize = await getDirSize(hlsDir);
     const usedBytes = eventsSize + hlsSize;
     const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
+
+    let diskTotal = 0;
+    let diskAvailable = 0;
+    try {
+      const diskStats = await fs.statfs(config.storageDir);
+      diskTotal = diskStats.blocks * diskStats.bsize;
+      diskAvailable = diskStats.bavail * diskStats.bsize;
+    } catch (err) {
+      // ignore
+    }
     
     res.json({
       usedBytes,
@@ -157,6 +167,8 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
       recordingMode: settings.recordingMode || "continuous",
       maxStorageGb: settings.maxStorageGb || 5,
       retentionDays: settings.retentionDays || 7,
+      diskTotal,
+      diskAvailable,
     });
   } catch (err) {
     next(err);
