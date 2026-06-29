@@ -39,7 +39,15 @@ function toPoint(r: TrafficRates): Point {
 
 export function BandwidthChart() {
   const autoRefresh = useSettings((s) => s.settings.autoRefresh);
-  const [range, setRange] = useState<Range>("1h");
+  const [range, setRange] = useState<Range>(() => {
+    const saved = localStorage.getItem("bandwidth_chart_range") as Range;
+    return ["1m", "1h", "24h"].includes(saved) ? saved : "1h";
+  });
+
+  const handleRangeChange = (newRange: Range) => {
+    setRange(newRange);
+    localStorage.setItem("bandwidth_chart_range", newRange);
+  };
   const historyQuery = useQuery({
     queryKey: ["traffic-history", range],
     queryFn: () => statsApi.trafficHistory(range),
@@ -98,7 +106,7 @@ export function BandwidthChart() {
                 key={r}
                 size="sm"
                 variant="ghost"
-                onClick={() => setRange(r)}
+                onClick={() => handleRangeChange(r)}
                 className={cn(
                   "h-7 px-2.5 text-xs font-medium rounded-sm",
                   range === r && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
