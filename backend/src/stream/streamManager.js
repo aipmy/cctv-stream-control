@@ -160,7 +160,7 @@ function logLifecycle(session, message) {
 }
 
 export function isChildAlive(child) {
-  return child && child.exitCode === null && child.signalCode === null && !child.killed;
+  return child && child.exitCode === null && child.signalCode === null;
 }
 
 function scheduleHlsIdleCleanup() {
@@ -223,21 +223,6 @@ async function cleanDir(dir) {
 
 export async function startHls(id, requestedOutput = "HLS Stable") {
   const output = normalizeOutput(requestedOutput);
-  const existing = hlsSessions.get(id);
-  if (existing) {
-    if (isChildAlive(existing.child)) {
-      if (existing.output === output) {
-        existing.lastRequestAt = Date.now();
-        return existing;
-      }
-      await stopHls(id);
-    } else {
-      const closedAtMs = existing.closedAt ? new Date(existing.closedAt).getTime() : 0;
-      if (existing.status === "error" && Date.now() - closedAtMs < 10000) {
-        return existing;
-      }
-    }
-  }
 
   const locked = hlsStartLocks.get(id);
   if (locked) {
@@ -246,9 +231,24 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     return session;
   }
 
-
-
   const startPromise = (async () => {
+    const existing = hlsSessions.get(id);
+    if (existing) {
+      if (isChildAlive(existing.child)) {
+        if (existing.output === output) {
+          existing.lastRequestAt = Date.now();
+          return existing;
+        }
+        hlsSessions.delete(id);
+        await stopHls(id);
+      } else {
+        const closedAtMs = existing.closedAt ? new Date(existing.closedAt).getTime() : 0;
+        if (existing.status === "error" && Date.now() - closedAtMs < 10000) {
+          return existing;
+        }
+      }
+    }
+
     const camera = await getCamera(id, { revealSecret: true });
     if (!camera) return null;
     if (!camera.enabled) {
@@ -447,9 +447,19 @@ export async function stopHls(id, _output) {
     if (!session) return;
     if (isChildAlive(session.child)) {
       await new Promise((resolve) => {
-        session.child.once("close", () => resolve());
+        let exited = false;
+        session.child.once("close", () => {
+          exited = true;
+          resolve();
+        });
         session.child.kill("SIGTERM");
-        setTimeout(resolve, 2000);
+        setTimeout(() => {
+          if (!exited && isChildAlive(session.child)) {
+            console.log(`[StreamManager] Process ${session.pid} (Camera: ${cameraId}) did not exit on SIGTERM. Sending SIGKILL...`);
+            session.child.kill("SIGKILL");
+          }
+          resolve();
+        }, 2000);
       });
     }
     session.status = "stopped";
@@ -471,12 +481,21 @@ export async function waitForPlaylist(session) {
   const started = Date.now();
   while (Date.now() - started < config.hlsStartTimeoutMs) {
     // eslint-disable-next-line no-await-in-loop
-    if (await playlistReady(session.playlist)) return true;
+    if (await playlistReady(session.playlist)) {
+      session.status = "running";
+      await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
+      return true;
+    }
     if (!isChildAlive(session.child) && session.status !== "starting") return false;
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  return exists(session.playlist);
+  const ok = await exists(session.playlist);
+  if (ok) {
+    session.status = "running";
+    await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
+  }
+  return ok;
 }
 
 export function getHlsFilePath(id, output, filename) {
@@ -654,6 +673,9 @@ export function streamStatus() {
   const now = Date.now();
   const items = [];
   for (const [id, session] of hlsSessions.entries()) {
+    if (session.status === "starting" && fsSync.existsSync(session.playlist)) {
+      session.status = "running";
+    }
     items.push({
       key: id,
       id: session.id,
@@ -705,6 +727,9 @@ function estimatedKbpsFor(streamType) {
 export function streamRuntimeStatusFor(id) {
   const hls = hlsSessions.get(id);
   if (hls && isChildAlive(hls.child)) {
+    if (hls.status === "starting" && fsSync.existsSync(hls.playlist)) {
+      hls.status = "running";
+    }
     return hls.status === "running" ? "online" : "starting";
   }
   const mjpeg = mjpegSessions.get(id);
