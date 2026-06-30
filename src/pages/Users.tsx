@@ -14,20 +14,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Plus, Pencil, Trash2, ScrollText, Loader2, Download, ChevronsUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ScrollText, Loader2, Download, ChevronsUpDown, User, Calendar, ShieldCheck } from "lucide-react";
 import type { AuditOutcome, CreateUserInput, Role, UserSummary } from "@/types";
 import { auditApi } from "@/lib/api";
 import { toast } from "sonner";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 const roleColors: Record<Role, string> = {
-  admin: "bg-primary/15 text-primary border-primary/30",
-  teknisi: "bg-info/15 text-info border-info/30",
-  guest: "bg-muted text-muted-foreground border-border",
-  internal: "bg-success/15 text-success border-success/30",
-  external: "bg-warning/15 text-warning border-warning/30",
+  admin: "bg-primary/10 text-primary border-primary/20 shadow-[0_0_8px_rgba(20,184,166,0.1)]",
+  teknisi: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  guest: "bg-muted text-muted-foreground border-border/40",
+  internal: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  external: "bg-amber-500/10 text-amber-400 border-amber-500/20",
 };
 
 export default function Users() {
@@ -59,16 +60,15 @@ export default function Users() {
   const audit = useAuditQuery(auditFilters, role === "admin");
   const auditItems = audit.data?.pages.flatMap((page) => page.items) || [];
 
-  const formatRelativeTime = (iso: string) => {
-    const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-    if (d < 60) return t("relativeJustNow");
-    if (d < 3600) return t("relativeMinutes", { n: Math.floor(d / 60) });
-    if (d < 86400) return t("relativeHours", { n: Math.floor(d / 3600) });
-    if (d < 172800) {
-      const timeStr = new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
-      return t("relativeYesterday", { time: timeStr });
-    }
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  const formatExactTime = (iso: string) => {
+    const date = new Date(iso);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+    const ss = String(date.getSeconds()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
   };
 
   if (role !== "admin") return <Navigate to="/" replace />;
@@ -128,35 +128,43 @@ export default function Users() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+    <div className="space-y-6 pb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold tracking-tight">{t("userManagement")}</h1>
-          <p className="text-sm text-muted-foreground">{lang === "id" ? "Kelola akun operator dan hak akses." : "Manage operator accounts and access permissions."}</p>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <ShieldCheck className="h-5.5 w-5.5 text-primary" />
+            {t("userManagement")}
+          </h1>
+          <p className="text-sm text-muted-foreground">{lang === "id" ? "Kelola akun operator dan hak akses khusus." : "Manage operator accounts and custom permissions."}</p>
         </div>
-        <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-95">
-          <Plus className="h-4 w-4" /> {t("addUser")}
+        <Button onClick={openNew} className="bg-gradient-primary text-primary-foreground hover:opacity-95 shadow-lg shadow-primary/10">
+          <Plus className="h-4 w-4 mr-1.5" /> {t("addUser")}
         </Button>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_350px] gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="space-y-4">
-          <Card className="overflow-hidden">
+          {/* Desktop Table View */}
+          <Card className="overflow-hidden hidden md:block border border-border/40 dark:border-white/5 rounded-xl bg-card/65 backdrop-blur-sm shadow-2xl">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>{t("status")}</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[180px]">Username</TableHead>
+                  <TableHead className="w-[120px]">Role</TableHead>
+                  <TableHead className="w-[100px]">{t("status")}</TableHead>
                   <TableHead>{t("lastLogin")}</TableHead>
-                  <TableHead className="text-right">{t("actions")}</TableHead>
+                  <TableHead className="text-right w-[110px]">{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.username}</TableCell>
-                    <TableCell><Badge variant="outline" className={roleColors[u.role]}>{t(u.role)}</Badge></TableCell>
+                  <TableRow key={u.id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="font-semibold text-foreground">{u.username}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn("px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider", roleColors[u.role])}>
+                        {t(u.role)}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Switch
                         checked={u.active}
@@ -174,72 +182,171 @@ export default function Users() {
                         }}
                       />
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) : <span className="text-muted-foreground/50">{t("neverLoggedIn")}</span>}
+                    <TableCell className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      {u.lastLoginAt ? formatExactTime(u.lastLoginAt) : <span className="text-muted-foreground/30">{t("neverLoggedIn")}</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDel(u)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-muted" onClick={() => openEdit(u)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => setDel(u)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </Card>
+
+          {/* Mobile Card Stack View */}
+          <div className="block md:hidden space-y-4">
+            {users.map((u) => (
+              <Card key={u.id} className="p-4 space-y-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 rounded-xl">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm uppercase">
+                      {u.username.substring(0, 2)}
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-sm text-foreground leading-tight">{u.username}</h3>
+                      <Badge variant="outline" className={cn("px-1.5 py-0 text-[9px] uppercase tracking-wider mt-1 block w-max", roleColors[u.role])}>
+                        {t(u.role)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={u.active}
+                    onCheckedChange={async (v) => {
+                      try {
+                        await updateUser(u.id, { active: v });
+                        toast.success(
+                          v 
+                            ? (lang === "id" ? "Pengguna diaktifkan" : "User activated") 
+                            : (lang === "id" ? "Pengguna dinonaktifkan" : "User deactivated")
+                        );
+                      } catch (err) {
+                        toast.error(lang === "id" ? "Gagal mengubah status pengguna" : "Failed to update user status");
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="border-t pt-3 border-border/40 dark:border-white/5 text-xs space-y-2">
+                  <div>
+                    <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">{t("lastLogin")}</div>
+                    <div className="font-mono mt-1 text-foreground/90 flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      {u.lastLoginAt ? formatExactTime(u.lastLoginAt) : <span className="text-muted-foreground/30">{t("neverLoggedIn")}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t border-border/40 dark:border-white/5">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex-1 h-9 text-xs gap-1.5"
+                    onClick={() => openEdit(u)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Edit</span>
+                  </Button>
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    className="h-9 w-9 text-destructive hover:bg-destructive/10"
+                    onClick={() => setDel(u)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
 
+        {/* Audit / Recent Activity Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold flex items-center"><ScrollText className="mr-1.5 h-4 w-4" /> {t("recentActivity")}</h2>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => window.open(auditApi.exportUrl(), "_blank")}><Download className="h-3 w-3 mr-1.5" /> Export</Button>
+            <h2 className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center">
+              <ScrollText className="mr-2 h-4 w-4 text-primary" /> 
+              {t("recentActivity")}
+            </h2>
+            <Button variant="outline" size="sm" className="h-7 text-xs border-border/40" onClick={() => window.open(auditApi.exportUrl(), "_blank")}>
+              <Download className="h-3 w-3 mr-1.5" /> Export
+            </Button>
           </div>
-          <Card className="flex flex-col h-[500px]">
-            <div className="p-3 border-b space-y-2">
+          
+          <Card className="flex flex-col h-[520px] bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 rounded-xl shadow-2xl overflow-hidden">
+            <div className="p-3 border-b border-border/40 dark:border-white/5 space-y-2 bg-muted/20">
               <Input
                 value={auditActor}
                 onChange={(event) => setAuditActor(event.target.value)}
                 placeholder="Filter actor/username"
-                className="h-8 text-xs"
+                className="h-8 text-xs bg-background/50 border-border/40"
               />
               <Select value={auditOutcome} onValueChange={(value) => setAuditOutcome(value as AuditOutcome | "all")}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs bg-background/50 border-border/40"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{lang === "id" ? "Semua hasil" : "All outcomes"}</SelectItem>
                   <SelectItem value="success">Success</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("time")}</TableHead>
-                    <TableHead>{t("actorAction")}</TableHead>
-                    <TableHead>{t("outcome")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {auditItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="whitespace-nowrap text-[10px] text-muted-foreground">{new Date(item.ts).toLocaleTimeString("id-ID", { hour12: false })}</TableCell>
-                      <TableCell>
-                        <div className="text-xs font-medium truncate max-w-[120px]">{item.actor.username}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">{item.action}</div>
-                      </TableCell>
-                      <TableCell><AuditOutcomeBadge outcome={item.outcome} /></TableCell>
-                    </TableRow>
-                  ))}
-                  {!audit.isPending && auditItems.length === 0 && (
-                    <TableRow><TableCell colSpan={3} className="py-12 text-center text-sm text-muted-foreground">{lang === "id" ? "Belum ada audit log." : "No audit logs found."}</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              {audit.isPending && <div className="flex items-center justify-center p-8 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("loading")}</div>}
-              {audit.isError && <div className="p-4 text-sm text-destructive">{audit.error instanceof Error ? audit.error.message : "Failed to load logs"}</div>}
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 pr-2">
+              {auditItems.map((item) => (
+                <div key={item.id} className="flex gap-3 pb-3.5 border-b border-border/30 dark:border-white/5 last:border-0 last:pb-0 text-xs transition-colors hover:bg-muted/10">
+                  <div className="flex flex-col items-center shrink-0">
+                    <span className={cn(
+                      "h-2 w-2 rounded-full mt-1.5",
+                      item.outcome === "success" 
+                        ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" 
+                        : item.outcome === "warning"
+                          ? "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
+                          : "bg-rose-500 shadow-[0_0_8px_#ef4444]"
+                    )} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-foreground">{item.actor.username}</span>
+                      <span className="text-[9px] text-muted-foreground font-mono shrink-0">
+                        {new Date(item.ts).toLocaleTimeString("id-ID", { hour12: false })}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-1 break-all bg-muted/40 p-1.5 rounded border border-border/20">
+                      {item.action}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {!audit.isPending && auditItems.length === 0 && (
+                <div className="py-16 text-center text-xs text-muted-foreground">
+                  {lang === "id" ? "Belum ada audit log." : "No audit logs found."}
+                </div>
+              )}
+              
+              {audit.isPending && (
+                <div className="flex items-center justify-center p-8 text-xs text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                  {t("loading")}
+                </div>
+              )}
+              
+              {audit.isError && (
+                <div className="p-4 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
+                  {audit.error instanceof Error ? audit.error.message : "Failed to load logs"}
+                </div>
+              )}
+              
               {audit.hasNextPage && (
-                <div className="border-t p-3 text-center">
-                  <Button variant="outline" size="sm" onClick={() => void audit.fetchNextPage()} disabled={audit.isFetchingNextPage}>
-                    {audit.isFetchingNextPage ? t("loading") : (lang === "id" ? "Muat lebih lama" : "Load more")}
+                <div className="pt-2 text-center">
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-full border-border/40" onClick={() => void audit.fetchNextPage()} disabled={audit.isFetchingNextPage}>
+                    {audit.isFetchingNextPage ? t("loading") : (lang === "id" ? "Muat lebih banyak" : "Load more")}
                   </Button>
                 </div>
               )}
@@ -249,25 +356,28 @@ export default function Users() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 flex flex-col">
-          <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
-            <DialogTitle>{edit ? t("editUser") : t("addUser")}</DialogTitle>
+        <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 flex flex-col border border-border/40 shadow-2xl max-w-lg rounded-xl">
+          <DialogHeader className="shrink-0 border-b border-border/40 px-6 py-5 pr-12 bg-muted/20">
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              {edit ? t("editUser") : t("addUser")}
+            </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <div>
-              <Label className="text-xs uppercase tracking-wider">{t("username")}</Label>
-              <Input className="mt-1.5" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+              <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">{t("username")}</Label>
+              <Input className="mt-1.5 bg-background/50 border-border/40" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wider">{t("password")}</Label>
-              <Input className="mt-1.5" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
+              <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">{t("password")}</Label>
+              <Input className="mt-1.5 bg-background/50 border-border/40" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
               <PasswordStrengthMeter password={form.password} />
-              {edit && <p className="mt-1 text-xs text-muted-foreground">{lang === "id" ? "Kosongkan jika password tidak diubah." : "Leave blank if you do not want to change password."}</p>}
+              {edit && <p className="mt-1.5 text-xs text-muted-foreground/80">{lang === "id" ? "Kosongkan jika password tidak diubah." : "Leave blank if you do not want to change password."}</p>}
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wider">{t("role")}</Label>
+              <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">{t("role")}</Label>
               <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5 bg-background/50 border-border/40"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="teknisi">{t("teknisi")}</SelectItem>
@@ -277,18 +387,18 @@ export default function Users() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <Label className="text-sm">{lang === "id" ? "Status Aktif" : "Active Status"}</Label>
+            <div className="flex items-center justify-between rounded-xl border border-border/40 p-3 bg-muted/10">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{lang === "id" ? "Status Aktif" : "Active Status"}</Label>
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
             </div>
             
             {form.role !== "admin" && (
-              <div className="space-y-4 pt-4 border-t mt-4">
+              <div className="space-y-4 pt-4 border-t border-border/40 mt-4">
                 <div>
-                  <Label className="text-xs uppercase tracking-wider block mb-2">{t("allowedGroups")}</Label>
+                  <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block mb-2">{t("allowedGroups")}</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between mt-1.5 text-left font-normal h-10 bg-background hover:bg-background border-border">
+                      <Button variant="outline" className="w-full justify-between mt-1.5 text-left font-normal h-10 bg-background/50 border-border/40">
                         <span className="truncate text-xs">
                           {(form.allowedGroups || []).length === 0
                             ? (lang === "id" ? "Pilih grup..." : "Select groups...")
@@ -299,7 +409,7 @@ export default function Users() {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-3" align="start">
+                    <PopoverContent className="w-[300px] p-3 border border-border/40" align="start">
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2 pb-2 border-b">
                           <Checkbox
@@ -348,8 +458,8 @@ export default function Users() {
                   </Popover>
                 </div>
 
-                <div className="flex items-center justify-between border-b pb-2 mt-4 mb-3">
-                  <Label className="text-xs uppercase tracking-wider font-semibold">{t("specificPermissions")}</Label>
+                <div className="flex items-center justify-between border-b border-border/40 pb-2 mt-4 mb-3">
+                  <Label className="text-xs uppercase tracking-wider font-semibold text-foreground">{t("specificPermissions")}</Label>
                   <div className="flex items-center space-x-2">
                     <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{t("allPermissions")}</span>
                     <Switch
@@ -381,8 +491,8 @@ export default function Users() {
                       {[
                         { key: "canViewStats", label: t("allowStats") },
                       ].map((p) => (
-                        <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
-                          <Label className="text-xs font-normal cursor-pointer flex-1" htmlFor={`perm-${p.key}`}>{p.label}</Label>
+                        <div key={p.key} className="flex items-center justify-between rounded-xl border border-border/40 p-2 bg-muted/10">
+                          <Label className="text-[11px] font-normal cursor-pointer flex-1 text-foreground" htmlFor={`perm-${p.key}`}>{p.label}</Label>
                           <Switch 
                             id={`perm-${p.key}`}
                             checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
@@ -405,8 +515,8 @@ export default function Users() {
                         { key: "canControlPTZ", label: t("allowPTZ") },
                         { key: "canPlayAudio", label: t("allowAudio") },
                       ].map((p) => (
-                        <div key={p.key} className="flex items-center justify-between rounded-md border p-2">
-                          <Label className="text-xs font-normal cursor-pointer flex-1" htmlFor={`perm-${p.key}`}>{p.label}</Label>
+                        <div key={p.key} className="flex items-center justify-between rounded-xl border border-border/40 p-2 bg-muted/10">
+                          <Label className="text-[11px] font-normal cursor-pointer flex-1 text-foreground" htmlFor={`perm-${p.key}`}>{p.label}</Label>
                           <Switch 
                             id={`perm-${p.key}`}
                             checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
@@ -420,8 +530,8 @@ export default function Users() {
               </div>
             )}
           </div>
-          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
+          <DialogFooter className="shrink-0 border-t border-border/40 bg-muted/20 px-6 py-4">
+            <Button variant="outline" className="border-border/40" onClick={() => setOpen(false)} disabled={saving}>{t("cancel")}</Button>
             <Button onClick={submit} disabled={saving}>{saving ? t("loading") : edit ? t("save") : t("add")}</Button>
           </DialogFooter>
         </DialogContent>
@@ -446,13 +556,4 @@ export default function Users() {
       />
     </div>
   );
-}
-
-function AuditOutcomeBadge({ outcome }: { outcome: AuditOutcome }) {
-  const className = outcome === "success"
-    ? "border-success/30 text-success"
-    : outcome === "warning"
-      ? "border-warning/30 text-warning"
-      : "border-destructive/30 text-destructive";
-  return <Badge variant="outline" className={className}>{outcome}</Badge>;
 }
