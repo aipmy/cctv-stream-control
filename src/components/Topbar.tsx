@@ -55,7 +55,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="h-14 flex items-center justify-between border-b border-white/5 bg-slate-950/40 backdrop-blur-md px-4 sticky top-0 z-30">
+    <header className="h-14 flex items-center justify-between border-b border-border/40 dark:border-white/5 bg-background/60 dark:bg-slate-950/40 backdrop-blur-md px-4 sticky top-0 z-30">
       <div className="flex items-center gap-2">
         <SidebarTrigger />
         <div className="hidden md:flex items-center gap-2 ml-2">
@@ -85,7 +85,7 @@ export function Topbar() {
       <div className="flex items-center gap-2 pr-2">
         <GlobalThemeToggle className="relative shrink-0" />
         
-        <div className="inline-flex rounded-lg border border-white/5 bg-slate-900/40 p-0.5 select-none shrink-0">
+        <div className="inline-flex rounded-lg border border-border/40 dark:border-white/5 bg-muted/40 dark:bg-slate-900/40 p-0.5 select-none shrink-0">
           <Button
             size="sm"
             variant="ghost"
@@ -94,7 +94,7 @@ export function Topbar() {
               "h-7 px-2.5 text-[10px] font-bold uppercase rounded-md transition-all duration-200",
               lang === "en" 
                 ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                : "text-slate-400 hover:text-slate-200"
+                : "text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200"
             )}
           >
             EN
@@ -107,7 +107,7 @@ export function Topbar() {
               "h-7 px-2.5 text-[10px] font-bold uppercase rounded-md transition-all duration-200",
               lang === "id" 
                 ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                : "text-slate-400 hover:text-slate-200"
+                : "text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200"
             )}
           >
             ID
@@ -119,26 +119,26 @@ export function Topbar() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-xl p-1 pl-2 text-left bg-slate-900/40 border border-white/5 hover:bg-slate-900/80 transition-all duration-200"
+                className="flex items-center gap-2 rounded-xl p-1 pl-2 text-left bg-muted/40 dark:bg-slate-900/40 border border-border/40 dark:border-white/5 hover:bg-muted/80 dark:hover:bg-slate-900/80 transition-all duration-200"
               >
                 <div className="flex flex-col items-end hidden sm:flex leading-tight pr-1">
-                  <span className="block truncate text-[11px] font-bold text-slate-200">{user.username}</span>
-                  <span className="block text-[9px] uppercase tracking-wider font-semibold text-slate-500 mt-0.5">{user.role}</span>
+                  <span className="block truncate text-[11px] font-bold text-foreground dark:text-slate-200">{user.username}</span>
+                  <span className="block text-[9px] uppercase tracking-wider font-semibold text-muted-foreground dark:text-slate-500 mt-0.5">{user.role}</span>
                 </div>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
                   <UserRound className="h-4 w-4" />
                 </span>
-                <ChevronsUpDown className="h-3.5 w-3.5 text-slate-500" />
+                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="bottom" align="end" className="w-56 bg-slate-900 border border-white/10 text-slate-200">
+            <DropdownMenuContent side="bottom" align="end" className="w-56 bg-popover dark:bg-slate-900 border border-border/40 dark:border-white/10 text-popover-foreground dark:text-slate-200">
               <DropdownMenuLabel>
-                <div className="text-xs font-semibold text-slate-200">{user.username}</div>
-                <div className="text-[10px] font-normal capitalize text-slate-500">{user.role}</div>
+                <div className="text-xs font-semibold text-foreground dark:text-slate-200">{user.username}</div>
+                <div className="text-[10px] font-normal capitalize text-muted-foreground dark:text-slate-500">{user.role}</div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem onSelect={() => setPasswordOpen(true)} className="hover:bg-white/5 focus:bg-white/5 cursor-pointer">
-                <KeyRound className="mr-2 h-4 w-4 text-slate-400" />
+              <DropdownMenuSeparator className="bg-border/40 dark:bg-white/5" />
+              <DropdownMenuItem onSelect={() => setPasswordOpen(true)} className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5 cursor-pointer">
+                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground dark:text-slate-400" />
                 {t("changePassword")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setLogoutOpen(true)} className="text-destructive focus:text-destructive hover:bg-rose-500/10 focus:bg-rose-500/10 cursor-pointer">

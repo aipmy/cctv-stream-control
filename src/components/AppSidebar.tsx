@@ -33,9 +33,9 @@ export function AppSidebar() {
   const { t } = useTranslation();
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-white/5 bg-slate-950/60 backdrop-blur-xl transition-all duration-300">
-      <SidebarHeader className="border-b border-white/5 py-4 bg-slate-955/10">
-        <div className="flex items-center gap-2.5 px-3 relative">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border dark:border-white/5 bg-sidebar dark:bg-slate-950/60 backdrop-blur-xl transition-all duration-300">
+      <SidebarHeader className="border-b border-sidebar-border dark:border-white/5 py-4 bg-sidebar dark:bg-slate-955/10">
+        <div className={cn("flex items-center gap-2.5 px-3 relative", collapsed && "px-1 justify-center")}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow relative shrink-0">
             <Cctv className="h-5 w-5 text-primary-foreground" />
             <span className="absolute -top-1 -right-1 flex h-2 w-2">
@@ -44,18 +44,18 @@ export function AppSidebar() {
             </span>
           </div>
           {!collapsed && (
-            <div className="leading-tight">
-              <div className="text-xs font-bold tracking-widest text-slate-100 uppercase">CCTV Lite</div>
-              <div className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">Monitoring</div>
+            <div className="leading-tight animate-fade-in">
+              <div className="text-xs font-bold tracking-widest text-foreground dark:text-slate-100 uppercase">CCTV Lite</div>
+              <div className="text-[9px] uppercase tracking-widest text-muted-foreground dark:text-slate-500 font-medium">Monitoring</div>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 pt-4 bg-slate-955/10">
+      <SidebarContent className="px-2 pt-4 bg-sidebar dark:bg-slate-955/10">
         <SidebarGroup>
           {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-slate-500 px-3 mb-2">
+            <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground dark:text-slate-500 px-3 mb-2">
               {t("menu")}
             </SidebarGroupLabel>
           )}
@@ -73,21 +73,22 @@ export function AppSidebar() {
                   const title = t(item.titleKey);
                   return (
                     <SidebarMenuItem key={item.titleKey} className="relative">
-                      {active && (
+                      {active && !collapsed && (
                         <div className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary shadow-[0_0_8px_#14b8a6]" />
                       )}
                       <SidebarMenuButton 
                         asChild 
                         isActive={active}
                         className={cn(
-                          "w-full h-10 px-3 rounded-xl transition-all duration-200 group relative",
+                          "transition-all duration-200 group relative",
+                          collapsed ? "rounded-lg" : "w-full h-10 px-3 rounded-xl",
                           active 
                             ? "bg-primary/10 border border-primary/20 text-primary shadow-[0_0_12px_rgba(20,184,166,0.12)] font-semibold" 
-                            : "text-slate-400 border border-transparent hover:text-slate-100 hover:bg-white/5 hover:translate-x-0.5"
+                            : "text-muted-foreground dark:text-slate-400 border border-transparent hover:text-foreground dark:hover:text-slate-100 hover:bg-muted dark:hover:bg-white/5 hover:translate-x-0.5"
                         )}
                       >
                         <NavLink to={item.url} className="flex items-center gap-3">
-                          <item.icon className={cn("h-4 w-4 transition-colors", active ? "text-primary" : "text-slate-400 group-hover:text-slate-100")} />
+                          <item.icon className={cn("h-4 w-4 transition-colors", active ? "text-primary" : "text-muted-foreground dark:text-slate-400 group-hover:text-foreground dark:group-hover:text-slate-100")} />
                           {!collapsed && <span className="text-[13px]">{title}</span>}
                         </NavLink>
                       </SidebarMenuButton>
