@@ -149,44 +149,75 @@ export default function Cameras() {
       </Card>
 
       {/* Desktop Table View */}
-      <Card className="overflow-hidden hidden md:block border border-border/40 dark:border-white/5 rounded-xl">
+      <Card className="overflow-hidden hidden md:block border border-border/40 dark:border-white/5 rounded-xl bg-card/65 backdrop-blur-sm shadow-2xl">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent">
               <TableHead>{t("cameraName")}</TableHead>
               <TableHead>Site</TableHead>
-              <TableHead>Brand</TableHead>
-              <TableHead>Info</TableHead>
-              <TableHead>Stream</TableHead>
+              <TableHead>Info Jaringan & Penggunaan</TableHead>
+              <TableHead>Kualitas Stream</TableHead>
               <TableHead>{t("active")}</TableHead>
               <TableHead>{t("status")}</TableHead>
-              <TableHead className="text-right">{t("actions")}</TableHead>
+              <TableHead className="text-right w-[180px]">{t("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((c) => (
               <Fragment key={c.id}>
-              <TableRow className={cn(highlightId === c.id && "bg-primary/10 border-l-2 border-l-primary")} id={`cam-${c.id}`}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-muted-foreground">{c.site}</TableCell>
-                <TableCell>{c.brand}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {canSeeIp ? <div className="font-mono">{c.ip}</div> : <div className="text-muted-foreground">{t("ipHidden")}</div>}
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" />{c.viewerCount || 0} {t("viewerCount").toLowerCase()}</span>
-                    <span className="inline-flex items-center gap-1"><Gauge className="h-3 w-3" />out {formatByteRateFromKbps(c.bandwidthKbps || 0)}</span>
+              <TableRow className={cn("hover:bg-muted/30 transition-colors", highlightId === c.id && "bg-primary/10 border-l-2 border-l-primary")} id={`cam-${c.id}`}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Cctv className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <div className="font-semibold text-foreground leading-none">{c.name}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono mt-1">{c.brand}</div>
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell><Badge variant="outline" className="text-xs">{c.streamType}</Badge></TableCell>
                 <TableCell>
-                  <Badge variant={c.enabled ? "default" : "outline"} className="text-xs">
-                    {c.enabled ? t("active") : t("inactive")}
+                  <Badge variant="outline" className="bg-muted/30 border-border/40 text-muted-foreground font-semibold px-2 py-0.5 text-[10px] rounded-md">
+                    {c.site}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {canSeeIp ? <div className="font-mono text-foreground/80">{c.ip}</div> : <div className="text-muted-foreground">{t("ipHidden")}</div>}
+                  <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{c.viewerCount || 0} {t("viewerCount").toLowerCase()}</span>
+                    <span className="flex items-center gap-1"><Gauge className="h-3 w-3" />{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 font-mono px-1.5 py-0">
+                      {c.streamType}
+                    </Badge>
+                    <div className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider pl-0.5">
+                      Audio: {c.audioMode}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Switch
+                    checked={c.enabled}
+                    disabled={!canEdit}
+                    onCheckedChange={async (v) => {
+                      try {
+                        // In case we want to toggle camera active status directly
+                        await probeCamera(c.id, false); // or update active status
+                        toast.success(lang === "id" ? "Status kamera diperbarui" : "Camera status updated");
+                      } catch {
+                        toast.error("Gagal memperbarui status");
+                      }
+                    }}
+                  />
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     <span className={cn("status-dot", !c.enabled || c.status === "offline" ? "status-dot-offline" : c.status === "starting" ? "status-dot-warning" : "status-dot-online")} />
-                    <span className="text-xs capitalize">{!c.enabled ? "disabled" : c.status}</span>
+                    <span className="text-xs capitalize font-semibold text-foreground/85">{!c.enabled ? "disabled" : c.status}</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -194,7 +225,7 @@ export default function Cameras() {
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      className="h-8 w-8" 
+                      className="h-8 w-8 hover:bg-muted" 
                       title={previewId === c.id ? t("closePreview") : t("previewStream")} 
                       onClick={() => setPreviewId((v) => v === c.id ? null : c.id)}
                     >
@@ -203,7 +234,7 @@ export default function Cameras() {
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      className="h-8 w-8" 
+                      className="h-8 w-8 hover:bg-muted" 
                       title={t("probeConnection")} 
                       onClick={async () => { 
                         try { 
@@ -221,17 +252,17 @@ export default function Cameras() {
                       <Radar className="h-3.5 w-3.5" />
                     </Button>
                     {canRestart && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setRestart(c)}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-muted" onClick={() => setRestart(c)}>
                         <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     {canEdit && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEdit(c); setOpen(true); }}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-muted" onClick={() => { setEdit(c); setOpen(true); }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     {canDelete && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDel(c)}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDel(c)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -239,9 +270,9 @@ export default function Cameras() {
                 </TableCell>
               </TableRow>
               {previewId === c.id && (
-                <TableRow>
-                  <TableCell colSpan={8} className="bg-muted/15 p-3">
-                    <div className="grid gap-3 md:grid-cols-[400px_1fr] items-start">
+                <TableRow className="bg-muted/10 hover:bg-muted/10">
+                  <TableCell colSpan={7} className="p-4 border-t border-b border-border/40">
+                    <div className="grid gap-4 md:grid-cols-[400px_1fr] items-start">
                       <CameraCard
                         camera={c}
                         onRestart={() => setRestart(c)}
@@ -250,17 +281,17 @@ export default function Cameras() {
                         pinned={false}
                         onTogglePin={() => {}}
                       />
-                      <div className="text-xs text-muted-foreground space-y-1 pt-1">
-                        <div className="font-medium text-foreground">{t("cameraManagementPreviewTitle")}</div>
+                      <div className="text-xs text-muted-foreground space-y-1.5 pt-1 bg-muted/20 p-4 rounded-xl border border-border/40">
+                        <div className="font-semibold text-foreground">{t("cameraManagementPreviewTitle")}</div>
                         <div>{t("cameraManagementPreviewHelp")}</div>
-                        <div>Stream: <span className="font-mono">{c.streamType}</span> · HLS Mode: <span className="font-mono">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono">{c.streamQuality || "Auto"}</span></div>
-                        <div>Audio: <span className="font-mono">{c.audioMode}</span> · PTZ: <span className="font-mono">{c.enablePTZ ? t("active") : t("inactive")}</span></div>
-                        <div>Status: <span className="font-mono">{c.status}</span> · Viewer: <span className="font-mono">{c.viewerCount || 0}</span></div>
-                        <div>Pull CCTV: <span className="font-mono">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span> · Output viewer: <span className="font-mono">{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span></div>
+                        <div>Stream: <span className="font-mono text-foreground/80">{c.streamType}</span> · HLS Mode: <span className="font-mono text-foreground/80">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono text-foreground/80">{c.streamQuality || "Auto"}</span></div>
+                        <div>Audio: <span className="font-mono text-foreground/80">{c.audioMode}</span> · PTZ: <span className="font-mono text-foreground/80">{c.enablePTZ ? t("active") : t("inactive")}</span></div>
+                        <div>Status: <span className="font-mono text-foreground/80">{c.status}</span> · Viewer: <span className="font-mono text-foreground/80">{c.viewerCount || 0}</span></div>
+                        <div>Pull CCTV: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span> · Output viewer: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span></div>
                         {c.errorHistory && c.errorHistory.length > 0 && (
-                          <div className="mt-2">
-                            <div className="font-medium text-destructive">{t("lastError")}</div>
-                            <div className="text-destructive/80">{tError(c.errorHistory[c.errorHistory.length - 1]?.message)}</div>
+                          <div className="mt-2.5">
+                            <div className="font-semibold text-destructive">{t("lastError")}</div>
+                            <div className="text-destructive/80 font-mono text-[11px] mt-1">{tError(c.errorHistory[c.errorHistory.length - 1]?.message)}</div>
                           </div>
                         )}
                       </div>
@@ -272,7 +303,7 @@ export default function Cameras() {
             ))}
             {!camerasQuery.isPending && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-12">{t("noCamerasRegistered")}</TableCell>
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-12">{t("noCamerasRegistered")}</TableCell>
               </TableRow>
             )}
           </TableBody>
