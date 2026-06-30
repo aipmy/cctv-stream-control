@@ -2,8 +2,12 @@ import { Router } from "express";
 import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { config } from "../core/config.js";
 import { streamSystemMetrics } from "../stream/streamManager.js";
+
+const execAsync = promisify(exec);
 import {
   listEvents,
   triggerEvent,
@@ -185,22 +189,57 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
         if (process.platform === "linux") {
           const meminfo = await fs.readFile("/proc/meminfo", "utf8");
           const lines = meminfo.split("\n");
-          let memFree = 0;
-          let buffers = 0;
-          let cached = 0;
-          let reclaimable = 0;
+          let memAvailable = 0;
           for (const line of lines) {
-            if (line.startsWith("MemFree:")) {
-              memFree = parseInt(line.match(/\d+/)[0], 10) * 1024;
-            } else if (line.startsWith("Buffers:")) {
-              buffers = parseInt(line.match(/\d+/)[0], 10) * 1024;
-            } else if (line.startsWith("Cached:")) {
-              cached = parseInt(line.match(/\d+/)[0], 10) * 1024;
-            } else if (line.startsWith("SReclaimable:")) {
-              reclaimable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            if (line.startsWith("MemAvailable:")) {
+              memAvailable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+              break;
             }
           }
-          freeMem = memFree + buffers + cached + reclaimable;
+          if (memAvailable > 0) {
+            freeMem = memAvailable;
+          } else {
+            let memFree = 0;
+            let buffers = 0;
+            let cached = 0;
+            let reclaimable = 0;
+            for (const line of lines) {
+              if (line.startsWith("MemFree:")) {
+                memFree = parseInt(line.match(/\d+/)[0], 10) * 1024;
+              } else if (line.startsWith("Buffers:")) {
+                buffers = parseInt(line.match(/\d+/)[0], 10) * 1024;
+              } else if (line.startsWith("Cached:")) {
+                cached = parseInt(line.match(/\d+/)[0], 10) * 1024;
+              } else if (line.startsWith("SReclaimable:")) {
+                reclaimable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+              }
+            }
+            freeMem = memFree + buffers + cached + reclaimable;
+          }
+        } else if (process.platform === "darwin") {
+          const { stdout } = await execAsync("vm_stat");
+          const lines = stdout.split("\n");
+          let pageSize = 4096;
+          const sizeMatch = lines[0].match(/page size of (\d+) bytes/);
+          if (sizeMatch) {
+            pageSize = parseInt(sizeMatch[1], 10);
+          }
+          let pagesFree = 0;
+          let pagesInactive = 0;
+          let pagesSpeculative = 0;
+          let pagesPurgeable = 0;
+          for (const line of lines) {
+            if (line.trim().startsWith("Pages free:")) {
+              pagesFree = parseInt(line.match(/\d+/)[0], 10);
+            } else if (line.trim().startsWith("Pages inactive:")) {
+              pagesInactive = parseInt(line.match(/\d+/)[0], 10);
+            } else if (line.trim().startsWith("Pages speculative:")) {
+              pagesSpeculative = parseInt(line.match(/\d+/)[0], 10);
+            } else if (line.trim().startsWith("Pages purgeable:")) {
+              pagesPurgeable = parseInt(line.match(/\d+/)[0], 10);
+            }
+          }
+          freeMem = (pagesFree + pagesInactive + pagesSpeculative + pagesPurgeable) * pageSize;
         }
       } catch (memErr) {
         // fallback
