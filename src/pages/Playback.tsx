@@ -270,7 +270,6 @@ export default function Playback() {
         let startTs = info.firstSegmentUnixTime;
         if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
           startTs = stateVal.timestamp;
-          initialSeekDone.current = true;
         }
         if (startTs) {
           setCurrentPlaybackTs(startTs);
@@ -356,6 +355,21 @@ export default function Playback() {
         video.src = playlistSrc;
         video.onloadedmetadata = () => {
           if (!disposed) {
+            if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
+              const targetTs = stateVal.timestamp;
+              let offset = 0;
+              const mappings = playbackInfo.segmentMappings || [];
+              if (mappings.length > 0) {
+                const closest = mappings.reduce((prev, curr) => {
+                  return Math.abs(curr.ts - targetTs) < Math.abs(prev.ts - targetTs) ? curr : prev;
+                });
+                offset = closest.offset + Math.max(0, targetTs - closest.ts);
+              } else if (playbackInfo.firstSegmentUnixTime) {
+                offset = targetTs - playbackInfo.firstSegmentUnixTime;
+              }
+              video.currentTime = Math.max(0, offset);
+              initialSeekDone.current = true;
+            }
             video.play().catch(() => {});
             setIsPlaying(true);
           }
@@ -383,6 +397,21 @@ export default function Playback() {
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
+            if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
+              const targetTs = stateVal.timestamp;
+              let offset = 0;
+              const mappings = playbackInfo.segmentMappings || [];
+              if (mappings.length > 0) {
+                const closest = mappings.reduce((prev, curr) => {
+                  return Math.abs(curr.ts - targetTs) < Math.abs(prev.ts - targetTs) ? curr : prev;
+                });
+                offset = closest.offset + Math.max(0, targetTs - closest.ts);
+              } else if (playbackInfo.firstSegmentUnixTime) {
+                offset = targetTs - playbackInfo.firstSegmentUnixTime;
+              }
+              video.currentTime = Math.max(0, offset);
+              initialSeekDone.current = true;
+            }
             video.play().catch(() => {});
             setIsPlaying(true);
           }
@@ -1100,9 +1129,17 @@ export default function Playback() {
                 className="w-full h-full object-contain cursor-pointer"
                 crossOrigin="anonymous"
                 onTimeUpdate={handleVideoTimeUpdate}
-                onWaiting={() => setIsBuffering(true)}
+                onWaiting={() => {
+                  const v = videoRef.current;
+                  if (v && !v.paused) {
+                    setIsBuffering(true);
+                  }
+                }}
                 onPlaying={() => setIsBuffering(false)}
-                onPause={() => setIsPlaying(false)}
+                onPause={() => {
+                  setIsPlaying(false);
+                  setIsBuffering(false);
+                }}
                 onPlay={() => setIsPlaying(true)}
                 onClick={togglePlay}
               />
