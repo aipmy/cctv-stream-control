@@ -112,7 +112,7 @@ export default function Playback() {
 
   // Controls UI state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
   const [isBuffering, setIsBuffering] = useState(false);
 
@@ -355,6 +355,7 @@ export default function Playback() {
         video.src = playlistSrc;
         video.onloadedmetadata = () => {
           if (!disposed) {
+            video.muted = isMuted;
             if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
               const targetTs = stateVal.timestamp;
               let offset = 0;
@@ -397,6 +398,7 @@ export default function Playback() {
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
+            video.muted = isMuted;
             if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
               const targetTs = stateVal.timestamp;
               let offset = 0;
@@ -564,6 +566,7 @@ export default function Playback() {
     }
 
     video.currentTime = Math.max(0, offset);
+    video.muted = isMuted;
     video.play().catch(() => {});
     setIsPlaying(true);
     toast.info(`Melompat ke 15s sebelum deteksi: ${new Date(eventTs).toLocaleTimeString("id-ID", { hour12: false })}`);
@@ -1128,6 +1131,7 @@ export default function Playback() {
                 ref={videoRef}
                 className="w-full h-full object-contain cursor-pointer"
                 crossOrigin="anonymous"
+                muted={isMuted}
                 onTimeUpdate={handleVideoTimeUpdate}
                 onWaiting={() => {
                   const v = videoRef.current;
