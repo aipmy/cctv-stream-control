@@ -179,9 +179,11 @@ export default function Settings() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const storagePercentage = storageStatus
-    ? Math.min(100, (storageStatus.usedBytes / storageStatus.maxBytes) * 100)
+  const rawStoragePercentage = storageStatus
+    ? (storageStatus.usedBytes / storageStatus.maxBytes) * 100
     : 0;
+
+  const storagePercentage = Math.min(100, rawStoragePercentage);
 
   return (
     <div className="space-y-5 max-w-3xl pb-10">
@@ -437,18 +439,21 @@ export default function Settings() {
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${storagePercentage}%`,
-                      background: "linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #ef4444 100%)",
-                      backgroundSize: `${100 / Math.max(0.1, storagePercentage / 100)}% 100%`,
-                      boxShadow: storagePercentage > 80 
+                      background: storagePercentage > 90 
+                        ? "linear-gradient(90deg, #f43f5e 0%, #ef4444 100%)" 
+                        : storagePercentage > 70 
+                        ? "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)" 
+                        : "linear-gradient(90deg, #34d399 0%, #10b981 100%)",
+                      boxShadow: storagePercentage > 90 
                         ? "0 0 10px rgba(239, 68, 68, 0.6)" 
-                        : storagePercentage > 50 
+                        : storagePercentage > 70 
                         ? "0 0 10px rgba(245, 158, 11, 0.5)" 
                         : "0 0 10px rgba(16, 185, 129, 0.4)"
                     }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>{t("usedPercent").replace("{pct}", storagePercentage.toFixed(1))}</span>
+                  <span>{t("usedPercent").replace("{pct}", rawStoragePercentage.toFixed(1))}</span>
                   <span>{t("autoCleanupNotice")}</span>
                 </div>
                 {storageStatus && storageStatus.diskTotal !== undefined && storageStatus.diskTotal > 0 && (
