@@ -108,11 +108,11 @@ export default function Cameras() {
         </div>
       </div>
 
-      <Card className="grid gap-2 p-3 md:grid-cols-[minmax(240px,1fr)_200px_200px]">
-        <div className="relative">
+      <Card className="flex flex-col sm:flex-row gap-3 p-3 bg-card/60 backdrop-blur-sm border border-border/40 dark:border-white/5 rounded-xl">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            className="pl-9 h-9" 
+            className="pl-9 h-9 bg-background/40 border-border/40" 
             placeholder={t("searchCamera")} 
             value={q} 
             onChange={(e) => {
@@ -123,30 +123,33 @@ export default function Cameras() {
             }} 
           />
         </div>
-        <Select value={siteFilter} onValueChange={(v) => {
-          setSiteFilter(v);
-          if (v && v !== "all") searchParams.set("site", v);
-          else searchParams.delete("site");
-          setSearchParams(searchParams, { replace: true });
-        }}>
-          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("allSitesOrGroups")}</SelectItem>
-            {sites.map((site) => <SelectItem key={site} value={site}>{site}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={sort} onValueChange={setSort}>
-          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="site-asc">Site A–Z</SelectItem>
-            <SelectItem value="site-desc">Site Z–A</SelectItem>
-            <SelectItem value="name-asc">{t("cameraName")} A–Z</SelectItem>
-            <SelectItem value="name-desc">{t("cameraName")} Z–A</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <Select value={siteFilter} onValueChange={(v) => {
+            setSiteFilter(v);
+            if (v && v !== "all") searchParams.set("site", v);
+            else searchParams.delete("site");
+            setSearchParams(searchParams, { replace: true });
+          }}>
+            <SelectTrigger className="h-9 w-full sm:w-[180px] bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allSitesOrGroups")}</SelectItem>
+              {sites.map((site) => <SelectItem key={site} value={site}>{site}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger className="h-9 w-full sm:w-[180px] bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="site-asc">Site A–Z</SelectItem>
+              <SelectItem value="site-desc">Site Z–A</SelectItem>
+              <SelectItem value="name-asc">{t("cameraName")} A–Z</SelectItem>
+              <SelectItem value="name-desc">{t("cameraName")} Z–A</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </Card>
 
-      <Card className="overflow-hidden">
+      {/* Desktop Table View */}
+      <Card className="overflow-hidden hidden md:block border border-border/40 dark:border-white/5 rounded-xl">
         <Table>
           <TableHeader>
             <TableRow>
@@ -275,6 +278,117 @@ export default function Cameras() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Mobile Card Stack View */}
+      <div className="block md:hidden space-y-4">
+        {filtered.length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-12 bg-card/60 border border-border/40 rounded-xl">
+            {t("noCamerasRegistered")}
+          </div>
+        ) : (
+          filtered.map((c) => (
+            <Card key={c.id} className={cn("p-4 space-y-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 rounded-xl relative", highlightId === c.id && "border-primary/60 shadow-md shadow-primary/5")}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold text-sm text-foreground leading-tight">{c.name}</h3>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mt-1 block">{c.site} • {c.brand}</span>
+                </div>
+                <Badge variant={c.enabled ? "default" : "outline"} className="text-[10px] px-2 py-0 shrink-0">
+                  {c.enabled ? t("active") : t("inactive")}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs border-t pt-3 border-border/40 dark:border-white/5">
+                <div>
+                  <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">IP Address</div>
+                  <div className="font-mono mt-1 text-foreground/90">{canSeeIp ? c.ip : t("ipHidden")}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Stream</div>
+                  <div className="mt-1 text-foreground/90">{c.streamType}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-3 border-border/40 dark:border-white/5">
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {c.viewerCount || 0}</span>
+                  <span className="flex items-center gap-1"><Gauge className="h-3.5 w-3.5" /> {formatByteRateFromKbps(c.bandwidthKbps || 0)}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("status-dot", !c.enabled || c.status === "offline" ? "status-dot-offline" : c.status === "starting" ? "status-dot-warning" : "status-dot-online")} />
+                  <span className="text-xs capitalize font-semibold text-foreground/95">{!c.enabled ? "disabled" : c.status}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-border/40 dark:border-white/5">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1 h-9 text-xs gap-1.5"
+                  onClick={() => setPreviewId((v) => v === c.id ? null : c.id)}
+                >
+                  {previewId === c.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span>Preview</span>
+                </Button>
+
+                <Button 
+                  size="icon" 
+                  variant="outline" 
+                  className="h-9 w-9"
+                  onClick={async () => {
+                    try {
+                      await probeCamera(c.id, false);
+                      toast.success(lang === "id" ? `Probe ${c.name} selesai` : `Probe ${c.name} completed`);
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : t("probeFailed"));
+                    }
+                  }}
+                >
+                  <Radar className="h-4 w-4" />
+                </Button>
+
+                {canRestart && (
+                  <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => setRestart(c)}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {canEdit && (
+                  <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => { setEdit(c); setOpen(true); }}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {canDelete && (
+                  <Button size="icon" variant="outline" className="h-9 w-9 text-destructive hover:bg-destructive/10" onClick={() => setDel(c)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {previewId === c.id && (
+                <div className="pt-3 border-t border-border/40 dark:border-white/5 space-y-3">
+                  <CameraCard
+                    camera={c}
+                    onRestart={() => setRestart(c)}
+                    onEdit={() => { setEdit(c); setOpen(true); }}
+                    onDelete={() => setDel(c)}
+                    pinned={false}
+                    onTogglePin={() => {}}
+                  />
+                  <div className="text-[11px] text-muted-foreground space-y-1.5 bg-muted/20 p-3 rounded-lg border">
+                    <div className="font-semibold text-foreground">{t("cameraManagementPreviewTitle")}</div>
+                    <div>Stream: <span className="font-mono text-foreground/80">{c.streamType}</span> · HLS: <span className="font-mono text-foreground/80">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono text-foreground/80">{c.streamQuality || "Auto"}</span></div>
+                    <div>PTZ: <span className="font-mono text-foreground/80">{c.enablePTZ ? t("active") : t("inactive")}</span> · Audio: <span className="font-mono text-foreground/80">{c.audioMode}</span></div>
+                    <div>Pull CCTV: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span></div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))
+        )}
+      </div>
 
       <CameraFormDialog open={open} onOpenChange={setOpen} camera={edit} />
       

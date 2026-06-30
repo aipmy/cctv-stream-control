@@ -1592,7 +1592,7 @@ export default function Playback() {
                 <h3 className="font-semibold text-xs">
                   {selectedCameraId ? t("motionMarkers") : t("recentMotionActivityAll")}
                 </h3>
-                <span className="text-[10px] text-muted-foreground bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
+                <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
                   {t("nMatched").replace("{n}", String(filteredEvents.length))}
                 </span>
               </div>
@@ -1615,7 +1615,7 @@ export default function Playback() {
                       >
                         {/* Vertical Timeline Axis */}
                         <div className="flex flex-col items-center shrink-0 relative">
-                          <div className={`h-3 w-3 rounded-full border-2 bg-slate-950 z-5 transition-all duration-300 ${
+                          <div className={`h-3 w-3 rounded-full border-2 bg-background dark:bg-slate-955 z-5 transition-all duration-300 ${
                             isHuman 
                               ? "border-rose-500 shadow-[0_0_8px_#f43f5e]" 
                               : isPet 
@@ -1629,13 +1629,13 @@ export default function Playback() {
 
                         {/* Node Card */}
                         <div
-                          className="flex-1 group/item flex items-center justify-between gap-3 p-2 rounded-xl border border-white/5 bg-slate-900/20 hover:bg-slate-900/60 hover:border-primary/20 transition-all duration-300 shadow-sm relative overflow-hidden"
+                          className="flex-1 group/item flex items-center justify-between gap-3 p-2 rounded-xl border border-border/40 dark:border-white/5 bg-card/60 hover:bg-muted/50 dark:bg-slate-900/20 dark:hover:bg-slate-900/60 hover:border-primary/20 transition-all duration-300 shadow-sm relative overflow-hidden"
                         >
                           <div 
                             onClick={() => handleEventClick(evt)}
                             className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer animate-fade-in"
                           >
-                            <div className="w-14 h-9 bg-slate-950 border border-white/5 rounded-lg overflow-hidden relative shrink-0">
+                            <div className="w-14 h-9 bg-muted/40 dark:bg-slate-950 border border-border/40 dark:border-white/5 rounded-lg overflow-hidden relative shrink-0">
                               <img
                                 src={eventApi.snapshotUrl(evt.id)}
                                 alt="Event"
@@ -1658,9 +1658,9 @@ export default function Playback() {
                                   {evt.cameraName}
                                 </div>
                               )}
-                              <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 font-mono">
+                              <div className="text-[10px] text-muted-foreground dark:text-slate-400 flex flex-col gap-0.5 font-mono">
                                 <span>{t("startLabel")} {new Date(new Date(evt.ts).getTime() - 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
-                                <span className="text-[11px] font-bold text-slate-200 font-sans mt-0.5">
+                                <span className="text-[11px] font-bold text-foreground dark:text-slate-200 font-sans mt-0.5">
                                   {getClassificationLabel(evt.classification, evt.typeDescription, t)}
                                 </span>
                                 <span>{t("untilLabel")} {new Date(new Date(evt.ts).getTime() + 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
@@ -1672,7 +1672,7 @@ export default function Playback() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-md"
+                              className="h-7 w-7 p-0 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-white/10 rounded-md"
                               onClick={() => handleEventClick(evt)}
                               title={t("playback")}
                             >

@@ -154,11 +154,11 @@ export default function Events() {
     <div className="space-y-6 max-w-7xl pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
             {t("smartEvents")}
           </h1>
-          <p className="text-sm text-slate-400">{t("smartEventsDesc")}</p>
+          <p className="text-sm text-muted-foreground">{t("smartEventsDesc")}</p>
         </div>
         {events.length > 0 && (
           <Button variant="destructive" size="sm" onClick={() => setShowClearConfirm(true)} className="shadow-lg shadow-red-500/10">
@@ -169,18 +169,18 @@ export default function Events() {
       </div>
 
       {/* Filter Bar */}
-      <Card className="p-5 flex flex-col md:flex-row md:items-end gap-4 justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 shadow-2xl rounded-xl">
+      <Card className="p-5 flex flex-col md:flex-row md:items-end gap-4 justify-between bg-card/65 backdrop-blur-md border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label className="text-xs text-slate-400">{t("cameras")}</Label>
+            <Label className="text-xs text-muted-foreground">{t("cameras")}</Label>
             <Select value={filterCamera} onValueChange={setFilterCamera}>
-              <SelectTrigger className="bg-slate-950/40 border border-white/5 hover:bg-slate-955/60 text-slate-100 transition-colors">
+              <SelectTrigger className="bg-background/40 border border-border/40 dark:border-white/5 hover:bg-muted/40 dark:hover:bg-slate-955/60 text-foreground transition-colors">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-slate-900 border border-white/10 text-slate-100">
-                <SelectItem value="all" className="hover:bg-white/5 focus:bg-white/5">{t("allCameras")}</SelectItem>
+              <SelectContent className="bg-popover border border-border/40 dark:border-white/10 text-popover-foreground">
+                <SelectItem value="all" className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5">{t("allCameras")}</SelectItem>
                 {cameras.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="hover:bg-white/5 focus:bg-white/5">
+                  <SelectItem key={c.id} value={c.id} className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5">
                     {c.name}
                   </SelectItem>
                 ))}
@@ -189,21 +189,21 @@ export default function Events() {
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs text-slate-400">{t("eventType")}</Label>
+            <Label className="text-xs text-muted-foreground">{t("eventType")}</Label>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="bg-slate-950/40 border border-white/5 hover:bg-slate-955/60 text-slate-100 transition-colors">
+              <SelectTrigger className="bg-background/40 border border-border/40 dark:border-white/5 hover:bg-muted/40 dark:hover:bg-slate-955/60 text-foreground transition-colors">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-slate-900 border border-white/10 text-slate-100">
-                <SelectItem value="all" className="hover:bg-white/5 focus:bg-white/5">{t("allStatuses")}</SelectItem>
-                <SelectItem value="motion" className="hover:bg-white/5 focus:bg-white/5">{t("motion")}</SelectItem>
-                <SelectItem value="sound" className="hover:bg-white/5 focus:bg-white/5">{t("sound")}</SelectItem>
+              <SelectContent className="bg-popover border border-border/40 dark:border-white/10 text-popover-foreground">
+                <SelectItem value="all" className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5">{t("allStatuses")}</SelectItem>
+                <SelectItem value="motion" className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5">{t("motion")}</SelectItem>
+                <SelectItem value="sound" className="hover:bg-muted dark:hover:bg-white/5 focus:bg-muted dark:focus:bg-white/5">{t("sound")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={fetchEvents} className="shrink-0 h-10 border border-white/5 hover:bg-white/5 text-slate-200">
+        <Button variant="ghost" size="sm" onClick={fetchEvents} className="shrink-0 h-10 border border-border/40 dark:border-white/5 hover:bg-muted dark:hover:bg-white/5 text-foreground">
           Refresh
         </Button>
       </Card>
@@ -212,15 +212,15 @@ export default function Events() {
       {loading && events.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-sm text-slate-400">{t("loading")}</span>
+          <span className="text-sm text-muted-foreground">{t("loading")}</span>
         </div>
       ) : filteredEvents.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center space-y-3 bg-slate-900/10 border-dashed border-white/10 rounded-xl">
-          <div className="p-4 bg-slate-955/40 border border-white/5 rounded-full text-slate-500">
+        <Card className="p-16 flex flex-col items-center justify-center text-center space-y-3 bg-muted/10 border-dashed border-border/40 dark:border-white/10 rounded-xl">
+          <div className="p-4 bg-muted/30 dark:bg-slate-955/40 border border-border/40 dark:border-white/5 rounded-full text-muted-foreground">
             <Bell className="h-8 w-8" />
           </div>
-          <h3 className="font-semibold text-lg text-white">{t("noEvents")}</h3>
-          <p className="text-sm text-slate-400 max-w-xs">{t("noEventsSub")}</p>
+          <h3 className="font-semibold text-lg text-foreground">{t("noEvents")}</h3>
+          <p className="text-sm text-muted-foreground max-w-xs">{t("noEventsSub")}</p>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -232,11 +232,11 @@ export default function Events() {
               return (
                 <Card 
                   key={evt.id} 
-                  className="overflow-hidden flex flex-col justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 hover:border-primary/40 rounded-xl shadow-2xl relative group hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] transition-all duration-500 cursor-pointer"
+                  className="overflow-hidden flex flex-col justify-between bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 hover:border-primary/40 rounded-xl shadow-2xl relative group hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] transition-all duration-500 cursor-pointer"
                   onClick={() => handleEventClick(evt)}
                 >
                   {/* Snapshot Image Container */}
-                  <div className="relative aspect-video bg-slate-955 overflow-hidden shrink-0">
+                  <div className="relative aspect-video bg-muted/20 overflow-hidden shrink-0">
                     <img
                       src={eventApi.snapshotUrl(evt.id)}
                       alt="Snapshot"
@@ -306,15 +306,15 @@ export default function Events() {
                   <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold text-sm leading-tight text-slate-100 group-hover:text-primary transition-colors duration-300">
+                        <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors duration-300">
                           {evt.cameraName}
                         </h3>
-                        <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0">
+                        <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground bg-muted/40 border border-border/40 dark:bg-white/5 dark:border-white/10 px-2 py-0.5 rounded-full shrink-0">
                           {evt.site}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-1.5">
-                        <Calendar className="h-3 w-3 text-slate-500" />
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1.5">
+                        <Calendar className="h-3 w-3 text-muted-foreground/60" />
                         {dateStr} • {timeStr}
                       </p>
                     </div>
@@ -326,13 +326,13 @@ export default function Events() {
 
           {/* Pagination Controls Bar */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-5 border-t border-white/5 mt-8 bg-slate-900/10 p-4 rounded-xl">
-              <span className="text-xs text-slate-400">
-                Menampilkan <span className="font-semibold text-slate-200">{startIndex + 1}</span> -{" "}
-                <span className="font-semibold text-slate-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-5 border-t border-border/40 mt-8 bg-muted/10 p-4 rounded-xl">
+              <span className="text-xs text-muted-foreground">
+                Menampilkan <span className="font-semibold text-foreground">{startIndex + 1}</span> -{" "}
+                <span className="font-semibold text-foreground">
                   {Math.min(startIndex + itemsPerPage, filteredEvents.length)}
                 </span>{" "}
-                dari <span className="font-semibold text-slate-200">{filteredEvents.length}</span> event
+                dari <span className="font-semibold text-foreground">{filteredEvents.length}</span> event
               </span>
 
               <div className="flex items-center gap-1">
@@ -341,7 +341,7 @@ export default function Events() {
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 bg-slate-900/40 border border-white/5 text-slate-200 hover:bg-white/5 disabled:opacity-30"
+                  className="h-8 w-8 p-0 bg-background border border-border/45 text-foreground hover:bg-muted disabled:opacity-30"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -358,15 +358,15 @@ export default function Events() {
                     const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                     return (
                       <div key={page} className="flex items-center gap-1">
-                        {showEllipsis && <span className="text-slate-500 px-1 text-xs">...</span>}
+                        {showEllipsis && <span className="text-muted-foreground px-1 text-xs">...</span>}
                         <Button
                           variant={currentPage === page ? "default" : "outline"}
                           size="sm"
                           onClick={() => setCurrentPage(page)}
                           className={`h-8 w-8 p-0 text-xs font-semibold ${
                             currentPage === page
-                              ? "bg-primary text-white"
-                              : "bg-slate-900/40 border border-white/5 text-slate-300 hover:bg-white/5 hover:text-white"
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background border border-border/45 text-foreground hover:bg-muted"
                           }`}
                         >
                           {page}
@@ -380,7 +380,7 @@ export default function Events() {
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0 bg-slate-900/40 border border-white/5 text-slate-200 hover:bg-white/5 disabled:opacity-30"
+                  className="h-8 w-8 p-0 bg-background border border-border/45 text-foreground hover:bg-muted disabled:opacity-30"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
