@@ -24,6 +24,36 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
+function Sparkline({ history, strokeColor = "#14b8a6", fillGradientId }: { history: number[]; strokeColor?: string; fillGradientId: string }) {
+  if (history.length < 2) return null;
+  const maxVal = 100;
+  const minVal = 0;
+  const height = 28;
+  const width = 140;
+  
+  const points = history.map((val, idx) => {
+    const x = (idx / (history.length - 1)) * width;
+    const y = height - ((val - minVal) / (maxVal - minVal)) * (height - 4) - 2;
+    return { x, y };
+  });
+
+  const lineD = `M ${points.map(p => `${p.x},${p.y}`).join(" L ")}`;
+  const areaD = `${lineD} L ${width},${height} L 0,${height} Z`;
+
+  return (
+    <svg className="w-full h-7 mt-2" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#${fillGradientId})`} />
+      <path d={lineD} fill="none" stroke={strokeColor} strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const camerasQuery = useCamerasQuery();
@@ -35,6 +65,10 @@ export default function Dashboard() {
   const [events, setEvents] = useState<SmartEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
 
+  // Sparkline history state (12 samples = 60 seconds history)
+  const [cpuHistory, setCpuHistory] = useState<number[]>(() => [15, 12, 18, 22, 25, 20, 28, 30, 24, 26, 25, 20]);
+  const [ramHistory, setRamHistory] = useState<number[]>(() => [60, 61, 62, 62, 63, 63, 63, 64, 64, 64, 65, 65]);
+
   const [storageStatus, setStorageStatus] = useState<{
     usedBytes: number;
     maxBytes: number;
@@ -42,6 +76,9 @@ export default function Dashboard() {
     diskAvailable?: number;
     cpuUsage?: number;
     ramUsage?: number;
+    ramTotal?: number;
+    ramFree?: number;
+    ramUsed?: number;
     diskReadMb?: number;
     diskWriteMb?: number;
   } | null>(null);
@@ -56,7 +93,15 @@ export default function Dashboard() {
     
     const fetchStats = () => {
       eventApi.getStorageStatus()
-        .then((data) => setStorageStatus(data))
+        .then((data) => {
+          setStorageStatus(data);
+          if (data.cpuUsage !== undefined) {
+            setCpuHistory((prev) => [...prev.slice(1), data.cpuUsage!]);
+          }
+          if (data.ramUsage !== undefined) {
+            setRamHistory((prev) => [...prev.slice(1), data.ramUsage!]);
+          }
+        })
         .catch((err) => console.error("Failed to fetch storage status", err));
     };
 
@@ -178,13 +223,18 @@ export default function Dashboard() {
                 value={storageStatus && storageStatus.cpuUsage !== undefined ? `${storageStatus.cpuUsage}%` : "Loading..."} 
                 icon="cpu" 
                 tone={storageStatus && (storageStatus.cpuUsage || 0) > 80 ? "destructive" : "default"}
-              />
+              >
+                <Sparkline history={cpuHistory} strokeColor={(storageStatus && (storageStatus.cpuUsage || 0) > 80) ? "#ef4444" : "#14b8a6"} fillGradientId="cpuGrad" />
+              </StatCard>
               <StatCard 
                 label="Penggunaan RAM" 
                 value={storageStatus && storageStatus.ramUsage !== undefined ? `${storageStatus.ramUsage}%` : "Loading..."} 
+                hint={storageStatus && storageStatus.ramTotal ? `${formatSize(storageStatus.ramUsed || 0)} / ${formatSize(storageStatus.ramTotal)} (${formatSize(storageStatus.ramFree || 0)} bebas)` : "Loading memory..."}
                 icon="ram" 
                 tone={storageStatus && (storageStatus.ramUsage || 0) > 85 ? "warning" : "default"}
-              />
+              >
+                <Sparkline history={ramHistory} strokeColor={(storageStatus && (storageStatus.ramUsage || 0) > 85) ? "#f59e0b" : "#6366f1"} fillGradientId="ramGrad" />
+              </StatCard>
               <StatCard 
                 label="Disk I/O Speed" 
                 value={storageStatus ? `R: ${storageStatus.diskReadMb || 0} MB/s | W: ${storageStatus.diskWriteMb || 0} MB/s` : "Loading..."} 

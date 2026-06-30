@@ -165,6 +165,9 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
     
     let cpuUsage = 5;
     let ramUsage = 15;
+    let ramTotal = 0;
+    let ramFree = 0;
+    let ramUsed = 0;
     let diskReadMb = 0.0;
     let diskWriteMb = 0.0;
     try {
@@ -175,9 +178,10 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
       const loadPercentage = Math.round((os.loadavg()[0] / numCpus) * 100);
       cpuUsage = Math.min(Math.max(loadPercentage || (baseCpu + streamCpu), 3), 98);
 
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      ramUsage = Math.round(((totalMem - freeMem) / totalMem) * 100);
+      ramTotal = os.totalmem();
+      ramFree = os.freemem();
+      ramUsed = ramTotal - ramFree;
+      ramUsage = Math.round((ramUsed / ramTotal) * 100);
 
       diskWriteMb = parseFloat(((sysMetrics.activeProcesses || 0) * 1.25 + Math.random() * 0.15).toFixed(2));
       diskReadMb = parseFloat(((sysMetrics.viewers || 0) * 0.85 + Math.random() * 0.1).toFixed(2));
@@ -195,6 +199,9 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
       diskAvailable,
       cpuUsage,
       ramUsage,
+      ramTotal,
+      ramFree,
+      ramUsed,
       diskReadMb,
       diskWriteMb,
     });
