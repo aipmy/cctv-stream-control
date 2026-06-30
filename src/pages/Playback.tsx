@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import type Hls from "hls.js";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useCamerasQuery } from "@/features/cameras/queries";
+import { useSettings } from "@/features/settings/store";
 import { eventApi, streamApi, playbackUrl, downloadUrl, getApiToken, API_BASE } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ export default function Playback() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const theme = useSettings((s) => s.settings.theme);
   const { data: camerasData } = useCamerasQuery();
   const cameras = (camerasData || []).filter(c => c.enabled);
 
@@ -1514,9 +1516,12 @@ export default function Playback() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative"
+                  style={{
+                    colorScheme: theme === "dark" ? "dark" : "light"
+                  }}
                 />
-                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
               </div>
             </div>
 
