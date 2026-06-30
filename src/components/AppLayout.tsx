@@ -57,8 +57,8 @@ export function AppLayout() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
-  // Hanya fetch/poll stats jika user berada di Dashboard atau Manajemen Kamera
-  const isStatsNeeded = location.pathname === "/" || location.pathname === "/cameras";
+  // Hanya fetch/poll stats jika user berada di Dashboard, Manajemen Kamera, atau Live View
+  const isStatsNeeded = location.pathname === "/" || location.pathname === "/cameras" || location.pathname === "/live";
   useCameraStats(Boolean(user) && camerasQuery.isSuccess && isStatsNeeded, autoRefresh);
   useUsersQuery(user?.role === "admin");
 
