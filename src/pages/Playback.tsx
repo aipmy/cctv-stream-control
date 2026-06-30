@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import type Hls from "hls.js";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useCamerasQuery } from "@/features/cameras/queries";
@@ -81,10 +81,35 @@ export default function Playback() {
 
   const location = useLocation();
   const stateVal = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
+
+  const [searchParams] = useSearchParams();
+  const queryCameraId = searchParams.get("camera") || "";
+  const queryTs = searchParams.get("ts") || "";
+
+  const parsedQueryState = useMemo(() => {
+    if (!queryCameraId) return null;
+    const dateObj = queryTs ? new Date(queryTs) : new Date();
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    const unixTs = Math.floor(dateObj.getTime() / 1000);
+    return {
+      cameraId: queryCameraId,
+      date: dateStr,
+      timestamp: unixTs,
+      eventSeek: true,
+    };
+  }, [queryCameraId, queryTs]);
+
+  const effectiveState = useMemo(() => {
+    return stateVal || parsedQueryState;
+  }, [stateVal, parsedQueryState]);
+
   const initialSeekDone = useRef(false);
   const dragStartPlayheadRef = useRef<number | null>(null);
 
-  const [selectedCameraId, setSelectedCameraId] = useState(() => stateVal?.cameraId || "");
+  const [selectedCameraId, setSelectedCameraId] = useState(() => effectiveState?.cameraId || "");
   const [cameraSearchQuery, setCameraSearchQuery] = useState("");
   const [isCameraPopoverOpen, setIsCameraPopoverOpen] = useState(false);
 
@@ -102,7 +127,7 @@ export default function Playback() {
 
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedDate, setSelectedDate] = useState(() => {
-    if (stateVal?.date) return stateVal.date;
+    if (effectiveState?.date) return effectiveState.date;
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -116,9 +141,25 @@ export default function Playback() {
   const [volume, setVolume] = useState(1);
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // Playback window & center states
-  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>(() => stateVal?.eventSeek ? "15" : "none");
-  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(() => stateVal?.eventSeek ? stateVal.timestamp || null : null);
+  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>(() => effectiveState?.eventSeek ? "15" : "none");
+  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(() => effectiveState?.eventSeek ? effectiveState.timestamp || null : null);
+
+  // Synchronize URL query changes to state variables reactively!
+  useEffect(() => {
+    if (effectiveState) {
+      if (effectiveState.cameraId && effectiveState.cameraId !== selectedCameraId) {
+        setSelectedCameraId(effectiveState.cameraId);
+      }
+      if (effectiveState.date && effectiveState.date !== selectedDate) {
+        setSelectedDate(effectiveState.date);
+      }
+      if (effectiveState.eventSeek) {
+        setPlaybackWindowMinutes("15");
+        setPlaybackWindowCenterTs(effectiveState.timestamp || null);
+        initialSeekDone.current = false; // Reset seek done ref so it plays the new event!
+      }
+    }
+  }, [effectiveState]);
 
   const [playbackInfo, setPlaybackInfo] = useState<{
     hasRecording: boolean;
@@ -268,8 +309,8 @@ export default function Playback() {
 
       if (info.hasRecording) {
         let startTs = info.firstSegmentUnixTime;
-        if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
-          startTs = stateVal.timestamp;
+        if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+          startTs = effectiveState.timestamp;
         }
         if (startTs) {
           setCurrentPlaybackTs(startTs);
@@ -356,8 +397,8 @@ export default function Playback() {
         video.onloadedmetadata = () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
-              const targetTs = stateVal.timestamp;
+            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+              const targetTs = effectiveState.timestamp;
               let offset = 0;
               const mappings = playbackInfo.segmentMappings || [];
               if (mappings.length > 0) {
@@ -399,8 +440,8 @@ export default function Playback() {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
-              const targetTs = stateVal.timestamp;
+            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+              const targetTs = effectiveState.timestamp;
               let offset = 0;
               const mappings = playbackInfo.segmentMappings || [];
               if (mappings.length > 0) {

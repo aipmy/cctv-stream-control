@@ -40,18 +40,30 @@ export default function Dashboard() {
     maxBytes: number;
     diskTotal?: number;
     diskAvailable?: number;
+    cpuUsage?: number;
+    ramUsage?: number;
+    diskReadMb?: number;
+    diskWriteMb?: number;
   } | null>(null);
 
   const pinnedCameraIds = user?.preferences?.pinnedCameraIds || [];
   const { t, lang } = useTranslation();
   const canViewStats = user?.role === "admin" || !!user?.permissions?.canViewStats;
 
-  // Fetch Storage
+  // Fetch Storage and Telemetry
   useEffect(() => {
     if (!canViewStats) return;
-    eventApi.getStorageStatus()
-      .then((data) => setStorageStatus(data))
-      .catch((err) => console.error("Failed to fetch storage status", err));
+    
+    const fetchStats = () => {
+      eventApi.getStorageStatus()
+        .then((data) => setStorageStatus(data))
+        .catch((err) => console.error("Failed to fetch storage status", err));
+    };
+
+    fetchStats();
+    // Poll telemetry stats every 5 seconds for real-time dashboard CPU/RAM updates!
+    const interval = setInterval(fetchStats, 5000);
+    return () => clearInterval(interval);
   }, [canViewStats]);
 
   // Fetch Recent Events
@@ -126,37 +138,68 @@ export default function Dashboard() {
       </div>
 
       {canViewStats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
-          <StatCard 
-            label={t("camerasOnline")} 
-            value={online} 
-            hint={t("camerasOnlineHint", { n: Math.round((online / Math.max(enabled, 1)) * 100) })} 
-            icon="online" 
-            tone="success" 
-          />
-          <StatCard 
-            label={t("camerasOffline")} 
-            value={offline} 
-            hint={t("camerasOfflineHint", { starting, disabled })} 
-            icon="offline" 
-            tone="destructive" 
-          />
-          <StatCard 
-            label={t("camerasStreamingActive")} 
-            value={streaming} 
-            hint={t("camerasStreamingHint", { n: totalViewers })} 
-            icon="stream" 
-            tone="info" 
-          />
-          <StatCard label={t("cctvBandwidth")} value={formatByteRateFromKbps(totalBw)} icon="bandwidth" tone="warning" />
-          <StatCard 
-            label={t("diskUsage").replace(":", "")} 
-            value={storageStatus ? formatSize(storageStatus.usedBytes) : "Loading..."} 
-            hint={storageStatus && storageStatus.diskTotal ? `${formatSize(storageStatus.diskAvailable || 0)} bebas / ${formatSize(storageStatus.diskTotal)}` : "Loading server disk..."}
-            icon="disk" 
-            tone="default" 
-          />
+        <div className="space-y-5">
+          {/* Row 1: CCTV Status */}
+          <div className="space-y-2">
+            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">Jaringan CCTV</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
+              <StatCard 
+                label={t("camerasOnline")} 
+                value={online} 
+                hint={t("camerasOnlineHint", { n: Math.round((online / Math.max(enabled, 1)) * 100) })} 
+                icon="online" 
+                tone="success" 
+              />
+              <StatCard 
+                label={t("camerasOffline")} 
+                value={offline} 
+                hint={t("camerasOfflineHint", { starting, disabled })} 
+                icon="offline" 
+                tone="destructive" 
+              />
+              <StatCard 
+                label={t("camerasStreamingActive")} 
+                value={streaming} 
+                hint={t("camerasStreamingHint", { n: totalViewers })} 
+                icon="stream" 
+                tone="info" 
+              />
+              <StatCard label={t("cctvBandwidth")} value={formatByteRateFromKbps(totalBw)} icon="bandwidth" tone="warning" />
+            </div>
+          </div>
+
+          {/* Row 2: Server System Telemetry */}
+          <div className="space-y-2">
+            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">Kesehatan Server NVR</h4>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard 
+                label="Penggunaan CPU" 
+                value={storageStatus && storageStatus.cpuUsage !== undefined ? `${storageStatus.cpuUsage}%` : "Loading..."} 
+                icon="cpu" 
+                tone={storageStatus && (storageStatus.cpuUsage || 0) > 80 ? "destructive" : "default"}
+              />
+              <StatCard 
+                label="Penggunaan RAM" 
+                value={storageStatus && storageStatus.ramUsage !== undefined ? `${storageStatus.ramUsage}%` : "Loading..."} 
+                icon="ram" 
+                tone={storageStatus && (storageStatus.ramUsage || 0) > 85 ? "warning" : "default"}
+              />
+              <StatCard 
+                label="Disk I/O Speed" 
+                value={storageStatus ? `R: ${storageStatus.diskReadMb || 0} MB/s | W: ${storageStatus.diskWriteMb || 0} MB/s` : "Loading..."} 
+                icon="bandwidth" 
+                tone="info"
+              />
+              <StatCard 
+                label={t("diskUsage").replace(":", "")} 
+                value={storageStatus ? formatSize(storageStatus.usedBytes) : "Loading..."} 
+                hint={storageStatus && storageStatus.diskTotal ? `${formatSize(storageStatus.diskAvailable || 0)} bebas / ${formatSize(storageStatus.diskTotal)}` : "Loading server disk..."}
+                icon="disk" 
+                tone="default" 
+              />
+            </div>
+          </div>
         </div>
       )}
 

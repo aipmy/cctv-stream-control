@@ -1,4 +1,4 @@
-import { Camera as CameraIcon, Wifi, WifiOff, Radio, Gauge, HardDrive } from "lucide-react";
+import { Camera as CameraIcon, Wifi, WifiOff, Radio, Gauge, HardDrive, Cpu, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -6,12 +6,12 @@ interface StatCardProps {
   label: string;
   value: string | number;
   hint?: string;
-  icon: "camera" | "online" | "offline" | "stream" | "bandwidth" | "disk";
+  icon: "camera" | "online" | "offline" | "stream" | "bandwidth" | "disk" | "cpu" | "ram";
   tone?: "default" | "success" | "destructive" | "info" | "warning";
 }
 
 const icons = {
-  camera: CameraIcon, online: Wifi, offline: WifiOff, stream: Radio, bandwidth: Gauge, disk: HardDrive,
+  camera: CameraIcon, online: Wifi, offline: WifiOff, stream: Radio, bandwidth: Gauge, disk: HardDrive, cpu: Cpu, ram: Activity,
 };
 
 const toneMap: Record<NonNullable<StatCardProps["tone"]>, string> = {
