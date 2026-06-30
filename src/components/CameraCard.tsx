@@ -94,9 +94,7 @@ type PtzFeedback = "sending" | "success" | "warning" | "failure";
 
 import { useTranslation } from "@/hooks/useTranslation";
 
-// Variabel modul global untuk melacak ID kamera yang sedang mengeluarkan suara (unmuted) di browser session.
-// Ini menjamin bahwa secara default hanya satu kamera yang bersuara untuk menghindari tabrakan audio di HP.
-let activeUnmutedCameraId: string | null = null;
+
 
 export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin, hideManagementActions = false }: Props) {
   const user = useAuth((s) => s.user);
@@ -135,35 +133,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   // Semua kamera selalu dimulai dalam keadaan Muted saat reload halaman agar responsif, hemat bandwidth,
   // dan menghindari pemblokiran autoplay dari browser HP. Pengguna dapat mengaktifkan suara secara manual.
 
-  // Efek listener untuk mematikan suara jika ada kamera lain yang di-unmute oleh pengguna
-  useEffect(() => {
-    const handleMuteOthers = (e: Event) => {
-      const customEvent = e as CustomEvent<{ activeId: string }>;
-      if (customEvent.detail.activeId !== camera.id) {
-        setAudio((prev) => {
-          if (!prev.muted) {
-            const next = { ...prev, muted: true };
-            localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
-            return next;
-          }
-          return prev;
-        });
-      }
-    };
-    window.addEventListener("cctv-mute-others", handleMuteOthers);
-    return () => {
-      window.removeEventListener("cctv-mute-others", handleMuteOthers);
-    };
-  }, [camera.id]);
 
-  // Cleanup: Jika kamera ini dihancurkan (unmounted) dan merupakan kamera bersuara aktif, kosongkan tracker
-  useEffect(() => {
-    return () => {
-      if (activeUnmutedCameraId === camera.id) {
-        activeUnmutedCameraId = null;
-      }
-    };
-  }, [camera.id]);
 
   useEffect(() => () => {
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
@@ -371,12 +341,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
                     const next = { volume: pct / 100, muted: isMuted };
                     setAudio(next);
                     localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
-                    if (!isMuted) {
-                      activeUnmutedCameraId = camera.id;
-                      window.dispatchEvent(new CustomEvent("cctv-mute-others", { detail: { activeId: camera.id } }));
-                    } else if (activeUnmutedCameraId === camera.id) {
-                      activeUnmutedCameraId = null;
-                    }
                   }}
                   className="w-20 accent-white"
                 />
@@ -395,12 +359,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
                     ? { muted: false, volume: v.volume > 0.02 ? v.volume : 0.5 }
                     : { ...v, muted: true };
                   localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
-                  if (isUnmuting) {
-                    activeUnmutedCameraId = camera.id;
-                    window.dispatchEvent(new CustomEvent("cctv-mute-others", { detail: { activeId: camera.id } }));
-                  } else if (activeUnmutedCameraId === camera.id) {
-                    activeUnmutedCameraId = null;
-                  }
                   return next;
                 });
               }}

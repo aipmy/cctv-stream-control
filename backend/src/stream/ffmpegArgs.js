@@ -36,7 +36,8 @@ function audioArgs(camera, audioFallback) {
   if (camera.audioMode === "Disable") return ["-an"];
   if (camera.audioMode === "Auto" && audioFallback) return ["-an"];
   // Transcode to AAC if possible, or fallback to -an if Auto and failed
-  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2", "-af", "aresample=async=1"];
+  // Menambahkan volume=3.0 untuk mengamplifikasi suara mikrofon CCTV yang aslinya sangat kecil
+  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2", "-af", "volume=3.0,aresample=async=1"];
 }
 
 function copyHlsArgs(camera, output, dir, options, audioFallback) {
