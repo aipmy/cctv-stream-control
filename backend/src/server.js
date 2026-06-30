@@ -101,9 +101,9 @@ await initializeAudit();
 await initializeBlacklist();
 await startTrafficHistory(() => streamSystemMetrics());
 
-// Start automatic storage cleanup task
+// Start automatic storage cleanup task (runs every 2 minutes)
 void runStorageCleanup();
-const cleanupInterval = setInterval(() => void runStorageCleanup(), 30 * 60 * 1000);
+const cleanupInterval = setInterval(() => void runStorageCleanup(), 2 * 60 * 1000);
 
 // Start background motion detection worker
 startMotionDetectionWorker();
