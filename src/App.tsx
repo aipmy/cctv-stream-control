@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ThemeManager } from "@/components/ThemeManager";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import LiveView from "./pages/LiveView";
 import Cameras from "./pages/Cameras";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
@@ -34,6 +35,7 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/live" element={<LiveView />} />
                 <Route path="/cameras" element={<Cameras />} />
                 <Route path="/playback" element={<Playback />} />
                 <Route path="/events" element={<Events />} />

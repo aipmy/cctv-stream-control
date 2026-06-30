@@ -8,6 +8,9 @@ export const translations = {
     settings: "Settings",
     monitoringCenter: "Monitoring Center",
     playback: "Playback",
+    liveView: "Live View",
+    monitoring: "Monitoring",
+    administration: "Administration",
 
     // Common / Buttons
     save: "Save",
@@ -504,6 +507,9 @@ export const translations = {
     settings: "Pengaturan",
     monitoringCenter: "Pusat Monitoring",
     playback: "Putar Ulang",
+    liveView: "Pemantauan Langsung",
+    monitoring: "Pemantauan",
+    administration: "Administrasi",
 
     // Common / Buttons
     save: "Simpan",
