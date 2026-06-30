@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { eventApi } from "@/lib/api";
 import { useCamerasQuery } from "@/features/cameras/queries";
@@ -25,9 +26,27 @@ const getClassificationLabel = (classification?: string, fallback?: string) => {
 };
 
 export default function Events() {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { data: camerasData } = useCamerasQuery();
   const cameras = camerasData || [];
+
+  const handleEventClick = (evt: SmartEvent) => {
+    const dateObj = new Date(evt.ts);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+
+    navigate("/playback", {
+      state: {
+        cameraId: evt.cameraId,
+        date: dateStr,
+        timestamp: Math.floor(dateObj.getTime() / 1000),
+        eventSeek: true
+      }
+    });
+  };
 
   const [events, setEvents] = useState<SmartEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,11 +253,16 @@ export default function Events() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredEvents.map((evt) => (
-            <Card key={evt.id} className="overflow-hidden flex flex-col justify-between group hover:shadow-md transition-shadow duration-300">
+            <Card 
+              key={evt.id} 
+              className="overflow-hidden flex flex-col justify-between group hover:shadow-md hover:border-primary/50 transition-all duration-300 cursor-pointer"
+              onClick={() => handleEventClick(evt)}
+            >
               <div className="relative aspect-video bg-black/10 shrink-0">
                 <img
                   src={eventApi.snapshotUrl(evt.id)}
                   alt="Snapshot"
+                  loading="lazy"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=640&q=80";
@@ -274,25 +298,19 @@ export default function Events() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-2 border-t mt-auto">
-                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setActiveSnapshot(evt.id)}>
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); setActiveSnapshot(evt.id); }}>
                     <Eye className="h-3.5 w-3.5 mr-1" />
                     Snapshot
                   </Button>
-                  {evt.videoPath ? (
-                    <Button variant="outline" size="sm" className="flex-1 text-xs text-primary hover:text-primary" onClick={() => setActiveVideo(evt.id)}>
-                      <Video className="h-3.5 w-3.5 mr-1" />
-                      {t("video")}
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" className="flex-1 text-xs opacity-40 cursor-not-allowed" disabled>
-                      No Video
-                    </Button>
-                  )}
+                  <Button variant="outline" size="sm" className="flex-1 text-xs text-primary hover:text-primary" onClick={(e) => { e.stopPropagation(); handleEventClick(evt); }}>
+                    <Video className="h-3.5 w-3.5 mr-1" />
+                    Playback
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:bg-destructive/10 shrink-0"
-                    onClick={() => handleDelete(evt.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(evt.id); }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

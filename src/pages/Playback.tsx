@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import type Hls from "hls.js";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useCamerasQuery } from "@/features/cameras/queries";
@@ -78,7 +79,11 @@ export default function Playback() {
   const { data: camerasData } = useCamerasQuery();
   const cameras = (camerasData || []).filter(c => c.enabled);
 
-  const [selectedCameraId, setSelectedCameraId] = useState("");
+  const location = useLocation();
+  const stateVal = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
+  const initialSeekDone = useRef(false);
+
+  const [selectedCameraId, setSelectedCameraId] = useState(() => stateVal?.cameraId || "");
   const [cameraSearchQuery, setCameraSearchQuery] = useState("");
   const [isCameraPopoverOpen, setIsCameraPopoverOpen] = useState(false);
 
@@ -96,6 +101,7 @@ export default function Playback() {
 
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedDate, setSelectedDate] = useState(() => {
+    if (stateVal?.date) return stateVal.date;
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -110,8 +116,8 @@ export default function Playback() {
   const [isBuffering, setIsBuffering] = useState(false);
 
   // Playback window & center states
-  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>("none");
-  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(null);
+  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>(() => stateVal?.eventSeek ? "15" : "none");
+  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(() => stateVal?.eventSeek ? stateVal.timestamp || null : null);
 
   const [playbackInfo, setPlaybackInfo] = useState<{
     hasRecording: boolean;
@@ -260,9 +266,14 @@ export default function Playback() {
       setPlaybackInfo(info);
 
       if (info.hasRecording) {
-        if (info.firstSegmentUnixTime) {
-          setCurrentPlaybackTs(info.firstSegmentUnixTime);
-          setCurrentRecordingTime(new Date(info.firstSegmentUnixTime * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+        let startTs = info.firstSegmentUnixTime;
+        if (stateVal?.eventSeek && stateVal?.timestamp && !initialSeekDone.current) {
+          startTs = stateVal.timestamp;
+          initialSeekDone.current = true;
+        }
+        if (startTs) {
+          setCurrentPlaybackTs(startTs);
+          setCurrentRecordingTime(new Date(startTs * 1000).toLocaleTimeString("id-ID", { hour12: false }));
         }
 
         // Fetch motion events
@@ -1501,6 +1512,7 @@ export default function Playback() {
                           <img
                             src={eventApi.snapshotUrl(evt.id)}
                             alt="Event"
+                            loading="lazy"
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
