@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Eye, Trash2, Video, Bell, Volume2, ShieldAlert, Sparkles, User, Footprints, Activity } from "lucide-react";
+import { Eye, Trash2, Video, Bell, Volume2, ShieldAlert, Sparkles, User, Footprints, Activity, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import type { SmartEvent } from "@/types";
 
@@ -139,14 +139,17 @@ export default function Events() {
   });
 
   return (
-    <div className="space-y-6 max-w-6xl pb-10">
+    <div className="space-y-6 max-w-7xl pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold tracking-tight">{t("smartEvents")}</h1>
-          <p className="text-sm text-muted-foreground">{t("smartEventsDesc")}</p>
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            {t("smartEvents")}
+          </h1>
+          <p className="text-sm text-slate-400">{t("smartEventsDesc")}</p>
         </div>
         {events.length > 0 && (
-          <Button variant="destructive" size="sm" onClick={() => setShowClearConfirm(true)}>
+          <Button variant="destructive" size="sm" onClick={() => setShowClearConfirm(true)} className="shadow-lg shadow-red-500/10">
             <Trash2 className="h-4 w-4 mr-2" />
             {t("clearEvents")}
           </Button>
@@ -155,22 +158,22 @@ export default function Events() {
 
       {/* Simulator Card & Filter Bar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-5 space-y-4 lg:col-span-1">
-          <div className="flex items-center gap-2 font-medium text-sm text-primary">
+        <Card className="p-5 space-y-4 lg:col-span-1 bg-slate-900/40 backdrop-blur-md border border-white/5 shadow-2xl rounded-xl">
+          <div className="flex items-center gap-2 font-medium text-xs text-primary uppercase tracking-wider">
             <Sparkles className="h-4 w-4" />
             <span>{t("simulateEvent")} (Beta Testing)</span>
           </div>
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">{t("cameras")}</Label>
+              <Label className="text-xs text-slate-400">{t("cameras")}</Label>
               <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-950/40 border border-white/5 hover:bg-slate-955/60 text-slate-100 transition-colors">
                   <SelectValue placeholder={t("selectSite")} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-slate-900 border border-white/10 text-slate-100">
                   {cameras.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={c.id} className="hover:bg-white/5 focus:bg-white/5">
                       {c.name} ({c.site})
                     </SelectItem>
                   ))}
@@ -184,8 +187,9 @@ export default function Events() {
                 size="sm"
                 onClick={() => triggerSimulation("motion")}
                 disabled={simulating || !selectedCameraId}
+                className="bg-slate-950/40 border border-white/5 hover:bg-white/5 text-slate-200 transition-all hover:border-warning/30"
               >
-                <ShieldAlert className="h-4 w-4 mr-1.5 text-warning" />
+                <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse mr-2" />
                 {t("simulateMotion")}
               </Button>
               <Button
@@ -193,26 +197,27 @@ export default function Events() {
                 size="sm"
                 onClick={() => triggerSimulation("sound")}
                 disabled={simulating || !selectedCameraId}
+                className="bg-slate-950/40 border border-white/5 hover:bg-white/5 text-slate-200 transition-all hover:border-info/30"
               >
-                <Volume2 className="h-4 w-4 mr-1.5 text-info" />
+                <span className="h-1.5 w-1.5 rounded-full bg-info animate-pulse mr-2" />
                 {t("simulateSound")}
               </Button>
             </div>
           </div>
         </Card>
 
-        <Card className="p-5 lg:col-span-2 flex flex-col md:flex-row md:items-end gap-4 justify-between">
+        <Card className="p-5 lg:col-span-2 flex flex-col md:flex-row md:items-end gap-4 justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 shadow-2xl rounded-xl">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label className="text-xs">{t("cameras")}</Label>
+              <Label className="text-xs text-slate-400">{t("cameras")}</Label>
               <Select value={filterCamera} onValueChange={setFilterCamera}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-950/40 border border-white/5 hover:bg-slate-955/60 text-slate-100 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("allCameras")}</SelectItem>
+                <SelectContent className="bg-slate-900 border border-white/10 text-slate-100">
+                  <SelectItem value="all" className="hover:bg-white/5 focus:bg-white/5">{t("allCameras")}</SelectItem>
                   {cameras.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={c.id} className="hover:bg-white/5 focus:bg-white/5">
                       {c.name}
                     </SelectItem>
                   ))}
@@ -221,21 +226,21 @@ export default function Events() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">{t("eventType")}</Label>
+              <Label className="text-xs text-slate-400">{t("eventType")}</Label>
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-950/40 border border-white/5 hover:bg-slate-955/60 text-slate-100 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("allStatuses")}</SelectItem>
-                  <SelectItem value="motion">{t("motion")}</SelectItem>
-                  <SelectItem value="sound">{t("sound")}</SelectItem>
+                <SelectContent className="bg-slate-900 border border-white/10 text-slate-100">
+                  <SelectItem value="all" className="hover:bg-white/5 focus:bg-white/5">{t("allStatuses")}</SelectItem>
+                  <SelectItem value="motion" className="hover:bg-white/5 focus:bg-white/5">{t("motion")}</SelectItem>
+                  <SelectItem value="sound" className="hover:bg-white/5 focus:bg-white/5">{t("sound")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={fetchEvents} className="shrink-0 h-10">
+          <Button variant="ghost" size="sm" onClick={fetchEvents} className="shrink-0 h-10 border border-white/5 hover:bg-white/5 text-slate-200">
             Refresh
           </Button>
         </Card>
@@ -243,81 +248,117 @@ export default function Events() {
 
       {/* Events List */}
       {loading && events.length === 0 ? (
-        <div className="text-sm text-muted-foreground text-center py-10">{t("loading")}</div>
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-slate-400">{t("loading")}</span>
+        </div>
       ) : filteredEvents.length === 0 ? (
-        <Card className="p-10 flex flex-col items-center justify-center text-center space-y-2 border-dashed">
-          <Bell className="h-10 w-10 text-muted-foreground/60" />
-          <h3 className="font-semibold text-lg">{t("noEvents")}</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">{t("noEventsSub")}</p>
+        <Card className="p-16 flex flex-col items-center justify-center text-center space-y-3 bg-slate-900/10 border-dashed border-white/10 rounded-xl">
+          <div className="p-4 bg-slate-955/40 border border-white/5 rounded-full text-slate-500">
+            <Bell className="h-8 w-8" />
+          </div>
+          <h3 className="font-semibold text-lg text-white">{t("noEvents")}</h3>
+          <p className="text-sm text-slate-400 max-w-xs">{t("noEventsSub")}</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filteredEvents.map((evt) => (
-            <Card 
-              key={evt.id} 
-              className="overflow-hidden flex flex-col justify-between group hover:shadow-md hover:border-primary/50 transition-all duration-300 cursor-pointer"
-              onClick={() => handleEventClick(evt)}
-            >
-              <div className="relative aspect-video bg-black/10 shrink-0">
-                <img
-                  src={eventApi.snapshotUrl(evt.id)}
-                  alt="Snapshot"
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=640&q=80";
-                  }}
-                />
-                <div className="absolute top-2.5 left-2.5 flex gap-1.5 items-center">
-                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider text-white ${
-                    evt.type === "motion" ? "bg-warning" : "bg-info"
-                  }`}>
-                    {evt.type === "motion" ? t("motion") : t("sound")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-medium text-sm leading-tight text-foreground">{evt.cameraName}</h3>
-                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">{evt.site}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredEvents.map((evt) => {
+            const dateObj = new Date(evt.ts);
+            const dateStr = dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+            const timeStr = dateObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+            return (
+              <Card 
+                key={evt.id} 
+                className="overflow-hidden flex flex-col justify-between bg-slate-900/40 backdrop-blur-md border border-white/5 hover:border-primary/40 rounded-xl shadow-2xl relative group hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] transition-all duration-500 cursor-pointer"
+                onClick={() => handleEventClick(evt)}
+              >
+                {/* Snapshot Image Container */}
+                <div className="relative aspect-video bg-slate-955 overflow-hidden shrink-0">
+                  <img
+                    src={eventApi.snapshotUrl(evt.id)}
+                    alt="Snapshot"
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=640&q=80";
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60 transition-opacity duration-500" />
+                  
+                  {/* Event Type Badge */}
+                  <div className="absolute top-3 left-3 flex gap-2 items-center z-5">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider bg-slate-950/85 backdrop-blur-md border border-white/10 text-white shadow-lg">
+                      <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
+                        evt.type === "motion" ? "bg-amber-400 shadow-[0_0_8px_#f59e0b]" : "bg-cyan-400 shadow-[0_0_8px_#06b6d4]"
+                      }`} />
+                      {evt.type === "motion" ? t("motion") : t("sound")}
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    {new Date(evt.ts).toLocaleString("id-ID", { hour12: false })}
-                  </p>
+
+                  {/* Motion Classification Badge */}
                   {evt.type === "motion" && (
-                    <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-foreground/85 bg-accent/30 border border-border/40 px-2 py-0.5 rounded-sm w-max">
-                      {evt.classification === "human" && <User className="h-3 w-3 text-red-500" />}
-                      {evt.classification === "pet" && <Footprints className="h-3 w-3 text-amber-500" />}
-                      {evt.classification === "pixel" && <Activity className="h-3 w-3 text-primary" />}
-                      {!evt.classification && <Activity className="h-3 w-3 text-primary" />}
-                      <span>{getClassificationLabel(evt.classification, evt.typeDescription)}</span>
+                    <div className="absolute top-3 right-3 z-5">
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold bg-slate-950/85 backdrop-blur-md border border-white/10 text-white/90 shadow-lg">
+                        {evt.classification === "human" && <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]" />}
+                        {evt.classification === "pet" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />}
+                        {evt.classification === "pixel" && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6]" />}
+                        {!evt.classification && <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
+                        {getClassificationLabel(evt.classification, evt.typeDescription)}
+                      </span>
                     </div>
                   )}
+
+                  {/* Hover Action Bar Overlay */}
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent flex items-center justify-between gap-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-10 backdrop-blur-sm">
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="h-8 text-xs flex-1 bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur-md" 
+                      onClick={(e) => { e.stopPropagation(); setActiveSnapshot(evt.id); }}
+                    >
+                      <Eye className="h-3 w-3 mr-1.5" />
+                      Snapshot
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="h-8 text-xs flex-1 bg-primary/80 hover:bg-primary border border-primary/20 text-white backdrop-blur-md shadow-lg shadow-primary/25" 
+                      onClick={(e) => { e.stopPropagation(); handleEventClick(evt); }}
+                    >
+                      <Video className="h-3 w-3 mr-1.5" />
+                      Playback
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 backdrop-blur-md border border-white/5 rounded-md"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(evt.id); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 border-t mt-auto">
-                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); setActiveSnapshot(evt.id); }}>
-                    <Eye className="h-3.5 w-3.5 mr-1" />
-                    Snapshot
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-xs text-primary hover:text-primary" onClick={(e) => { e.stopPropagation(); handleEventClick(evt); }}>
-                    <Video className="h-3.5 w-3.5 mr-1" />
-                    Playback
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:bg-destructive/10 shrink-0"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(evt.id); }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {/* Card Info Body */}
+                <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-semibold text-sm leading-tight text-slate-100 group-hover:text-primary transition-colors duration-300">
+                        {evt.cameraName}
+                      </h3>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0">
+                        {evt.site}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-1.5">
+                      <Calendar className="h-3 w-3 text-slate-500" />
+                      {dateStr} • {timeStr}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

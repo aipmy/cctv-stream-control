@@ -1178,90 +1178,87 @@ export default function Playback() {
 
             {/* Custom Control Overlay (visible on hover) */}
             {playbackInfo?.hasRecording && (
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent p-3 pt-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 z-10 pointer-events-auto">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Playback action items */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white"
-                      onClick={togglePlay}
-                    >
-                      {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white"
-                      onClick={() => handleTimeShift(-10)}
-                      title={t("rewind10s")}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white"
-                      onClick={() => handleTimeShift(10)}
-                      title={t("forward10s")}
-                    >
-                      <RotateCw className="h-4 w-4" />
-                    </Button>
+              <div className="absolute bottom-4 inset-x-4 bg-slate-950/75 backdrop-blur-md border border-white/10 p-3 flex items-center justify-between shadow-2xl opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 z-10 pointer-events-auto rounded-xl">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+                    onClick={togglePlay}
+                  >
+                    {isPlaying ? <Pause className="h-4.5 w-4.5" /> : <Play className="h-4.5 w-4.5 text-primary-foreground fill-white" />}
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+                    onClick={() => handleTimeShift(-10)}
+                    title={t("rewind10s")}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+                    onClick={() => handleTimeShift(10)}
+                    title={t("forward10s")}
+                  >
+                    <RotateCw className="h-4 w-4" />
+                  </Button>
 
-                    <div className="flex items-center gap-1 group/volume ml-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white"
-                        onClick={toggleMute}
-                      >
-                        {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                      </Button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={volume}
-                        onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary group-hover/volume:w-20 transition-all duration-200"
-                      />
-                    </div>
+                  <div className="flex items-center gap-1 group/volume ml-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+                      onClick={toggleMute}
+                    >
+                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </Button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={volume}
+                      onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                      className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary group-hover/volume:w-20 transition-all duration-200"
+                    />
+                  </div>
+                </div>
+
+                {/* Settings / Speed / Screen */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-white text-xs font-semibold">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">{t("speed")}</span>
+                    <Select
+                      value={String(playbackSpeed)}
+                      onValueChange={(val) => setPlaybackSpeed(parseFloat(val))}
+                    >
+                      <SelectTrigger className="w-[72px] h-7 bg-slate-900/60 hover:bg-slate-900/80 text-white border-white/10 text-xs px-2 py-0 rounded-lg transition-colors">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border border-white/10 text-white">
+                        <SelectItem value="0.5" className="hover:bg-white/5 focus:bg-white/5">0.5x</SelectItem>
+                        <SelectItem value="1" className="hover:bg-white/5 focus:bg-white/5">1x</SelectItem>
+                        <SelectItem value="1.5" className="hover:bg-white/5 focus:bg-white/5">1.5x</SelectItem>
+                        <SelectItem value="2" className="hover:bg-white/5 focus:bg-white/5">2x</SelectItem>
+                        <SelectItem value="5" className="hover:bg-white/5 focus:bg-white/5">5x</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Settings / Speed / Screen */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-white text-xs font-semibold">
-                      <span>{t("speed")}:</span>
-                      <Select
-                        value={String(playbackSpeed)}
-                        onValueChange={(val) => setPlaybackSpeed(parseFloat(val))}
-                      >
-                        <SelectTrigger className="w-[68px] h-7 bg-slate-900/60 text-white border-white/10 text-xs px-2 py-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-950 text-white border-white/10">
-                          <SelectItem value="0.5">0.5x</SelectItem>
-                          <SelectItem value="1">1x</SelectItem>
-                          <SelectItem value="1.5">1.5x</SelectItem>
-                          <SelectItem value="2">2x</SelectItem>
-                          <SelectItem value="5">5x</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white"
-                      onClick={toggleFullscreen}
-                    >
-                      <Maximize className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors"
+                    onClick={toggleFullscreen}
+                  >
+                    <Maximize className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             )}
@@ -1599,77 +1596,102 @@ export default function Playback() {
                   {t("nMatched").replace("{n}", String(filteredEvents.length))}
                 </span>
               </div>
-
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 select-none">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 select-none py-1">
                 {filteredEvents.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center py-12">
                     {t("noMotionDetectedMatch")}
                   </div>
                 ) : (
-                  filteredEvents.map((evt) => (
-                    <div
-                      key={evt.id}
-                      className="group flex items-center justify-between gap-2.5 p-2 rounded-lg border border-border/40 bg-card hover:bg-accent/40 transition-colors duration-200"
-                    >
-                      <div 
-                        onClick={() => handleEventClick(evt)}
-                        className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer animate-fade-in"
+                  filteredEvents.map((evt) => {
+                    const badge = getClassificationBadge(evt.classification, t);
+                    const isHuman = evt.classification === "human";
+                    const isPet = evt.classification === "pet";
+                    const isPixel = evt.classification === "pixel";
+                    
+                    return (
+                      <div
+                        key={evt.id}
+                        className="group flex gap-3 relative pb-4 last:pb-0"
                       >
-                        <div className="w-14 h-9 bg-slate-950 border border-border/20 rounded overflow-hidden relative shrink-0">
-                          <img
-                            src={eventApi.snapshotUrl(evt.id)}
-                            alt="Event"
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                          <div className={cn(
-                            "absolute bottom-0.5 right-0.5 p-0.5 rounded-sm border backdrop-blur-sm z-10",
-                            getClassificationBadge(evt.classification, t).bgColor
-                          )}>
-                            {getClassificationBadge(evt.classification, t).icon}
-                          </div>
+                        {/* Vertical Timeline Axis */}
+                        <div className="flex flex-col items-center shrink-0 relative">
+                          <div className={`h-3 w-3 rounded-full border-2 bg-slate-950 z-5 transition-all duration-300 ${
+                            isHuman 
+                              ? "border-rose-500 shadow-[0_0_8px_#f43f5e]" 
+                              : isPet 
+                                ? "border-emerald-500 shadow-[0_0_8px_#10b981]" 
+                                : isPixel 
+                                  ? "border-blue-500 shadow-[0_0_8px_#3b82f6]" 
+                                  : "border-amber-500 shadow-[0_0_8px_#f59e0b]"
+                          }`} />
+                          <div className="w-0.5 bg-border/20 flex-1 absolute top-3 bottom-0" />
                         </div>
-                        <div className="leading-tight min-w-0 flex-1 space-y-0.5">
-                          {!selectedCameraId ? (
-                            <div className="text-[10px] font-semibold text-primary truncate">
-                              {evt.cameraName}
-                            </div>
-                          ) : null}
-                          <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5 font-mono">
-                            <span>{t("startLabel")} {new Date(new Date(evt.ts).getTime() - 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
-                            <span className="text-xs font-semibold text-foreground font-sans">
-                              {t("motion")}: {getClassificationLabel(evt.classification, evt.typeDescription, t)}
-                            </span>
-                            <span>{t("untilLabel")} {new Date(new Date(evt.ts).getTime() + 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-white"
-                          onClick={() => handleEventClick(evt)}
-                          title={t("playback")}
+                        {/* Node Card */}
+                        <div
+                          className="flex-1 group/item flex items-center justify-between gap-3 p-2 rounded-xl border border-white/5 bg-slate-900/20 hover:bg-slate-900/60 hover:border-primary/20 transition-all duration-300 shadow-sm relative overflow-hidden"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/15"
-                          onClick={() => handleDeleteEvent(evt)}
-                          title={t("deleteEvent")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                          <div 
+                            onClick={() => handleEventClick(evt)}
+                            className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer animate-fade-in"
+                          >
+                            <div className="w-14 h-9 bg-slate-950 border border-white/5 rounded-lg overflow-hidden relative shrink-0">
+                              <img
+                                src={eventApi.snapshotUrl(evt.id)}
+                                alt="Event"
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover/item:scale-105"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
+                              />
+                              <div className={cn(
+                                "absolute bottom-0.5 right-0.5 p-0.5 rounded-sm border backdrop-blur-sm z-10",
+                                badge.bgColor
+                              )}>
+                                {badge.icon}
+                              </div>
+                            </div>
+                            <div className="leading-tight min-w-0 flex-1 space-y-0.5">
+                              {!selectedCameraId && (
+                                <div className="text-[9px] uppercase tracking-wider font-semibold text-primary truncate">
+                                  {evt.cameraName}
+                                </div>
+                              )}
+                              <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 font-mono">
+                                <span>{t("startLabel")} {new Date(new Date(evt.ts).getTime() - 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
+                                <span className="text-[11px] font-bold text-slate-200 font-sans mt-0.5">
+                                  {getClassificationLabel(evt.classification, evt.typeDescription, t)}
+                                </span>
+                                <span>{t("untilLabel")} {new Date(new Date(evt.ts).getTime() + 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 shrink-0 z-5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-md"
+                              onClick={() => handleEventClick(evt)}
+                              title={t("playback")}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/25 rounded-md"
+                              onClick={() => handleDeleteEvent(evt)}
+                              title={t("deleteEvent")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </Card>
