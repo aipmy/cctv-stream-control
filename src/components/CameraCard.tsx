@@ -41,6 +41,7 @@ interface Props {
   onDelete: (c: Camera) => void;
   pinned: boolean;
   onTogglePin: (c: Camera) => void;
+  hideManagementActions?: boolean;
 }
 
 function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string) {
@@ -71,17 +72,17 @@ function audioKey(id: string) {
 
 function readAudioState(camera: Camera) {
   if (typeof window === "undefined") return { muted: true, volume: 0 };
+  // Selalu paksa kondisi Muted=true saat load awal agar tidak memicu pemblokiran Autoplay dari browser HP.
   try {
     const saved = JSON.parse(localStorage.getItem(audioKey(camera.id)) || "null");
     if (saved && typeof saved === "object") {
-      const volume = Number.isFinite(Number(saved.volume)) ? Math.max(0, Math.min(1, Number(saved.volume))) : 0;
-      return { muted: Boolean(saved.muted) || volume <= 0, volume };
+      const volume = Number.isFinite(Number(saved.volume)) ? Math.max(0, Math.min(1, Number(saved.volume))) : 0.5;
+      return { muted: true, volume: volume > 0 ? volume : 0.5 };
     }
   } catch {
     // ignore
   }
-  // Default harus mute dan 0% agar refresh / kamera baru tidak tiba-tiba bersuara.
-  return { muted: true, volume: 0 };
+  return { muted: true, volume: 0.5 };
 }
 
 function statusLabel(camera: Camera) {
@@ -93,7 +94,11 @@ type PtzFeedback = "sending" | "success" | "warning" | "failure";
 
 import { useTranslation } from "@/hooks/useTranslation";
 
-export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin }: Props) {
+// Variabel modul global untuk melacak ID kamera yang sedang mengeluarkan suara (unmuted) di browser session.
+// Ini menjamin bahwa secara default hanya satu kamera yang bersuara untuk menghindari tabrakan audio di HP.
+let activeUnmutedCameraId: string | null = null;
+
+export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin, hideManagementActions = false }: Props) {
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
@@ -127,10 +132,38 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     setAudio(readAudioState(camera));
   }, [camera.id]);
 
+  // Semua kamera selalu dimulai dalam keadaan Muted saat reload halaman agar responsif, hemat bandwidth,
+  // dan menghindari pemblokiran autoplay dari browser HP. Pengguna dapat mengaktifkan suara secara manual.
+
+  // Efek listener untuk mematikan suara jika ada kamera lain yang di-unmute oleh pengguna
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(audioKey(camera.id), JSON.stringify(audio));
-  }, [camera.id, audio]);
+    const handleMuteOthers = (e: Event) => {
+      const customEvent = e as CustomEvent<{ activeId: string }>;
+      if (customEvent.detail.activeId !== camera.id) {
+        setAudio((prev) => {
+          if (!prev.muted) {
+            const next = { ...prev, muted: true };
+            localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
+            return next;
+          }
+          return prev;
+        });
+      }
+    };
+    window.addEventListener("cctv-mute-others", handleMuteOthers);
+    return () => {
+      window.removeEventListener("cctv-mute-others", handleMuteOthers);
+    };
+  }, [camera.id]);
+
+  // Cleanup: Jika kamera ini dihancurkan (unmounted) dan merupakan kamera bersuara aktif, kosongkan tracker
+  useEffect(() => {
+    return () => {
+      if (activeUnmutedCameraId === camera.id) {
+        activeUnmutedCameraId = null;
+      }
+    };
+  }, [camera.id]);
 
   useEffect(() => () => {
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
@@ -249,6 +282,17 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {hideManagementActions && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+              onClick={() => onTogglePin(camera)}
+              title={pinned ? t("unpinCamera") : t("pinCameraPriority")}
+            >
+              {pinned ? <PinOff className="h-3.5 w-3.5 text-primary" /> : <Pin className="h-3.5 w-3.5" />}
+            </Button>
+          )}
           {isError && (
             <Badge variant="outline" title={badgeTooltip} className="text-[9px] px-1 h-4 cursor-help border-destructive/50 text-destructive">
               Error
@@ -323,7 +367,16 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
                   value={volumePct}
                   onChange={(e) => {
                     const pct = Math.max(0, Math.min(100, Number(e.target.value)));
-                    setAudio({ volume: pct / 100, muted: pct <= 0 });
+                    const isMuted = pct <= 0;
+                    const next = { volume: pct / 100, muted: isMuted };
+                    setAudio(next);
+                    localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
+                    if (!isMuted) {
+                      activeUnmutedCameraId = camera.id;
+                      window.dispatchEvent(new CustomEvent("cctv-mute-others", { detail: { activeId: camera.id } }));
+                    } else if (activeUnmutedCameraId === camera.id) {
+                      activeUnmutedCameraId = null;
+                    }
                   }}
                   className="w-20 accent-white"
                 />
@@ -337,8 +390,18 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               onClick={() => {
                 if (!audioAvailable) return;
                 setAudio((v) => {
-                  if (v.muted || v.volume <= 0.02) return { muted: false, volume: v.volume > 0.02 ? v.volume : 0.5 };
-                  return { ...v, muted: true };
+                  const isUnmuting = (v.muted || v.volume <= 0.02);
+                  const next = isUnmuting
+                    ? { muted: false, volume: v.volume > 0.02 ? v.volume : 0.5 }
+                    : { ...v, muted: true };
+                  localStorage.setItem(audioKey(camera.id), JSON.stringify(next));
+                  if (isUnmuting) {
+                    activeUnmutedCameraId = camera.id;
+                    window.dispatchEvent(new CustomEvent("cctv-mute-others", { detail: { activeId: camera.id } }));
+                  } else if (activeUnmutedCameraId === camera.id) {
+                    activeUnmutedCameraId = null;
+                  }
+                  return next;
                 });
               }}
               title={!audioAvailable ? t("audioAdminOnly") : effectiveMuted ? t("unmute") : t("mute")}
@@ -374,26 +437,28 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
-          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? t("unpinCamera") : t("pinCameraPriority")}>
-            {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
-          </Button>
-          {canRestart && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title={t("restartStream")}>
-                <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
-              </Button>
-          )}
-          {canEdit && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title={t("editCameraTitle")}>
-                <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-              </Button>
-          )}
-          {canDelete && (
-            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title={t("deleteCameraTitleLabel")}>
-              <Trash2 className="h-4 w-4" />
+        {!hideManagementActions && (
+          <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
+            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? t("unpinCamera") : t("pinCameraPriority")}>
+              {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
             </Button>
-          )}
-        </div>
+            {canRestart && (
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title={t("restartStream")}>
+                  <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
+                </Button>
+            )}
+            {canEdit && (
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title={t("editCameraTitle")}>
+                  <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </Button>
+            )}
+            {canDelete && (
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title={t("deleteCameraTitleLabel")}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );

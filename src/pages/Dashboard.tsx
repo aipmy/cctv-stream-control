@@ -287,6 +287,7 @@ export default function Dashboard() {
               onDelete={(cam) => setDeleteCam(cam)}
               pinned={pinnedCameraIds.includes(c.id)}
               onTogglePin={(cam) => void togglePin(cam)}
+              hideManagementActions={true}
             />
           ))}
         </div>

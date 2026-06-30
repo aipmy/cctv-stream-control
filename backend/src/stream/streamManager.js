@@ -239,7 +239,6 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
           existing.lastRequestAt = Date.now();
           return existing;
         }
-        hlsSessions.delete(id);
         await stopHls(id);
       } else {
         const closedAtMs = existing.closedAt ? new Date(existing.closedAt).getTime() : 0;
@@ -469,10 +468,12 @@ export async function stopHls(id, _output) {
 
   if (id) {
     await stopOne(id, hlsSessions.get(id));
+    hlsSessions.delete(id);
   } else {
     for (const [cameraId, session] of hlsSessions.entries()) {
       await stopOne(cameraId, session);
     }
+    hlsSessions.clear();
   }
   return stopped;
 }
