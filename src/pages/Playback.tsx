@@ -842,14 +842,29 @@ export default function Playback() {
     const clickX = e.clientX - rect.left;
     const clickUnix = getUnixFromX(clickX);
 
-    // If clicked within 10s of playhead, scrub
-    const current = currentPlaybackTs || 0;
-    if (Math.abs(clickUnix - current) < (86400 / rect.width) * 15) {
-      setIsScrubbing(true);
-    } else {
+    // Shift key triggers panning (scrolling the timeline view)
+    if (e.shiftKey) {
       setIsPanning(true);
       setDragStartX(e.clientX);
+      const current = currentPlaybackTs || clickUnix;
       setDragStartCenter(timelineCenterTs !== null ? timelineCenterTs : current);
+    } else {
+      // Direct click to seek anywhere on timeline
+      setIsScrubbing(true);
+      setCurrentPlaybackTs(clickUnix);
+      setCurrentRecordingTime(new Date(clickUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+      
+      const video = videoRef.current;
+      if (video) {
+        const mappings = playbackInfo.segmentMappings || [];
+        if (mappings.length > 0) {
+          const closest = mappings.reduce((prev, curr) => {
+            return Math.abs(curr.ts - clickUnix) < Math.abs(prev.ts - clickUnix) ? curr : prev;
+          });
+          const videoOffset = closest.offset + Math.max(0, clickUnix - closest.ts);
+          video.currentTime = Math.max(0, videoOffset);
+        }
+      }
     }
   };
 
@@ -869,6 +884,10 @@ export default function Playback() {
     });
 
     if (isScrubbing) {
+      // Update playhead immediately for smooth visual scrubbing feedback
+      setCurrentPlaybackTs(currentUnix);
+      setCurrentRecordingTime(new Date(currentUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+
       const video = videoRef.current;
       if (video) {
         const mappings = playbackInfo.segmentMappings || [];
