@@ -82,6 +82,7 @@ export default function Playback() {
   const location = useLocation();
   const stateVal = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
   const initialSeekDone = useRef(false);
+  const dragStartPlayheadRef = useRef<number | null>(null);
 
   const [selectedCameraId, setSelectedCameraId] = useState(() => stateVal?.cameraId || "");
   const [cameraSearchQuery, setCameraSearchQuery] = useState("");
@@ -851,6 +852,8 @@ export default function Playback() {
     } else {
       // Direct click to seek anywhere on timeline
       setIsScrubbing(true);
+      setDragStartX(e.clientX);
+      dragStartPlayheadRef.current = clickUnix;
       setCurrentPlaybackTs(clickUnix);
       setCurrentRecordingTime(new Date(clickUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
       
@@ -884,18 +887,60 @@ export default function Playback() {
     });
 
     if (isScrubbing) {
+      const startOfDay = new Date(`${selectedDate}T00:00:00`);
+      const endOfDay = new Date(`${selectedDate}T23:59:59.999`);
+      const startUnix = Math.floor(startOfDay.getTime() / 1000);
+      const endUnix = Math.floor(endOfDay.getTime() / 1000);
+
+      const windowSizes = {
+        "24h": 86400,
+        "6h": 6 * 3600,
+        "1h": 3600,
+        "15m": 15 * 60,
+        "5m": 5 * 60,
+        "1m": 60,
+      };
+      const size = windowSizes[timelineZoom];
+      const current = currentPlaybackTs || startUnix;
+      const center = timelineCenterTs !== null ? timelineCenterTs : current;
+      let zoomStart = center - size / 2;
+      let zoomEnd = center + size / 2;
+      if (zoomStart < startUnix) {
+        zoomStart = startUnix;
+        zoomEnd = Math.min(endUnix, startUnix + size);
+      }
+      if (zoomEnd > endUnix) {
+        zoomEnd = endUnix;
+        zoomStart = Math.max(startUnix, endUnix - size);
+      }
+      const timeSpan = zoomEnd - zoomStart;
+
+      const sensitivities = {
+        "24h": 0.05,  // 20x slower
+        "6h": 0.15,   // 6.7x slower
+        "1h": 0.35,   // 3x slower
+        "15m": 0.7,   // 1.4x slower
+        "5m": 1.0,
+        "1m": 1.0,
+      };
+      const sensitivity = sensitivities[timelineZoom] || 1.0;
+      const deltaX = e.clientX - dragStartX;
+      const timeDelta = (deltaX / rect.width) * timeSpan * sensitivity;
+      const startPlayhead = dragStartPlayheadRef.current !== null ? dragStartPlayheadRef.current : currentUnix;
+      const scrubUnix = Math.max(startUnix, Math.min(endUnix, startPlayhead + timeDelta));
+
       // Update playhead immediately for smooth visual scrubbing feedback
-      setCurrentPlaybackTs(currentUnix);
-      setCurrentRecordingTime(new Date(currentUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+      setCurrentPlaybackTs(scrubUnix);
+      setCurrentRecordingTime(new Date(scrubUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
 
       const video = videoRef.current;
       if (video) {
         const mappings = playbackInfo.segmentMappings || [];
         if (mappings.length > 0) {
           const closest = mappings.reduce((prev, curr) => {
-            return Math.abs(curr.ts - currentUnix) < Math.abs(prev.ts - currentUnix) ? curr : prev;
+            return Math.abs(curr.ts - scrubUnix) < Math.abs(prev.ts - scrubUnix) ? curr : prev;
           });
-          const videoOffset = closest.offset + Math.max(0, currentUnix - closest.ts);
+          const videoOffset = closest.offset + Math.max(0, scrubUnix - closest.ts);
           video.currentTime = Math.max(0, videoOffset);
         }
       }
@@ -920,12 +965,14 @@ export default function Playback() {
     setIsScrubbing(false);
     setIsPanning(false);
     setDragStartCenter(null);
+    dragStartPlayheadRef.current = null;
   };
 
   const handleTimelineMouseLeave = () => {
     setHoverInfo((prev) => ({ ...prev, show: false }));
     setIsScrubbing(false);
     setIsPanning(false);
+    dragStartPlayheadRef.current = null;
   };
 
   const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
