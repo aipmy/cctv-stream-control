@@ -57,7 +57,9 @@ export function Topbar() {
   return (
     <header className="h-14 flex items-center justify-between border-b border-border/40 dark:border-white/5 bg-background/60 dark:bg-slate-950/40 backdrop-blur-md px-4 sticky top-0 z-30">
       <div className="flex items-center gap-2">
-        <SidebarTrigger />
+        <div className="hidden md:block">
+          <SidebarTrigger />
+        </div>
         <div className="hidden md:flex items-center gap-2 ml-2">
           <Activity className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{t("monitoringCenter")}</span>
