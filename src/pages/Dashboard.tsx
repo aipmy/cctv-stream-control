@@ -239,13 +239,13 @@ export default function Dashboard() {
                 label={t("diskIoSpeed")} 
                 value={
                   storageStatus ? (
-                    <div className="flex flex-col gap-1 text-[13px] sm:text-[14px] font-semibold mt-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground/50 text-[9px] uppercase font-bold w-4">R:</span>
+                    <div className="flex flex-col gap-1 mt-1 text-sm xs:text-base sm:text-lg font-bold">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground/60 text-[10px] sm:text-[11px] uppercase font-bold w-4">R:</span>
                         <span className="text-foreground">{storageStatus.diskReadMb || 0} MB/s</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground/50 text-[9px] uppercase font-bold w-4">W:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground/60 text-[10px] sm:text-[11px] uppercase font-bold w-4">W:</span>
                         <span className="text-foreground">{storageStatus.diskWriteMb || 0} MB/s</span>
                       </div>
                     </div>
