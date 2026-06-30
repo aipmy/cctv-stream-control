@@ -26,12 +26,12 @@ const toneMap: Record<NonNullable<StatCardProps["tone"]>, string> = {
 export function StatCard({ label, value, hint, icon, tone = "default", children }: StatCardProps) {
   const Icon = icons[icon];
   return (
-    <Card className="p-4 glass-panel border-border/60">
-      <div className="flex items-start justify-between gap-3">
+    <Card className="p-4 glass-panel border-border/60 h-full flex flex-col justify-between overflow-hidden">
+      <div className="flex items-start justify-between gap-3 w-full">
         <div className="min-w-0 flex-1">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold tracking-tight mt-1">{value}</div>
-          {hint && <div className="text-xs text-muted-foreground mt-0.5">{hint}</div>}
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground truncate whitespace-nowrap block" title={label}>{label}</div>
+          <div className="text-xl md:text-2xl font-bold tracking-tight mt-1 truncate whitespace-nowrap block" title={String(value)}>{value}</div>
+          {hint && <div className="text-[10px] text-muted-foreground mt-0.5 truncate whitespace-nowrap block" title={hint}>{hint}</div>}
           {children}
         </div>
         <div className={cn("h-9 w-9 rounded-md flex items-center justify-center shrink-0", toneMap[tone])}>

@@ -217,9 +217,9 @@ export default function Dashboard() {
           {/* Row 2: Server System Telemetry */}
           <div className="space-y-2">
             <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">Kesehatan Server NVR</h4>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
               <StatCard 
-                label="Penggunaan CPU" 
+                label={t("cpuUsage")} 
                 value={storageStatus && storageStatus.cpuUsage !== undefined ? `${storageStatus.cpuUsage}%` : "Loading..."} 
                 icon="cpu" 
                 tone={storageStatus && (storageStatus.cpuUsage || 0) > 80 ? "destructive" : "default"}
@@ -227,16 +227,16 @@ export default function Dashboard() {
                 <Sparkline history={cpuHistory} strokeColor={(storageStatus && (storageStatus.cpuUsage || 0) > 80) ? "#ef4444" : "#14b8a6"} fillGradientId="cpuGrad" />
               </StatCard>
               <StatCard 
-                label="Penggunaan RAM" 
+                label={t("ramUsage")} 
                 value={storageStatus && storageStatus.ramUsage !== undefined ? `${storageStatus.ramUsage}%` : "Loading..."} 
-                hint={storageStatus && storageStatus.ramTotal ? `${formatSize(storageStatus.ramUsed || 0)} / ${formatSize(storageStatus.ramTotal)} (${formatSize(storageStatus.ramFree || 0)} bebas)` : "Loading memory..."}
+                hint={storageStatus && storageStatus.ramTotal ? `${formatSize(storageStatus.ramUsed || 0)} / ${formatSize(storageStatus.ramTotal)} (${formatSize(storageStatus.ramFree || 0)} ${t("free")})` : t("loadingMemory")}
                 icon="ram" 
                 tone={storageStatus && (storageStatus.ramUsage || 0) > 85 ? "warning" : "default"}
               >
                 <Sparkline history={ramHistory} strokeColor={(storageStatus && (storageStatus.ramUsage || 0) > 85) ? "#f59e0b" : "#6366f1"} fillGradientId="ramGrad" />
               </StatCard>
               <StatCard 
-                label="Disk I/O Speed" 
+                label={t("diskIoSpeed")} 
                 value={storageStatus ? `R: ${storageStatus.diskReadMb || 0} MB/s | W: ${storageStatus.diskWriteMb || 0} MB/s` : "Loading..."} 
                 icon="bandwidth" 
                 tone="info"
@@ -244,10 +244,26 @@ export default function Dashboard() {
               <StatCard 
                 label={t("diskUsage").replace(":", "")} 
                 value={storageStatus ? formatSize(storageStatus.usedBytes) : "Loading..."} 
-                hint={storageStatus && storageStatus.diskTotal ? `${formatSize(storageStatus.diskAvailable || 0)} bebas / ${formatSize(storageStatus.diskTotal)}` : "Loading server disk..."}
+                hint={storageStatus && storageStatus.diskTotal ? `${formatSize(storageStatus.diskAvailable || 0)} ${t("free")} / ${formatSize(storageStatus.diskTotal)}` : "Loading server disk..."}
                 icon="disk" 
                 tone="default" 
-              />
+              >
+                {storageStatus && storageStatus.diskTotal && (
+                  <div className="w-full bg-muted/40 rounded-full h-1.5 mt-3.5 overflow-hidden">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        (storageStatus.usedBytes / storageStatus.diskTotal * 100) > 90 
+                          ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]" 
+                          : (storageStatus.usedBytes / storageStatus.diskTotal * 100) > 70 
+                            ? "bg-amber-500 shadow-[0_0_8px_#f59e0b]" 
+                            : "bg-emerald-500 shadow-[0_0_8px_#10b981]"
+                      )}
+                      style={{ width: `${Math.min(Math.round((storageStatus.usedBytes / storageStatus.diskTotal) * 100), 100)}%` }}
+                    />
+                  </div>
+                )}
+              </StatCard>
             </div>
           </div>
         </div>

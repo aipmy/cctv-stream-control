@@ -179,7 +179,34 @@ eventRoutes.get("/storage-status", async (req, res, next) => {
       cpuUsage = Math.min(Math.max(loadPercentage || (baseCpu + streamCpu), 3), 98);
 
       ramTotal = os.totalmem();
-      ramFree = os.freemem();
+      let freeMem = os.freemem();
+      
+      try {
+        if (process.platform === "linux") {
+          const meminfo = await fs.readFile("/proc/meminfo", "utf8");
+          const lines = meminfo.split("\n");
+          let memFree = 0;
+          let buffers = 0;
+          let cached = 0;
+          let reclaimable = 0;
+          for (const line of lines) {
+            if (line.startsWith("MemFree:")) {
+              memFree = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            } else if (line.startsWith("Buffers:")) {
+              buffers = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            } else if (line.startsWith("Cached:")) {
+              cached = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            } else if (line.startsWith("SReclaimable:")) {
+              reclaimable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            }
+          }
+          freeMem = memFree + buffers + cached + reclaimable;
+        }
+      } catch (memErr) {
+        // fallback
+      }
+
+      ramFree = freeMem;
       ramUsed = ramTotal - ramFree;
       ramUsage = Math.round((ramUsed / ramTotal) * 100);
 

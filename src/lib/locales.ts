@@ -11,6 +11,11 @@ export const translations = {
     liveView: "Live View",
     monitoring: "Monitoring",
     administration: "Administration",
+    cpuUsage: "CPU Usage",
+    ramUsage: "RAM Usage",
+    diskIoSpeed: "Disk I/O Speed",
+    loadingMemory: "Loading memory...",
+    free: "free",
 
     // Common / Buttons
     save: "Save",
@@ -510,6 +515,11 @@ export const translations = {
     liveView: "Pemantauan Langsung",
     monitoring: "Pemantauan",
     administration: "Administrasi",
+    cpuUsage: "Penggunaan CPU",
+    ramUsage: "Penggunaan RAM",
+    diskIoSpeed: "Kecepatan Disk I/O",
+    loadingMemory: "Memuat memori...",
+    free: "bebas",
 
     // Common / Buttons
     save: "Simpan",
