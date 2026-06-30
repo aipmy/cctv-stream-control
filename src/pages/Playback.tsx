@@ -1516,9 +1516,10 @@ export default function Playback() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative"
+                  className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
                   style={{
-                    colorScheme: theme === "dark" ? "dark" : "light"
+                    colorScheme: theme === "dark" ? "dark" : "light",
+                    boxSizing: "border-box"
                   }}
                 />
                 <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
