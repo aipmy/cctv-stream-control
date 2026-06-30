@@ -237,7 +237,20 @@ export default function Dashboard() {
               </StatCard>
               <StatCard 
                 label={t("diskIoSpeed")} 
-                value={storageStatus ? `R: ${storageStatus.diskReadMb || 0} MB/s | W: ${storageStatus.diskWriteMb || 0} MB/s` : "Loading..."} 
+                value={
+                  storageStatus ? (
+                    <div className="flex flex-col gap-1 text-[13px] sm:text-[14px] font-semibold mt-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground/50 text-[9px] uppercase font-bold w-4">R:</span>
+                        <span className="text-foreground">{storageStatus.diskReadMb || 0} MB/s</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground/50 text-[9px] uppercase font-bold w-4">W:</span>
+                        <span className="text-foreground">{storageStatus.diskWriteMb || 0} MB/s</span>
+                      </div>
+                    </div>
+                  ) : "Loading..."
+                } 
                 icon="bandwidth" 
                 tone="info"
               />

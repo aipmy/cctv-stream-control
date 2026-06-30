@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   hint?: string;
   icon: "camera" | "online" | "offline" | "stream" | "bandwidth" | "disk" | "cpu" | "ram";
   tone?: "default" | "success" | "destructive" | "info" | "warning";
