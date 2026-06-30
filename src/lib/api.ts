@@ -300,7 +300,22 @@ export const eventApi = {
   clear: () => api<void>("/api/events/clear", { method: "POST" }),
   videoUrl: (id: string) => withToken(`${API_BASE}/api/events/video/${encodeURIComponent(id)}`),
   snapshotUrl: (id: string) => withToken(`${API_BASE}/api/events/snapshot/${encodeURIComponent(id)}`),
-  getStorageStatus: () => api<{ usedBytes: number; maxBytes: number; recordingMode: string; maxStorageGb: number; retentionDays: number }>("/api/events/storage-status"),
+  getStorageStatus: () => api<{
+    usedBytes: number;
+    maxBytes: number;
+    recordingMode: string;
+    maxStorageGb: number;
+    retentionDays: number;
+    diskTotal?: number;
+    diskAvailable?: number;
+    cpuUsage?: number;
+    ramUsage?: number;
+    ramTotal?: number;
+    ramFree?: number;
+    ramUsed?: number;
+    diskReadMb?: number;
+    diskWriteMb?: number;
+  }>("/api/events/storage-status"),
   runStorageCleanup: () => api<{ ok: boolean }>("/api/events/cleanup", { method: "POST" }),
   deleteSnapshot: (id: string) => api<{ ok: boolean }>(`/api/events/${encodeURIComponent(id)}/snapshot`, { method: "DELETE" }),
 };
