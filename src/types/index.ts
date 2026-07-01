@@ -41,6 +41,12 @@ export interface Camera {
   enablePTZ: boolean;
   lastSeen: string; // ISO
   viewerCount: number;
+  viewerDetails?: Array<{
+    id: string;
+    username: string;
+    ip: string;
+    output: string;
+  }>;
   bandwidthKbps: number;
   pullBandwidthKbps?: number;
   outBytesPerSec?: number;

@@ -33,14 +33,16 @@ import { CameraLiveView } from "@/components/CameraLiveView";
 import { cameraApi } from "@/lib/api";
 import { formatByteRateFromBytes, formatByteRateFromKbps } from "@/lib/bandwidth";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface Props {
   camera: Camera;
   onRestart: (c: Camera) => void;
   onEdit: (c: Camera) => void;
   onDelete: (c: Camera) => void;
-  pinned: boolean;
-  onTogglePin: (c: Camera) => void;
+  pinned?: boolean;
+  onTogglePin?: (c: Camera) => void;
   hideManagementActions?: boolean;
 }
 
@@ -92,11 +94,18 @@ function statusLabel(camera: Camera) {
 
 type PtzFeedback = "sending" | "success" | "warning" | "failure";
 
-import { useTranslation } from "@/hooks/useTranslation";
 
 
 
-export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin, hideManagementActions = false }: Props) {
+export function CameraCard({
+  camera,
+  onRestart,
+  onEdit,
+  onDelete,
+  pinned = false,
+  onTogglePin = () => {},
+  hideManagementActions = false,
+}: Props) {
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
@@ -387,7 +396,37 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               {!camera.enabled && <span className="text-warning">· Nonaktif</span>}
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
-              <span className="inline-flex items-center gap-1 text-muted-foreground"><Users className="h-3 w-3" />{camera.viewerCount || 0} viewer</span>
+              {camera.viewerDetails && camera.viewerDetails.length > 0 ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors cursor-pointer select-none">
+                      <Users className="h-3 w-3 text-primary animate-pulse" />
+                      <span className="underline decoration-dotted underline-offset-2">{camera.viewerCount || 0} viewer</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-60 p-2.5 bg-popover dark:bg-slate-900 border border-border/40 dark:border-white/10 text-popover-foreground text-xs shadow-2xl rounded-xl z-50">
+                    <div className="font-semibold px-1 py-1 border-b border-border/30 dark:border-white/5 mb-2 text-[9px] uppercase tracking-wider text-muted-foreground">
+                      {t("activeViewers") || "Active Viewers"}
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {camera.viewerDetails.map((viewer, idx) => (
+                        <div key={idx} className="flex flex-col px-2 py-1 rounded bg-muted/30 dark:bg-white/5 leading-tight">
+                          <span className="font-bold text-foreground text-xs">{viewer.username}</span>
+                          <span className="text-[9px] text-muted-foreground flex justify-between items-center mt-1">
+                            <span>{viewer.output}</span>
+                            {viewer.ip && <span className="font-mono text-[8px] opacity-75">{viewer.ip}</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Users className="h-3 w-3" />
+                  {camera.viewerCount || 0} viewer
+                </span>
+              )}
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Gauge className="h-3 w-3" />out {outRate}</span>
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Radio className="h-3 w-3" />pull {pullRate}</span>
               {camera.status === "offline" && camera.enabled && <span className="inline-flex items-center gap-1 text-muted-foreground"><Activity className="h-3 w-3" />last {timeAgo(camera.lastSeen, t)}</span>}

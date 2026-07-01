@@ -85,7 +85,7 @@ streamRoutes.post("/:id/start", async (req, res, next) => {
       }
       return res.json({ ok: true, ready: true, streamUrl: `/api/streams/${req.params.id}/video.mjpg?${segmentQuery(req, output)}`, pid: session.pid });
     }
-    recordViewer(req.params.id, viewerId(req), output);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).json({ error: "Camera not found" });
     const q = segmentQuery(req, output);
@@ -101,7 +101,7 @@ streamRoutes.post("/:id/stop", async (req, res, next) => {
 streamRoutes.post("/:id/ping", async (req, res) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -130,7 +130,7 @@ streamRoutes.get("/:id/video.mjpg", async (req, res, next) => {
 streamRoutes.get("/:id/index.m3u8", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).send("Camera not found");
     const ready = await waitForPlaylist(session);
@@ -504,7 +504,7 @@ streamRoutes.get("/:id/download", async (req, res, next) => {
 streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
     const filePath = getHlsFilePath(req.params.id, output, req.params.file);
     if (!filePath || !fs.existsSync(filePath)) return res.status(404).send("Segment not found");
     try {
