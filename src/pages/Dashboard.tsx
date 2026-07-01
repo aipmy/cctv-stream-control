@@ -284,17 +284,6 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
         <div className="space-y-6">
-          {/* Bandwidth Usage History Graph */}
-          {canViewStats && (
-            <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Grafik Bandwidth</h3>
-              </div>
-              <BandwidthChart />
-            </Card>
-          )}
-
           {/* Quick-Access Camera Streams Grid */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -329,6 +318,17 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Bandwidth Usage History Graph */}
+          {canViewStats && (
+            <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Grafik Bandwidth</h3>
+              </div>
+              <BandwidthChart />
+            </Card>
+          )}
         </div>
 
         {/* Sidebar: Recent Alert/Events Feed */}
