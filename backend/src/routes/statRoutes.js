@@ -13,6 +13,7 @@ function enrichCameras(cameras) {
       ...camera,
       status: !camera.enabled ? "offline" : runtimeStatus || camera.status || "offline",
       viewerCount: m.viewers,
+      viewerDetails: m.viewerDetails || [],
       bandwidthKbps: m.bandwidthKbps,
       pullBandwidthKbps: m.cctvPullKbps,
       outBytesPerSec: m.outBytesPerSec || 0,
