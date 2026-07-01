@@ -282,52 +282,50 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
-        <div className="space-y-6">
-          {/* Quick-Access Camera Streams Grid */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-1.5">
-                <LayoutGrid className="h-4 w-4 text-primary" />
-                {pinnedCameraIds.length > 0 ? "Kamera Pilihan" : "Kamera Aktif"}
-              </h2>
-              <Button variant="link" size="sm" onClick={() => navigate("/live")} className="text-xs text-primary px-0">
-                Lihat Seluruh Kamera &rarr;
-              </Button>
-            </div>
+      {/* Bandwidth Usage History Graph - Full Width Row */}
+      {canViewStats && (
+        <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Grafik Bandwidth</h3>
+          </div>
+          <BandwidthChart />
+        </Card>
+      )}
 
-            {dashboardCameras.length === 0 ? (
-              <Card className="p-12 flex flex-col items-center text-center bg-card/65 border border-border/40 dark:border-white/5 rounded-xl">
-                <CctvIcon className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                <h3 className="font-semibold">{t("noCamerasFound")}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{t("noCamerasSub")}</p>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {dashboardCameras.map((c) => (
-                  <CameraCard
-                    key={c.id} camera={c}
-                    onRestart={() => {}}
-                    onEdit={() => {}}
-                    onDelete={() => {}}
-                    pinned={pinnedCameraIds.includes(c.id)}
-                    onTogglePin={(cam) => void togglePin(cam)}
-                    hideManagementActions={true}
-                  />
-                ))}
-              </div>
-            )}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+        {/* Quick-Access Camera Streams Grid */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <LayoutGrid className="h-4 w-4 text-primary" />
+              {pinnedCameraIds.length > 0 ? "Kamera Pilihan" : "Kamera Aktif"}
+            </h2>
+            <Button variant="link" size="sm" onClick={() => navigate("/live")} className="text-xs text-primary px-0">
+              Lihat Seluruh Kamera &rarr;
+            </Button>
           </div>
 
-          {/* Bandwidth Usage History Graph */}
-          {canViewStats && (
-            <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Grafik Bandwidth</h3>
-              </div>
-              <BandwidthChart />
+          {dashboardCameras.length === 0 ? (
+            <Card className="p-12 flex flex-col items-center text-center bg-card/65 border border-border/40 dark:border-white/5 rounded-xl">
+              <CctvIcon className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <h3 className="font-semibold">{t("noCamerasFound")}</h3>
+              <p className="text-xs text-muted-foreground mt-1">{t("noCamerasSub")}</p>
             </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {dashboardCameras.map((c) => (
+                <CameraCard
+                  key={c.id} camera={c}
+                  onRestart={() => {}}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  pinned={pinnedCameraIds.includes(c.id)}
+                  onTogglePin={(cam) => void togglePin(cam)}
+                  hideManagementActions={true}
+                />
+              ))}
+            </div>
           )}
         </div>
 
