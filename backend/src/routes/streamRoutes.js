@@ -51,8 +51,19 @@ async function getCameraOutput(id) {
   return q === "HLS Low Latency" || q === "ll" ? "HLS Low Latency" : "HLS Stable";
 }
 
+function getClientIp(req) {
+  if (req.headers["cf-connecting-ip"]) return req.headers["cf-connecting-ip"];
+  const forward = req.headers["x-forwarded-for"];
+  if (forward) {
+    const parts = forward.split(",");
+    if (parts[0]) return parts[0].trim();
+  }
+  if (req.headers["x-real-ip"]) return req.headers["x-real-ip"];
+  return req.ip;
+}
+
 function viewerId(req) {
-  return String(req.query.vid || req.headers["x-cctv-viewer-id"] || `${req.ip}:${req.get("user-agent") || "ua"}`);
+  return String(req.query.vid || req.headers["x-cctv-viewer-id"] || `${getClientIp(req)}:${req.get("user-agent") || "ua"}`);
 }
 
 function segmentQuery(req, output) {
@@ -85,7 +96,7 @@ streamRoutes.post("/:id/start", async (req, res, next) => {
       }
       return res.json({ ok: true, ready: true, streamUrl: `/api/streams/${req.params.id}/video.mjpg?${segmentQuery(req, output)}`, pid: session.pid });
     }
-    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", getClientIp(req));
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).json({ error: "Camera not found" });
     const q = segmentQuery(req, output);
@@ -101,7 +112,7 @@ streamRoutes.post("/:id/stop", async (req, res, next) => {
 streamRoutes.post("/:id/ping", async (req, res) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", getClientIp(req));
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -130,7 +141,7 @@ streamRoutes.get("/:id/video.mjpg", async (req, res, next) => {
 streamRoutes.get("/:id/index.m3u8", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", getClientIp(req));
     const session = await startHls(req.params.id, output);
     if (!session) return res.status(404).send("Camera not found");
     const ready = await waitForPlaylist(session);
@@ -504,7 +515,7 @@ streamRoutes.get("/:id/download", async (req, res, next) => {
 streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", req.ip);
+    recordViewer(req.params.id, viewerId(req), output, req.auth?.username || "Guest", getClientIp(req));
     const filePath = getHlsFilePath(req.params.id, output, req.params.file);
     if (!filePath || !fs.existsSync(filePath)) return res.status(404).send("Segment not found");
     try {
