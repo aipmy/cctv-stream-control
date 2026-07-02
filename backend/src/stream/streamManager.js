@@ -328,7 +328,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         }
       }
       if (maskFilters.length > 0) {
-        vfFilter = maskFilters.join(",") + ",";
+        vfFilter += maskFilters.join(",") + ",";
       }
 
       if (camera.motionArea && typeof camera.motionArea === "object") {
