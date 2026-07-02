@@ -317,12 +317,12 @@ async function processSegmentEventRecording({
     const frame2File = path.join(tempWorkspace, "frame2.jpg");
 
     await new Promise((resolve) => {
-      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec1), "-i", snapSegmentPath1, "-vframes", "1", "-q:v", "2", frame1File], { stdio: "ignore" });
+      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec1), "-i", snapSegmentPath1, "-vframes", "1", "-vf", "scale=-1:360", "-q:v", "2", frame1File], { stdio: "ignore" });
       proc.on("close", resolve);
     });
 
     await new Promise((resolve) => {
-      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec2), "-i", snapSegmentPath2, "-vframes", "1", "-q:v", "2", frame2File], { stdio: "ignore" });
+      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec2), "-i", snapSegmentPath2, "-vframes", "1", "-vf", "scale=-1:360", "-q:v", "2", frame2File], { stdio: "ignore" });
       proc.on("close", resolve);
     });
     let motionOverlayApplied = false;
