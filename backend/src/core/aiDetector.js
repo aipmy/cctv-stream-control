@@ -48,8 +48,8 @@ export async function detectObjects(jpegBuffer) {
           resolve([]); // Just return empty on timeout
         }
       }, 15000);
-  }
-} 
+    });
+}
 
 if (!isMainThread) {
   // Worker Thread
