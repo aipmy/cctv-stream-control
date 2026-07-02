@@ -282,7 +282,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Bandwidth Usage History Graph - Full Width Row */}
+      {/* Bandwidth Usage History Graph (Full Width) */}
       {canViewStats && (
         <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
           <div className="flex items-center gap-2 mb-2">

@@ -94,7 +94,7 @@ function safeViewerId(value) {
 
 export function removeViewer(id, viewerId) { const k = safeViewerId(viewerId); const v = streamViewers.get(id); if (v) { v.delete(k); if (v.size === 0) streamViewers.delete(id); } }
 
-export function recordViewer(id, viewerId, output = "HLS Stable", username = "Guest", ip = "unknown") {
+export function recordViewer(id, viewerId, output = "HLS Stable", details = {}) {
   if (!id) return;
   const key = safeViewerId(viewerId);
   const now = Date.now();
@@ -103,16 +103,39 @@ export function recordViewer(id, viewerId, output = "HLS Stable", username = "Gu
     viewers = new Map();
     streamViewers.set(id, viewers);
   }
-  viewers.set(key, { 
-    lastSeen: now, 
-    output: normalizeOutput(output), 
-    username: username || "Guest",
-    ip: ip || "unknown"
+  viewers.set(key, {
+    lastSeen: now,
+    output: normalizeOutput(output),
+    username: details.username || "anonymous",
+    ip: details.ip || "",
+    userAgent: details.userAgent || "",
   });
   for (const [k, v] of viewers.entries()) {
     if (now - v.lastSeen > VIEWER_TTL_MS) viewers.delete(k);
   }
   if (viewers.size === 0) streamViewers.delete(id);
+}
+
+export function getActiveViewerList(id) {
+  const viewers = streamViewers.get(id);
+  if (!viewers) return [];
+  const now = Date.now();
+  const list = [];
+  for (const [k, v] of viewers.entries()) {
+    if (now - v.lastSeen <= VIEWER_TTL_MS) {
+      list.push({
+        id: k,
+        username: v.username || "anonymous",
+        ip: v.ip || "",
+        userAgent: v.userAgent || "",
+        output: v.output,
+        lastSeenAgoSeconds: Math.round((now - v.lastSeen) / 1000)
+      });
+    } else {
+      viewers.delete(k);
+    }
+  }
+  return list;
 }
 
 function activeViewerCount(id) {
@@ -126,27 +149,6 @@ function activeViewerCount(id) {
   }
   if (viewers.size === 0) streamViewers.delete(id);
   return count;
-}
-
-function activeViewersDetail(id) {
-  const viewers = streamViewers.get(id);
-  if (!viewers) return [];
-  const now = Date.now();
-  const list = [];
-  for (const [k, v] of viewers.entries()) {
-    if (now - v.lastSeen <= VIEWER_TTL_MS) {
-      list.push({
-        id: k,
-        username: v.username || "Guest",
-        ip: v.ip || "unknown",
-        output: v.output || "HLS Stable",
-      });
-    } else {
-      viewers.delete(k);
-    }
-  }
-  if (viewers.size === 0) streamViewers.delete(id);
-  return list;
 }
 
 function redact(value = "") {
@@ -809,7 +811,7 @@ export function streamMetricsFor(id, streamType) {
     bandwidthKbps, cctvPullKbps, latencyMs,
     outBytesPerSec: rates.outBytesPerSec,
     pullBytesPerSec: rates.pullBytesPerSec,
-    viewerDetails: activeViewersDetail(id),
+    activeViewers: getActiveViewerList(id),
   };
 }
 

@@ -26,7 +26,7 @@ import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
 
 const app = express();
 
-app.set("trust proxy", true);
+
 app.disable("x-powered-by");
 
 const corsOptions = {

@@ -41,12 +41,7 @@ export interface Camera {
   enablePTZ: boolean;
   lastSeen: string; // ISO
   viewerCount: number;
-  viewerDetails?: Array<{
-    id: string;
-    username: string;
-    ip: string;
-    output: string;
-  }>;
+  activeViewers?: ActiveViewer[];
   bandwidthKbps: number;
   pullBandwidthKbps?: number;
   outBytesPerSec?: number;
@@ -170,4 +165,13 @@ export interface AuditRecord {
   ip: string | null;
   userAgent: string | null;
   details: Record<string, unknown>;
+}
+
+export interface ActiveViewer {
+  id: string;
+  username: string;
+  ip: string;
+  userAgent?: string;
+  output: string;
+  lastSeenAgoSeconds: number;
 }
