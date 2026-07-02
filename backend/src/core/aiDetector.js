@@ -1,18 +1,19 @@
 import { Worker, isMainThread, parentPort } from 'worker_threads';
 import { fileURLToPath } from 'url';
 
-if (isMainThread) {
-  let worker = null;
-  let taskId = 0;
-  const callbacks = new Map();
+let worker = null;
+let taskId = 0;
+const callbacks = new Map();
 
-  export async function getModel() {
-    // Dummy function for compatibility if called
-    return true;
-  }
+export async function getModel() {
+  // Dummy function for compatibility if called
+  return true;
+}
 
-  export async function detectObjects(jpegBuffer) {
-    if (!worker) {
+export async function detectObjects(jpegBuffer) {
+  if (!isMainThread) return [];
+
+  if (!worker) {
       worker = new Worker(fileURLToPath(import.meta.url));
       worker.on('message', (msg) => {
         if (msg.type === 'ready') {
@@ -47,9 +48,10 @@ if (isMainThread) {
           resolve([]); // Just return empty on timeout
         }
       }, 15000);
-    });
   }
-} else {
+} 
+
+if (!isMainThread) {
   // Worker Thread
   (async () => {
     try {
