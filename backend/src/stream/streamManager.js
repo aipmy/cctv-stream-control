@@ -389,6 +389,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             const result = engine.processFrame(frame, {
               sensitivity: camera.motionSensitivity ?? 50,
               excludeAreas: camera.excludeAreas || [],
+              detectResolution: camera.detectResolution || "Auto",
             });
             if (result && result.motion && hasSmart) {
               void handleMotionDetected(camera);
