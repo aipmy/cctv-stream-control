@@ -357,9 +357,11 @@ async function processSegmentEventRecording({
 
             if (coverage > 0.65) {
               classifiedMode = "pixel";
-            } else if (ratio > 1.3 && largestBox.h > 60) {
+            } else if (ratio > 1.3 && largestBox.h > 30) {
+              // Threshold diturunkan dari 60→30 agar deteksi orang tetap bekerja
+              // pada frame kecil (426x240) dari sub-stream kamera WiFi
               classifiedMode = "human";
-            } else if (ratio <= 1.3 && largestBox.w > 40 && largestBox.h > 40) {
+            } else if (ratio <= 1.3 && largestBox.w > 20 && largestBox.h > 20) {
               classifiedMode = "pet";
             } else {
               classifiedMode = "pixel";
