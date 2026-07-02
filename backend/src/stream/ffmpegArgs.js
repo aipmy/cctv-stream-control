@@ -18,23 +18,6 @@ export function normalizeRtspTimeoutOption(value, options = {}) {
     : "none";
 }
 
-export function getStreamQualityWidth(camera, options) {
-  const res = camera.streamQuality || "Auto";
-  if (res === "Auto") {
-    return null;
-  }
-  const match = res.match(/^(\d+)p$/);
-  if (match) {
-    const height = Number(match[1]);
-    if (height === 1080) return 1920;
-    if (height === 720) return 1280;
-    if (height === 480) return 854;
-    if (height === 360) return 640;
-    if (height === 144) return 256;
-  }
-  return null;
-}
-
 export function buildRtspInputArgs(camera, options = {}) {
   if (camera.sourceType !== "RTSP" && camera.sourceType !== "RTSP+ONVIF") return [];
   const transport = normalizeRtspTransport(camera.rtspTransport, options);
@@ -66,10 +49,8 @@ function copyHlsArgs(camera, output, dir, options, audioFallback) {
   }
 
   const detectFps = options.mjpegFps || 8;
-  const streamWidth = getStreamQualityWidth(camera, options);
-  const detectFilter = streamWidth
-    ? `fps=${detectFps},scale=${streamWidth}:-2`
-    : `fps=${detectFps}`;
+  const detectWidth = options.mjpegWidth || 640;
+  const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
 
   return [
     "-hide_banner", "-nostdin",
@@ -123,10 +104,8 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   }
 
   const detectFps = options.mjpegFps || 8;
-  const streamWidth = getStreamQualityWidth(camera, options);
-  const detectFilter = streamWidth
-    ? `fps=${detectFps},scale=${streamWidth}:-2`
-    : `fps=${detectFps}`;
+  const detectWidth = options.mjpegWidth || 640;
+  const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
   const scaleFilter = camera.streamQuality && camera.streamQuality !== "Auto"
     ? `,scale=-2:${camera.streamQuality.replace("p", "")}`
     : "";

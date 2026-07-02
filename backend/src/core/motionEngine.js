@@ -118,47 +118,6 @@ export function detectMotion(prev, curr, width, height, options) {
   return { motion: boxes.length > 0, boxes, activity: activeCount };
 }
 
-export function getDetectDimensions(detectResolution, originalWidth, originalHeight) {
-  const res = detectResolution || "Auto";
-  if (res === "Auto") {
-    return { width: 640, height: 360 };
-  }
-  const match = res.match(/^(\d+)p$/);
-  if (match) {
-    const height = Number(match[1]);
-    if (height === 1080) return { width: 1920, height: 1080 };
-    if (height === 720) return { width: 1280, height: 720 };
-    if (height === 480) return { width: 854, height: 480 };
-    if (height === 360) return { width: 640, height: 360 };
-    if (height === 144) return { width: 256, height: 144 };
-  }
-  return { width: 640, height: 360 };
-}
-
-export function rgbaToGrayDownsample(rgba, width, height, targetWidth, targetHeight) {
-  if (width === targetWidth && height === targetHeight) {
-    return rgbaToGray(rgba, width, height);
-  }
-  const out = new Uint8Array(targetWidth * targetHeight);
-  const stepX = width / targetWidth;
-  const stepY = height / targetHeight;
-  let idx = 0;
-  for (let y = 0; y < targetHeight; y++) {
-    const srcY = Math.floor(y * stepY);
-    const rowOffset = srcY * width * 4;
-    for (let x = 0; x < targetWidth; x++) {
-      const srcX = Math.floor(x * stepX);
-      const pixelOffset = rowOffset + srcX * 4;
-      out[idx++] = Math.round(
-        0.299 * rgba[pixelOffset] +
-        0.587 * rgba[pixelOffset + 1] +
-        0.114 * rgba[pixelOffset + 2]
-      );
-    }
-  }
-  return out;
-}
-
 export class CameraMotionEngine {
   constructor(cameraId) {
     this.cameraId = cameraId;
@@ -172,13 +131,12 @@ export class CameraMotionEngine {
     } catch (e) { 
       return { error: "decode_error" }; 
     }
-    const target = getDetectDimensions(options.detectResolution || "Auto", decoded.width, decoded.height);
-    const gray = rgbaToGrayDownsample(decoded.data, decoded.width, decoded.height, target.width, target.height);
-    if (!this.previousGray || this.previousGray.length !== gray.length) { 
+    const gray = rgbaToGray(decoded.data, decoded.width, decoded.height);
+    if (!this.previousGray) { 
       this.previousGray = gray; 
       return { motion: false, boxes: [], activity: 0 }; 
     }
-    const motion = detectMotion(this.previousGray, gray, target.width, target.height, options);
+    const motion = detectMotion(this.previousGray, gray, decoded.width, decoded.height, options);
     this.previousGray = blendBackground(this.previousGray, gray, motion.motion ? 0.08 : 0.18);
     
     // Siarkan ke klien secara real-time
