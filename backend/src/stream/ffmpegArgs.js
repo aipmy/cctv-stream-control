@@ -56,7 +56,7 @@ function copyHlsArgs(camera, output, dir, options, audioFallback) {
     "-hide_banner", "-nostdin",
     "-fflags", "nobuffer+genpts",
     "-loglevel", options.ffmpegLogLevel || "warning",
-    ...(isRtsp ? ["-use_wallclock_as_timestamps", "1"] : []),
+
     ...buildRtspInputArgs(camera, options),
     "-i", source,
     "-filter_complex", `[0:v:0]${detectFilter}[vdetout]`,
@@ -116,7 +116,7 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
     "-fflags", "nobuffer+genpts",
     "-flags", "low_delay",
     "-loglevel", options.ffmpegLogLevel || "warning",
-    ...(isRtsp ? ["-use_wallclock_as_timestamps", "1"] : []),
+
     ...buildRtspInputArgs(camera, options),
     "-i", source,
     "-filter_complex", `[0:v:0]split=2[vhls][vdet];[vhls]${hlsFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`,
