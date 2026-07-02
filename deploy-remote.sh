@@ -20,9 +20,10 @@ sshpass -p "$KOST_PASS" ssh -o StrictHostKeyChecking=no "$KOST_USER@$KOST_HOST" 
   git pull && \
   sed -i 's/STREAM_READ_TIMEOUT_US=5000000/STREAM_READ_TIMEOUT_US=20000000/g' backend/.env && \
   (grep -q "VIDEO_ENCODER=" backend/.env && sed -i 's/VIDEO_ENCODER=.*/VIDEO_ENCODER=libx264/g' backend/.env || echo "VIDEO_ENCODER=libx264" >> backend/.env) && \
+  (grep -q "RTSP_TIMEOUT_OPTION=" backend/.env && sed -i 's/RTSP_TIMEOUT_OPTION=.*/RTSP_TIMEOUT_OPTION=stimeout/g' backend/.env || echo "RTSP_TIMEOUT_OPTION=stimeout" >> backend/.env) && \
   ./deploy.sh
 "
-
+ 
 echo "========================================="
 echo "Deploying to CAWANG (Mac Mini) - Rsync/SCP"
 echo "========================================="
@@ -38,13 +39,14 @@ rsync -avz \
   --exclude 'deploy-remote.sh' \
   -e "sshpass -p '$CAWANG_PASS' ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes" \
   ./ "$CAWANG_USER@$CAWANG_HOST:~/Projects/cctv-stream-control/"
-
+ 
 sshpass -p "$CAWANG_PASS" ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes "$CAWANG_USER@$CAWANG_HOST" "
   export NVM_DIR=\"\$HOME/.nvm\"
   [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
   cd ~/Projects/cctv-stream-control && \
   sed -i '' 's/STREAM_READ_TIMEOUT_US=5000000/STREAM_READ_TIMEOUT_US=20000000/g' backend/.env && \
   (grep -q "VIDEO_ENCODER=" backend/.env && sed -i '' 's/VIDEO_ENCODER=.*/VIDEO_ENCODER=h264_videotoolbox/g' backend/.env || echo "VIDEO_ENCODER=h264_videotoolbox" >> backend/.env) && \
+  (grep -q "RTSP_TIMEOUT_OPTION=" backend/.env && sed -i '' 's/RTSP_TIMEOUT_OPTION=.*/RTSP_TIMEOUT_OPTION=stimeout/g' backend/.env || echo "RTSP_TIMEOUT_OPTION=stimeout" >> backend/.env) && \
   ./deploy.sh
 "
 
