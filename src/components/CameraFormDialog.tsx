@@ -53,6 +53,8 @@ const empty = {
   detectionModes: [] as string[],
   detectResolution: "480p" as Camera["detectResolution"],
   recordingMode: "continuous",
+  recordMode: "" as Camera["recordMode"],
+  recordResolution: "Auto" as Camera["recordResolution"],
 };
 
 const sourceHelpKeys: Record<SourceType, TranslationKey> = {
@@ -301,11 +303,13 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         enableRecording: camera.enableRecording ?? false,
         enableNotifications: camera.enableNotifications ?? false,
         motionSensitivity: camera.motionSensitivity ?? 50,
-        motionArea: camera.motionArea ?? null,
-        excludeAreas: camera.excludeAreas ?? [],
-        detectionModes: camera.detectionModes ?? [],
+        motionArea: camera.motionArea || null,
+        excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
+        detectionModes: Array.isArray(camera.detectionModes) ? camera.detectionModes : ["pixel", "human", "pet"],
         detectResolution: camera.detectResolution ?? "480p",
         recordingMode: camera.recordingMode ?? "continuous",
+        recordMode: camera.recordMode ?? "",
+        recordResolution: camera.recordResolution ?? "Auto",
       });
     } else {
       setForm(emptyWithSite);
@@ -377,6 +381,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
       recordingMode: form.recordingMode ?? "continuous",
+      recordMode: form.recordMode,
+      recordResolution: form.recordResolution,
       ...(form.password ? { password: form.password } : {}),
     };
 
@@ -789,25 +795,66 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             </div>
 
             {form.enableRecording && (
-              <div className="pt-3 border-t space-y-2 animate-fade-in">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">{t("recordingModeLabel")}</Label>
-                <Select
-                  value={form.recordingMode || "continuous"}
-                  onValueChange={(v) => setForm({ ...form, recordingMode: v })}
-                >
-                  <SelectTrigger className="w-full h-9 text-xs">
-                    <SelectValue placeholder={t("selectRecordingMode")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="continuous">{t("continuousMode")}</SelectItem>
-                    <SelectItem value="event">{t("eventMode")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground">
-                  {form.recordingMode === "event"
-                    ? t("eventModeHelp")
-                    : t("continuousModeHelp")}
-                </p>
+              <div className="pt-3 border-t space-y-4 animate-fade-in">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">{t("recordingModeLabel")}</Label>
+                  <Select
+                    value={form.recordingMode || "continuous"}
+                    onValueChange={(v) => setForm({ ...form, recordingMode: v })}
+                  >
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder={t("selectRecordingMode")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="continuous">{t("continuousMode")}</SelectItem>
+                      <SelectItem value="event">{t("eventMode")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {form.recordingMode === "event"
+                      ? t("eventModeHelp")
+                      : t("continuousModeHelp")}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">Recording Quality (Beta) <span className="px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[9px]">BETA</span></Label>
+                  <Select
+                    value={form.recordMode || ""}
+                    onValueChange={(v) => setForm({ ...form, recordMode: v as any })}
+                  >
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder="Ikuti Live Stream" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Ikuti Live Stream</SelectItem>
+                      <SelectItem value="copy">Copy Asli (Paling Ringan)</SelectItem>
+                      <SelectItem value="transcode">Custom Transcode</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {form.recordMode === "transcode" ? <span className="text-amber-500 flex items-center gap-1"><Info className="w-3 h-3" /> Transcode memakan CPU berat.</span> : "Memisahkan kualitas rekaman dengan Live Stream."}
+                  </p>
+                </div>
+                {form.recordMode === "transcode" && (
+                  <div className="space-y-2 pl-4 border-l-2 border-muted animate-fade-in">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Custom Resolution</Label>
+                    <Select
+                      value={form.recordResolution || "Auto"}
+                      onValueChange={(v) => setForm({ ...form, recordResolution: v as any })}
+                    >
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Auto">Auto / Sama dengan sumber</SelectItem>
+                        <SelectItem value="1080p">1080p (FHD)</SelectItem>
+                        <SelectItem value="720p">720p (HD)</SelectItem>
+                        <SelectItem value="480p">480p (SD)</SelectItem>
+                        <SelectItem value="360p">360p (Hemat)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>

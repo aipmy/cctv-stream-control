@@ -97,6 +97,10 @@ export function normalizeCamera(input, existing = {}) {
       ? (input.detectResolution || existing.detectResolution)
       : "480p",
     recordingMode: String(input.recordingMode ?? existing.recordingMode ?? "continuous").toLowerCase() === "event" ? "event" : "continuous",
+    recordMode: String(input.recordMode ?? existing.recordMode ?? "").toLowerCase() === "transcode" ? "transcode" : (String(input.recordMode ?? existing.recordMode ?? "") === "copy" ? "copy" : ""),
+    recordResolution: ["Auto", "1080p", "720p", "480p", "360p", "144p"].includes(input.recordResolution || existing.recordResolution)
+      ? (input.recordResolution || existing.recordResolution)
+      : "Auto",
     preMotionSeconds: Number(input.preMotionSeconds ?? existing.preMotionSeconds ?? 15),
     postMotionSeconds: Number(input.postMotionSeconds ?? existing.postMotionSeconds ?? 15),
     segmentDuration: Number(input.segmentDuration ?? existing.segmentDuration ?? 5),

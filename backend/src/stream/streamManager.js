@@ -285,14 +285,29 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     }
 
     const dir = streamDir(id, output);
+    let recordDir = null;
+
     if (camera.enableRecording) {
+      const hlsMode = normalizeHlsMode(camera.hlsMode, config);
+      const recordMode = camera.recordMode || hlsMode;
+      const needsSeparateRecordOutput = 
+        recordMode !== hlsMode ||
+        (recordMode === "transcode" && camera.recordResolution && camera.recordResolution !== camera.streamQuality);
+
+      if (needsSeparateRecordOutput) {
+        recordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+        await fs.mkdir(recordDir, { recursive: true });
+        await fs.unlink(path.join(recordDir, "index.m3u8")).catch(() => {});
+      }
+
       await fs.mkdir(dir, { recursive: true });
       await fs.unlink(path.join(dir, "index.m3u8")).catch(() => {});
     } else {
       await cleanDir(dir);
     }
+    
     const audioFallback = audioFailures.has(id);
-    const args = buildHlsArgs({ camera, output, dir, options: config, audioFallback });
+    const args = buildHlsArgs({ camera, output, dir, recordDir, options: config, audioFallback });
 
     const hasSmartFeatures = camera.enableRecording || camera.enableNotifications;
     if (hasSmartFeatures) {

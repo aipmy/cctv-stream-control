@@ -143,10 +143,25 @@ export async function triggerEvent(cameraId, type, { req = null } = {}) {
 
   // Check HLS playlist to use segment-based pre-recording
   const hlsSubdir = camera.streamType.replace(/\W+/g, "_").toLowerCase();
-  const hlsDir = path.join(config.storageDir, "hls", camera.id, hlsSubdir);
-  const playlistFile = path.join(hlsDir, "index.m3u8");
+  const recordHlsDir = path.join(config.storageDir, "record_hls", camera.id, hlsSubdir);
+  const recordPlaylistFile = path.join(recordHlsDir, "index.m3u8");
+  
+  const standardHlsDir = path.join(config.storageDir, "hls", camera.id, hlsSubdir);
+  const standardPlaylistFile = path.join(standardHlsDir, "index.m3u8");
 
-  const useSegmentMerger = fsSync.existsSync(playlistFile);
+  let useSegmentMerger = false;
+  let hlsDir = null;
+  let playlistFile = null;
+
+  if (fsSync.existsSync(recordPlaylistFile)) {
+    useSegmentMerger = true;
+    hlsDir = recordHlsDir;
+    playlistFile = recordPlaylistFile;
+  } else if (fsSync.existsSync(standardPlaylistFile)) {
+    useSegmentMerger = true;
+    hlsDir = standardHlsDir;
+    playlistFile = standardPlaylistFile;
+  }
 
   // Create Event record (optimistically assumed to be created)
   const newEvent = {

@@ -23,11 +23,7 @@ export function buildRtspInputArgs(camera, options = {}) {
   const transport = normalizeRtspTransport(camera.rtspTransport, options);
   const args = [];
   if (transport !== "auto") args.push("-rtsp_transport", transport);
-  
-  // SELALU gunakan wallclock untuk memperbaiki timestamp PTS yang rusak dari kamera (time=-27:30 dsb)
-  // Ini mencegah HLS player menolak memutar stream karena timestamp negatif
   args.push("-use_wallclock_as_timestamps", "1");
-
   const timeoutOption = normalizeRtspTimeoutOption(camera.rtspTimeoutOption, options);
   const timeoutUs = Number(camera.streamReadTimeoutUs || options.streamReadTimeoutUs || 0);
   if (timeoutOption !== "none" && timeoutUs > 0) {
@@ -39,152 +35,151 @@ export function buildRtspInputArgs(camera, options = {}) {
 function audioArgs(camera, audioFallback) {
   if (camera.audioMode === "Disable") return ["-an"];
   if (camera.audioMode === "Auto" && audioFallback) return ["-an"];
-  // Transcode to AAC if possible, or fallback to -an if Auto and failed
-  // Menambahkan volume=3.0 untuk mengamplifikasi suara mikrofon CCTV yang aslinya sangat kecil
   return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2", "-af", "volume=3.0,aresample=async=1"];
 }
 
-function copyHlsArgs(camera, output, dir, options, audioFallback) {
-  const source = buildSourceUrl(camera);
-  const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
-  const flags = ["omit_endlist", "independent_segments", "temp_file"];
-  if (!camera.enableRecording) {
-    flags.push("delete_segments");
-  }
-
-  const detectFps = options.mjpegFps || 8;
-  const detectWidth = options.mjpegWidth || 640;
-  const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
-
-  return [
-    "-hide_banner", "-nostdin",
-    "-fflags", "nobuffer+genpts",
-    "-loglevel", options.ffmpegLogLevel || "warning",
-
-    ...buildRtspInputArgs(camera, options),
-    "-i", source,
-    "-filter_complex", `[0:v:0]${detectFilter}[vdetout]`,
-    "-map", "0:v:0",
-    "-vsync", "0",
-    "-vcodec", "copy",
-    ...audioArgs(camera, audioFallback),
-    "-hls_flags", flags.join("+"),
-    "-f", "hls",
-    "-hls_time", "2",
-    "-hls_list_size", "20",
-    "-hls_delete_threshold", "3",
-    "-hls_segment_type", "mpegts",
-    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, "%d.ts")]),
-    path.join(dir, "index.m3u8"),
-    "-map", "[vdetout]",
-    "-an",
-    "-vcodec", "mjpeg",
-    "-q:v", String(options.mjpegQuality || 7),
-    "-f", "image2pipe",
-    "pipe:1",
-  ];
-}
-
-function videoScaleArgs(camera) {
-  if (!camera.streamQuality || camera.streamQuality === "Auto") return [];
-  const match = camera.streamQuality.match(/^(\d+)p$/);
-  if (match) {
-    return ["-vf", `scale=-2:${match[1]}`];
-  }
-  return [];
-}
-
-function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
+export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, audioFallback = false }) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
   const hlsTime = lowLatency ? "1" : "2";
   
-  // Cek apakah ini sub-stream (resolusi kecil, misal channel 102)
-  const isSubStream = camera.sourcePath && (camera.sourcePath.includes("102") || camera.sourcePath.includes("sub"));
+  const streamMode = normalizeHlsMode(camera.hlsMode, options);
+  const streamResolution = camera.streamQuality === "Auto" ? null : (camera.streamQuality || null);
   
-  // Jika streamQuality = Auto, pertahankan FPS dan bitrate tinggi setara sumber aslinya
-  const isAuto = !camera.streamQuality || camera.streamQuality === "Auto";
-  const fps = isAuto ? "20" : (lowLatency ? "15" : "12");
+  const recordMode = camera.recordMode || streamMode;
+  const recordResolution = camera.recordResolution === "Auto" ? null : (camera.recordResolution || null);
+
+  const isSubStream = camera.sourcePath && (camera.sourcePath.includes("102") || camera.sourcePath.includes("sub"));
+  const fps = streamResolution ? (lowLatency ? "15" : "12") : "20";
   const gop = String(Number(fps) * Number(hlsTime));
-  const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
-
-  const flags = ["omit_endlist", "program_date_time", "independent_segments", "temp_file"];
-  if (!camera.enableRecording) {
-    flags.push("delete_segments");
-  }
-
+  
   const detectFps = options.mjpegFps || 8;
   const detectWidth = options.mjpegWidth || 640;
   const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
-  const scaleFilter = !isAuto
-    ? `,scale=-2:${camera.streamQuality.replace("p", "")}`
-    : "";
-  
-  // Jangan turunkan fps jika source asli fpsnya sama, biarkan natural dengan framerate drop filter
-  const hlsFilter = `fps=${fps}${scaleFilter}`;
 
-  // Sesuaikan bitrate jika ini sub-stream agar tidak melanggar limit H.264 Level
-  const autoBitrate = isSubStream ? "1000k" : "5000k";
-  const autoMaxrate = isSubStream ? "1500k" : "6000k";
-  const autoBufsize = isSubStream ? "2000k" : "12000k";
+  const streamFlags = ["omit_endlist", "independent_segments", "temp_file"];
+  if (streamMode === "transcode") streamFlags.push("program_date_time");
+  if (!camera.enableRecording) streamFlags.push("delete_segments");
 
-  const bitrate = isAuto ? autoBitrate : (lowLatency ? "2500k" : "3000k");
-  const maxrate = isAuto ? autoMaxrate : (lowLatency ? "3500k" : "4000k");
-  const bufsize = isAuto ? autoBufsize : (lowLatency ? "5000k" : "8000k");
+  const recordFlags = ["omit_endlist", "independent_segments", "temp_file"];
+  if (recordMode === "transcode") recordFlags.push("program_date_time");
 
-  return [
+  const buildTranscodeArgs = (resolution, isLowLatency) => {
+    const scaleFilter = resolution ? `,scale=-2:${resolution.replace("p", "")}` : "";
+    const filter = `fps=${fps}${scaleFilter}`;
+    const autoBitrate = isSubStream ? "1000k" : "5000k";
+    const autoMaxrate = isSubStream ? "1500k" : "6000k";
+    const autoBufsize = isSubStream ? "2000k" : "12000k";
+    const bitrate = resolution ? (isLowLatency ? "2500k" : "3000k") : autoBitrate;
+    const maxrate = resolution ? (isLowLatency ? "3500k" : "4000k") : autoMaxrate;
+    const bufsize = resolution ? (isLowLatency ? "5000k" : "8000k") : autoBufsize;
+
+    return {
+      filter,
+      args: [
+        "-c:v", options.videoEncoder || "libx264",
+        ...(((options.videoEncoder || "libx264") === "libx264") ? [
+          "-preset", isLowLatency ? "ultrafast" : "veryfast",
+          "-tune", "zerolatency",
+          "-profile:v", "baseline",
+          "-pix_fmt", "yuv420p",
+        ] : [
+          "-profile:v", isSubStream ? "main" : "high",
+          "-pix_fmt", "yuv420p",
+        ]),
+        "-vsync", "1",
+        "-r", fps,
+        "-g", gop,
+        "-keyint_min", gop,
+        "-sc_threshold", "0",
+        "-force_key_frames", `expr:gte(t,n_forced*${hlsTime})`,
+        "-b:v", bitrate,
+        "-maxrate", maxrate,
+        "-bufsize", bufsize,
+      ]
+    };
+  };
+
+  const args = [
     "-hide_banner", "-nostdin",
     "-fflags", "nobuffer+genpts",
     ...(lowLatency ? ["-flags", "low_delay"] : []),
     "-loglevel", options.ffmpegLogLevel || "warning",
-
     ...buildRtspInputArgs(camera, options),
     "-i", source,
-    "-filter_complex", `[0:v:0]split=2[vhls][vdet];[vhls]${hlsFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`,
-    "-map", "[vhlsout]",
-    "-c:v", options.videoEncoder || "libx264",
-    ...(((options.videoEncoder || "libx264") === "libx264") ? [
-      "-preset", lowLatency ? "ultrafast" : "veryfast",
-      "-tune", "zerolatency",
-      "-profile:v", "baseline",
-      "-pix_fmt", "yuv420p",
-    ] : [
-      // Hardware encoder optimizations (e.g. h264_videotoolbox)
-      "-profile:v", isSubStream ? "main" : "high",
-      "-pix_fmt", "yuv420p",
-    ]),
-    "-vsync", "1",
-    "-r", fps,
-    "-g", gop,
-    "-keyint_min", gop,
-    "-sc_threshold", "0",
-    "-force_key_frames", `expr:gte(t,n_forced*${hlsTime})`,
-    "-b:v", bitrate,
-    "-maxrate", maxrate,
-    "-bufsize", bufsize,
+  ];
+
+  let filterComplex = "";
+  if (streamMode === "transcode" && recordDir && recordMode === "transcode") {
+    const streamTc = buildTranscodeArgs(streamResolution, lowLatency);
+    const recordTc = buildTranscodeArgs(recordResolution, false);
+    filterComplex = `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamTc.filter}[vhlsout];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]`;
+  } else if (streamMode === "transcode") {
+    const streamTc = buildTranscodeArgs(streamResolution, lowLatency);
+    filterComplex = `[0:v:0]split=2[vhls][vdet];[vhls]${streamTc.filter}[vhlsout];[vdet]${detectFilter}[vdetout]`;
+  } else if (recordDir && recordMode === "transcode") {
+    const recordTc = buildTranscodeArgs(recordResolution, false);
+    filterComplex = `[0:v:0]split=2[vrec][vdet];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]`;
+  } else {
+    filterComplex = `[0:v:0]${detectFilter}[vdetout]`;
+  }
+
+  args.push("-filter_complex", filterComplex);
+
+  // 1. Live Stream Output
+  if (streamMode === "transcode") {
+    const streamTc = buildTranscodeArgs(streamResolution, lowLatency);
+    args.push("-map", "[vhlsout]", ...streamTc.args);
+  } else {
+    args.push("-map", "0:v:0", "-vsync", "0", "-vcodec", "copy");
+  }
+  
+  args.push(
     ...audioArgs(camera, audioFallback),
     "-f", "hls",
     "-hls_time", hlsTime,
     "-hls_list_size", lowLatency ? "20" : "15",
     "-hls_delete_threshold", "2",
-    "-hls_flags", flags.join("+"),
+    "-hls_flags", streamFlags.join("+"),
     "-hls_allow_cache", "0",
     "-hls_segment_type", "mpegts",
-    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, "seg_%06d.ts")]),
-    path.join(dir, "index.m3u8"),
+    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, (streamMode === "transcode" ? "seg_%06d.ts" : "%d.ts"))]),
+    path.join(dir, "index.m3u8")
+  );
+
+  // 2. Record HLS Output
+  if (recordDir) {
+    if (recordMode === "transcode") {
+      const recordTc = buildTranscodeArgs(recordResolution, false);
+      args.push("-map", "[vrecout]", ...recordTc.args);
+    } else {
+      args.push("-map", "0:v:0", "-vsync", "0", "-vcodec", "copy");
+    }
+    
+    args.push(
+      ...audioArgs(camera, audioFallback),
+      "-f", "hls",
+      "-hls_time", "2",
+      "-hls_list_size", "20",
+      "-hls_delete_threshold", "3",
+      "-hls_flags", recordFlags.join("+"),
+      "-hls_allow_cache", "0",
+      "-hls_segment_type", "mpegts",
+      "-strftime", "1",
+      "-hls_segment_filename", path.join(recordDir, "seg_%s.ts"),
+      path.join(recordDir, "index.m3u8")
+    );
+  }
+
+  // 3. Motion Detection Output
+  args.push(
     "-map", "[vdetout]",
     "-an",
     "-vcodec", "mjpeg",
     "-q:v", String(options.mjpegQuality || 7),
     "-f", "image2pipe",
-    "pipe:1",
-  ];
-}
+    "pipe:1"
+  );
 
-export function buildHlsArgs({ camera, output, dir, options = {}, audioFallback = false }) {
-  const needsTranscode = normalizeHlsMode(camera.hlsMode, options) === "transcode" || 
-                         (camera.streamQuality && camera.streamQuality !== "Auto");
-  return needsTranscode
-    ? transcodeHlsArgs(camera, output, dir, options, audioFallback)
-    : copyHlsArgs(camera, output, dir, options, audioFallback);
+  return args;
 }
