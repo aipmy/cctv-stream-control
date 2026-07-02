@@ -23,6 +23,10 @@ export function buildRtspInputArgs(camera, options = {}) {
   const transport = normalizeRtspTransport(camera.rtspTransport, options);
   const args = [];
   if (transport !== "auto") args.push("-rtsp_transport", transport);
+  
+  // SELALU gunakan wallclock untuk memperbaiki timestamp PTS yang rusak dari kamera (time=-27:30 dsb)
+  // Ini mencegah HLS player menolak memutar stream karena timestamp negatif
+  args.push("-use_wallclock_as_timestamps", "1");
 
   const timeoutOption = normalizeRtspTimeoutOption(camera.rtspTimeoutOption, options);
   const timeoutUs = Number(camera.streamReadTimeoutUs || options.streamReadTimeoutUs || 0);
