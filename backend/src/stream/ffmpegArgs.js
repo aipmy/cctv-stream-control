@@ -130,6 +130,7 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
     "-g", gop,
     "-keyint_min", gop,
     "-sc_threshold", "0",
+    "-force_key_frames", `expr:gte(t,n_forced*${hlsTime})`,
     "-b:v", lowLatency ? "1100k" : "900k",
     "-maxrate", lowLatency ? "1400k" : "1200k",
     "-bufsize", lowLatency ? "2200k" : "1800k",
