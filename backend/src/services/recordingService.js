@@ -124,7 +124,7 @@ export async function clearAllEvents() {
 /**
  * Triggers a smart CCTV event (motion or sound detection).
  */
-export async function triggerEvent(cameraId, type, { req = null } = {}) {
+export async function triggerEvent(cameraId, type, { req = null, predictions = null } = {}) {
   const camera = await getCamera(cameraId, { revealSecret: true });
   if (!camera) {
     throw new Error(`Camera with ID ${cameraId} not found`);
@@ -203,6 +203,7 @@ export async function triggerEvent(cameraId, type, { req = null } = {}) {
       cameraName: camera.name,
       site: camera.site,
       type,
+      predictions,
     });
   } else {
     void processFallbackEventRecording({
@@ -214,6 +215,7 @@ export async function triggerEvent(cameraId, type, { req = null } = {}) {
       enableNotifications: camera.enableNotifications,
       settings,
       type,
+      predictions,
     });
   }
 
@@ -254,6 +256,7 @@ async function processSegmentEventRecording({
   cameraName,
   site,
   type,
+  predictions,
 }) {
   const triggerUnixTime = Math.floor(Date.now() / 1000);
   let classifiedMode = "pixel";
@@ -359,44 +362,67 @@ async function processSegmentEventRecording({
 
           const camera = await getCamera(cameraId, { revealSecret: true });
           const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
-          const motionResult = detectMotion(gray1, gray2, width, height, {
-            sensitivity: camera?.motionSensitivity ?? 50,
-            excludeAreas: camera?.excludeAreas || [],
-          });
+          let boxesToDraw = [];
 
-          if (motionResult.motion && motionResult.boxes.length > 0) {
-            // Classify based on bounding box shape
-            const largestBox = motionResult.boxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
-            const ratio = largestBox.h / largestBox.w;
-            const coverage = (largestBox.w * largestBox.h) / (width * height);
-
-            // Kamera CCTV dipasang dari sudut atas → orang terlihat dari atas
-            // dan bounding box-nya cenderung lebar/kotak (rasio h/w bisa < 1.0).
-            // Gunakan coverage dan ukuran absolut sebagai penentu utama,
-            // bukan rasio tinggi/lebar yang hanya cocok untuk kamera depan.
-            if (coverage > 0.80) {
-              // Terlalu besar = perubahan seluruh frame (cahaya, bayangan, dll)
-              classifiedMode = "pixel";
-            } else if (largestBox.w > 20 && largestBox.h > 20) {
-              // Objek cukup besar → kemungkinan besar manusia
-              // (ratio > 0.5 agar tetap exclude noise horizontal tipis)
-              classifiedMode = ratio > 0.5 ? "human" : "pixel";
-            } else {
-              classifiedMode = "pixel";
-            }
-
-            const isMatch = detectionModes.includes(classifiedMode);
+          if (predictions && predictions.length > 0) {
+            classifiedMode = type;
+            const isMatch = detectionModes.includes(classifiedMode) || (classifiedMode === "person" && detectionModes.includes("human")) || (["cat", "dog", "bird"].includes(classifiedMode) && detectionModes.includes("pet"));
             if (!isMatch) {
               console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
               ignored = true;
               return;
             }
 
+            // Scale predictions bbox to snapshot dimensions
+            for (const p of predictions) {
+              const scaleX = width / p.frameWidth;
+              const scaleY = height / p.frameHeight;
+              const [bx, by, bw, bh] = p.bbox;
+              boxesToDraw.push({
+                x: Math.round(bx * scaleX),
+                y: Math.round(by * scaleY),
+                w: Math.round(bw * scaleX),
+                h: Math.round(bh * scaleY),
+                color: p.class === "person" ? [0, 255, 255] : [255, 165, 0] // Cyan for person, Orange for pet
+              });
+            }
+          } else {
+            const motionResult = detectMotion(gray1, gray2, width, height, {
+              sensitivity: camera?.motionSensitivity ?? 50,
+              excludeAreas: camera?.excludeAreas || [],
+            });
+
+            if (motionResult.motion && motionResult.boxes.length > 0) {
+              const largestBox = motionResult.boxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
+              const ratio = largestBox.h / largestBox.w;
+              const coverage = (largestBox.w * largestBox.h) / (width * height);
+              if (coverage > 0.80) {
+                classifiedMode = "pixel";
+              } else if (largestBox.w > 20 && largestBox.h > 20) {
+                classifiedMode = ratio > 0.5 ? "human" : "pixel";
+              } else {
+                classifiedMode = "pixel";
+              }
+
+              const isMatch = detectionModes.includes(classifiedMode);
+              if (!isMatch) {
+                console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
+                ignored = true;
+                return;
+              }
+              boxesToDraw = motionResult.boxes.map(b => ({ ...b, color: [255, 0, 0] })); // Red for pixel motion
+            }
+          }
+
+          if (!ignored) {
             const labelMap = {
               human: "Gerakan (Manusia)",
+              person: "Gerakan (Manusia)",
               pet: "Gerakan (Hewan/Lainnya)",
               pixel: "Gerakan (Perubahan Gambar)",
             };
+            const typeDesc = labelMap[classifiedMode] || (["cat", "dog", "bird"].includes(classifiedMode) ? "Gerakan (Hewan)" : "Deteksi Gerakan");
+            
             const eventRecord = {
               id: eventId,
               cameraId,
@@ -406,26 +432,27 @@ async function processSegmentEventRecording({
               type,
               snapshotPath: `/api/events/snapshot/${eventId}`,
               videoPath: enableRecording ? `/api/events/video/${eventId}` : "",
-              typeDescription: labelMap[classifiedMode] || "Deteksi Gerakan",
+              typeDescription: typeDesc,
               classification: classifiedMode,
             };
             await eventStore.update((events) => {
               return [eventRecord, ...events].slice(0, 1000);
             });
 
-            // Draw red bounding boxes directly on RGBA buffer
-            for (const box of motionResult.boxes) {
+            // Draw bounding boxes directly on RGBA buffer
+            for (const box of boxesToDraw) {
               const thickness = 3;
               const bx = Math.max(0, box.x);
               const by = Math.max(0, box.y);
               const bx2 = Math.min(width - 1, box.x + box.w);
               const by2 = Math.min(height - 1, box.y + box.h);
+              const [r, g, b] = box.color;
               for (let t = 0; t < thickness; t++) {
                 for (let x = bx; x <= bx2; x++) {
                   for (const row of [by + t, by2 - t]) {
                     if (row >= 0 && row < height) {
                       const idx = (width * row + x) << 2;
-                      img1.data[idx] = 255; img1.data[idx + 1] = 0; img1.data[idx + 2] = 0;
+                      img1.data[idx] = r; img1.data[idx + 1] = g; img1.data[idx + 2] = b;
                     }
                   }
                 }
@@ -433,7 +460,7 @@ async function processSegmentEventRecording({
                   for (const col of [bx + t, bx2 - t]) {
                     if (col >= 0 && col < width) {
                       const idx = (width * y + col) << 2;
-                      img1.data[idx] = 255; img1.data[idx + 1] = 0; img1.data[idx + 2] = 0;
+                      img1.data[idx] = r; img1.data[idx + 1] = g; img1.data[idx + 2] = b;
                     }
                   }
                 }
@@ -550,6 +577,7 @@ async function processFallbackEventRecording({
   enableNotifications,
   settings,
   type,
+  predictions,
 }) {
   try {
     const sourceUrl = buildSourceUrl(camera);
@@ -661,17 +689,21 @@ async function sendTelegramAlert(token, chatId, { cameraName, site, type, snapsh
   if (type === "sound") {
     emoji = "🔊";
     typeLabel = "Suara Bising";
-  } else if (type === "human") {
+  } else if (type === "person") {
     emoji = "⚠️🚶‍♂️";
     typeLabel = "Manusia Terdeteksi";
-  } else if (type === "pet") {
+  } else if (["cat", "dog", "bird", "horse", "sheep", "cow"].includes(type)) {
     emoji = "⚠️🐕";
-    typeLabel = "Hewan/Lainnya Terdeteksi";
+    typeLabel = "Hewan/Peliharaan Terdeteksi";
+  } else if (["car", "motorcycle", "bus", "truck", "bicycle"].includes(type)) {
+    emoji = "⚠️🚗";
+    typeLabel = "Kendaraan Terdeteksi";
   } else if (type === "pixel") {
     emoji = "⚠️📷";
     typeLabel = "Perubahan Gambar";
   }
-  const caption = `${emoji} *Smart CCTV Alert*\n\n*Kamera:* ${cameraName}\n*Lokasi:* ${site}\n*Tipe:* ${typeLabel}\n*Waktu:* ${new Date().toLocaleString("id-ID")}`;
+  
+  const caption = `${emoji} *Smart CCTV Alert*\n\n*Kamera:* ${cameraName}\n*Lokasi:* ${site || "Tidak diketahui"}\n*Tipe:* ${typeLabel}\n*Waktu:* ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`;
 
   try {
     const fileData = await fs.readFile(snapshotFile);

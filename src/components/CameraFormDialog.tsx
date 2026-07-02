@@ -1243,6 +1243,7 @@ function UnifiedMotionEditor({
   const [imgLoaded, setImgLoaded] = useState(false);
 
   const boxesRef = useRef<Array<{ x: number; y: number; w: number; h: number; blocks?: number }>>([]);
+  const aiBoxesRef = useRef<Array<{ class: string; score: number; bbox: number[]; frameWidth: number; frameHeight: number }>>([]);
   const frameDims = useRef({ width: 640, height: 480 });
 
   // Build MJPEG src URL
@@ -1273,6 +1274,13 @@ function UnifiedMotionEditor({
       try {
         const data = JSON.parse(evt.data);
         if (data.connected) return;
+        if (data.type === "ai-motion") {
+          if (data.predictions) aiBoxesRef.current = data.predictions;
+          // Auto clear ai boxes after 2 seconds
+          if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
+          (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 2000);
+          return;
+        }
         if (data.boxes) boxesRef.current = data.boxes;
         if (data.frame) frameDims.current = data.frame;
         if (data.activity != null) setActivity(data.activity);
@@ -1435,6 +1443,36 @@ function UnifiedMotionEditor({
           ctx.fillStyle = "#ffffff";
           ctx.fillText(`motion ${box.blocks || ""}`, bx + 4, Math.max(12, by - 4));
           ctx.fillStyle = "rgba(34, 197, 94, 0.15)"; // restore fill
+        }
+      }
+
+      // 5. Draw AI bounding boxes
+      if (aiBoxesRef.current.length > 0) {
+        ctx.lineWidth = 2;
+        ctx.font = "bold 11px monospace";
+        for (const box of aiBoxesRef.current) {
+          const sx = w / box.frameWidth;
+          const sy = h / box.frameHeight;
+          const bx = box.bbox[0] * sx;
+          const by = box.bbox[1] * sy;
+          const bw = box.bbox[2] * sx;
+          const bh = box.bbox[3] * sy;
+          
+          const isPerson = box.class === "person";
+          const colorHex = isPerson ? "#06b6d4" : "#f59e0b"; // Cyan or Amber
+          const colorFill = isPerson ? "rgba(6, 182, 212, 0.15)" : "rgba(245, 158, 11, 0.15)";
+          
+          ctx.strokeStyle = colorHex;
+          ctx.fillStyle = colorFill;
+          ctx.strokeRect(bx, by, bw, bh);
+          ctx.fillRect(bx, by, bw, bh);
+
+          ctx.fillStyle = colorHex;
+          const labelText = `${box.class} ${Math.round(box.score * 100)}%`;
+          const labelWidth = labelText.length * 7 + 10;
+          ctx.fillRect(bx, Math.max(0, by - 18), labelWidth, 18);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(labelText, bx + 4, Math.max(12, by - 5));
         }
       }
 

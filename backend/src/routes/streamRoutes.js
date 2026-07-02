@@ -25,11 +25,20 @@ streamRoutes.get("/:id/events", async (req, res) => {
   res.write("data: {\"connected\":true}\n\n");
 
   const eventName = `motion-${id}`;
+  const aiEventName = `ai-motion-${id}`;
+  
   const handler = (data) => {
     if (res.writableEnded) return;
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
+
+  const aiHandler = (data) => {
+    if (res.writableEnded) return;
+    res.write(`data: ${JSON.stringify({ type: "ai-motion", ...data })}\n\n`);
+  };
+
   motionEmitter.on(eventName, handler);
+  motionEmitter.on(aiEventName, aiHandler);
 
   // Heartbeat to keep connection alive
   const heartbeat = setInterval(() => {
@@ -39,6 +48,7 @@ streamRoutes.get("/:id/events", async (req, res) => {
 
   req.on("close", () => {
     motionEmitter.off(eventName, handler);
+    motionEmitter.off(aiEventName, aiHandler);
     clearInterval(heartbeat);
   });
 });

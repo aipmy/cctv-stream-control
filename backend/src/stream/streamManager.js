@@ -24,20 +24,59 @@ const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
 const lastTriggered = new Map(); // cameraId -> timestamp
 
-async function handleMotionDetected(camera) {
+async function handleMotionDetected(camera, predictions = null) {
   const now = Date.now();
 
   // Always update last motion timestamp (used by smart recording stop)
   updateLastMotionAt(camera.id, now);
+
+  const modes = camera.detectionModes || ["pixel", "human", "pet"];
+  let shouldTrigger = false;
+  let reason = "motion";
+
+  if (!predictions) {
+    // Basic pixel motion
+    shouldTrigger = modes.includes("pixel");
+  } else if (predictions.length === 0) {
+    // AI ran but found nothing, fallback to pixel if enabled
+    shouldTrigger = modes.includes("pixel");
+  } else {
+    // AI found objects, check if they match requested modes
+    for (const p of predictions) {
+      if (modes.includes("human") && p.class === "person") {
+        shouldTrigger = true;
+        reason = "person";
+        break;
+      }
+      if (modes.includes("pet") && ["cat", "dog", "bird", "horse", "sheep", "cow"].includes(p.class)) {
+        shouldTrigger = true;
+        reason = p.class;
+        break;
+      }
+      if (modes.includes("vehicle") && ["car", "motorcycle", "bus", "truck", "bicycle"].includes(p.class)) {
+        shouldTrigger = true;
+        reason = p.class;
+        break;
+      }
+    }
+    // If AI found objects but none match modes, DO NOT trigger (unless pixel mode is heavily trusted? No, if AI ran and found no matching objects, we ignore).
+    // Wait, if pixel mode is ON, and AI didn't find person/pet, should we still trigger? Yes, because pixel mode means "ANY motion".
+    if (!shouldTrigger && modes.includes("pixel")) {
+      shouldTrigger = true;
+      reason = "motion";
+    }
+  }
+
+  if (!shouldTrigger) return;
 
   // Only trigger a NEW event if enough time has passed since last event
   const lastTime = lastTriggered.get(camera.id) || 0;
   if (now - lastTime < 45000) return;
   lastTriggered.set(camera.id, now);
 
-  console.log(`[Motion Detection] ⚠️ Motion detected on camera: ${camera.name} (${camera.id})!`);
+  console.log(`[Motion Detection] ⚠️ ${reason} detected on camera: ${camera.name} (${camera.id})!`);
   try {
-    await triggerEvent(camera.id, "motion");
+    await triggerEvent(camera.id, reason, { predictions });
   } catch (err) {
     console.error(`[Motion Detection] Failed to trigger event for camera ${camera.id}:`, err);
   }
@@ -355,7 +394,31 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                 excludeAreas: camera.excludeAreas || [],
               });
               if (result && result.motion && hasSmart) {
-                void handleMotionDetected(camera);
+                // Background AI check
+                if (!session.lastAiProcess || nowMs - session.lastAiProcess > 2000) {
+                  session.lastAiProcess = nowMs;
+                  import("../core/aiDetector.js").then(ai => {
+                    ai.detectObjects(frame).then(predictions => {
+                      if (predictions && predictions.length > 0) {
+                        void handleMotionDetected(camera, predictions);
+                        // Emit AI results to frontend
+                        import("../core/motionEngine.js").then(({ motionEmitter }) => {
+                          motionEmitter.emit(`ai-motion-${id}`, {
+                            ts: new Date().toISOString(),
+                            predictions
+                          });
+                        });
+                      } else {
+                        // Fallback to basic motion if AI didn't find anything? 
+                        // No, if AI didn't find anything, it might just be a shadow.
+                        // We will rely on handleMotionDetected filtering it if Smart Type is set.
+                        void handleMotionDetected(camera, []);
+                      }
+                    }).catch(console.error);
+                  }).catch(console.error);
+                } else {
+                  void handleMotionDetected(camera);
+                }
               }
             }
           } catch (e) { /* ignore */ }
