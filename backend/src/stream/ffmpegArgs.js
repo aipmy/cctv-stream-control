@@ -94,7 +94,10 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
   const hlsTime = lowLatency ? "1" : "2";
-  const fps = lowLatency ? "12" : "10";
+  
+  // Jika streamQuality = Auto, pertahankan FPS dan bitrate tinggi setara sumber aslinya
+  const isAuto = !camera.streamQuality || camera.streamQuality === "Auto";
+  const fps = isAuto ? "20" : (lowLatency ? "15" : "12");
   const gop = String(Number(fps) * Number(hlsTime));
   const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
 
@@ -106,10 +109,16 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   const detectFps = options.mjpegFps || 8;
   const detectWidth = options.mjpegWidth || 640;
   const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
-  const scaleFilter = camera.streamQuality && camera.streamQuality !== "Auto"
+  const scaleFilter = !isAuto
     ? `,scale=-2:${camera.streamQuality.replace("p", "")}`
     : "";
+  
+  // Jangan turunkan fps jika source asli fpsnya sama, biarkan natural dengan framerate drop filter
   const hlsFilter = `fps=${fps}${scaleFilter}`;
+
+  const bitrate = isAuto ? "5000k" : (lowLatency ? "2500k" : "3000k");
+  const maxrate = isAuto ? "6000k" : (lowLatency ? "3500k" : "4000k");
+  const bufsize = isAuto ? "12000k" : (lowLatency ? "5000k" : "8000k");
 
   return [
     "-hide_banner", "-nostdin",
@@ -127,16 +136,20 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
       "-tune", "zerolatency",
       "-profile:v", "baseline",
       "-pix_fmt", "yuv420p",
-    ] : []),
+    ] : [
+      // Hardware encoder optimizations (e.g. h264_videotoolbox)
+      "-profile:v", "high",
+      "-pix_fmt", "yuv420p",
+    ]),
     "-vsync", "1",
     "-r", fps,
     "-g", gop,
     "-keyint_min", gop,
     "-sc_threshold", "0",
     "-force_key_frames", `expr:gte(t,n_forced*${hlsTime})`,
-    "-b:v", lowLatency ? "2500k" : "3000k",
-    "-maxrate", lowLatency ? "3500k" : "4000k",
-    "-bufsize", lowLatency ? "5000k" : "8000k",
+    "-b:v", bitrate,
+    "-maxrate", maxrate,
+    "-bufsize", bufsize,
     ...audioArgs(camera, audioFallback),
     "-f", "hls",
     "-hls_time", hlsTime,
