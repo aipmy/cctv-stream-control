@@ -904,25 +904,50 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               </div>
 
               {/* ──── Detection Resolution ──── */}
-              <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2 animate-fade-in">
-                <div className="min-w-0 pr-2 flex-1">
-                  <Label className="text-sm font-semibold">{t("detectionResolution")}</Label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {t("detectionResolutionHelp")}
-                  </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in">
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="min-w-0 pr-2 flex-1">
+                    <Label className="text-sm font-semibold">{t("detectionResolution")}</Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {t("detectionResolutionHelp")}
+                    </p>
+                  </div>
+                  <Select value={form.detectResolution || "480p"} onValueChange={(v) => setForm({ ...form, detectResolution: v as Camera["detectResolution"] })}>
+                    <SelectTrigger className="w-[100px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Auto">{t("all")}</SelectItem>
+                      <SelectItem value="720p">720p</SelectItem>
+                      <SelectItem value="480p">{t("detectResStandard")}</SelectItem>
+                      <SelectItem value="360p">{t("detectResLight")}</SelectItem>
+                      <SelectItem value="144p">{t("detectResMinimal")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={form.detectResolution || "480p"} onValueChange={(v) => setForm({ ...form, detectResolution: v as Camera["detectResolution"] })}>
-                  <SelectTrigger className="w-[120px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Auto">{t("all")}</SelectItem>
-                    <SelectItem value="720p">720p</SelectItem>
-                    <SelectItem value="480p">{t("detectResStandard")}</SelectItem>
-                    <SelectItem value="360p">{t("detectResLight")}</SelectItem>
-                    <SelectItem value="144p">{t("detectResMinimal")}</SelectItem>
-                  </SelectContent>
-                </Select>
+
+                {/* ──── Detection FPS ──── */}
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div className="min-w-0 pr-2 flex-1">
+                    <Label className="text-sm font-semibold">Detection FPS</Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Live View smoothness vs CPU load.
+                    </p>
+                  </div>
+                  <Select value={String(form.detectFps || 6)} onValueChange={(v) => setForm({ ...form, detectFps: Number(v) })}>
+                    <SelectTrigger className="w-[80px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 FPS</SelectItem>
+                      <SelectItem value="2">2 FPS</SelectItem>
+                      <SelectItem value="4">4 FPS</SelectItem>
+                      <SelectItem value="6">6 FPS</SelectItem>
+                      <SelectItem value="10">10 FPS</SelectItem>
+                      <SelectItem value="15">15 FPS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* ──── Smart Detection Modes ──── */}

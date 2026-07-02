@@ -53,7 +53,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const fps = streamResolution ? (lowLatency ? "15" : "12") : "20";
   const gop = String(Number(fps) * Number(hlsTime));
   
-  const detectFps = options.mjpegFps || 8;
+  const detectFps = (camera.detectFps !== undefined && camera.detectFps > 0) ? camera.detectFps : (options.mjpegFps || 8);
   const resMap = { "1080p": 1920, "720p": 1280, "480p": 854, "360p": 640, "144p": 256 };
   const detectWidth = (camera.detectResolution && camera.detectResolution !== "Auto" && resMap[camera.detectResolution]) ? resMap[camera.detectResolution] : (options.mjpegWidth || 640);
   const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
