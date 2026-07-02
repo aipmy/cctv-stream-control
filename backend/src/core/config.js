@@ -35,6 +35,7 @@ export const config = {
   ffmpegBin: process.env.FFMPEG_BIN || "ffmpeg",
   ffprobeBin: process.env.FFPROBE_BIN || "ffprobe",
   streamProfile: process.env.STREAM_PROFILE || "copy",
+  videoEncoder: process.env.VIDEO_ENCODER || "libx264",
   rtspTransport: process.env.RTSP_TRANSPORT || "tcp",
   hlsStartTimeoutMs: Number(process.env.HLS_START_TIMEOUT_MS || 20000),
   streamIdleMs: Number(process.env.STREAM_IDLE_MS || 10000),
