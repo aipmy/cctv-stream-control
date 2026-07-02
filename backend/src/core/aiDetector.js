@@ -1,76 +1,108 @@
-import * as tf from '@tensorflow/tfjs';
-import * as cocoSsd from '@tensorflow-models/coco-ssd';
-import jpeg from 'jpeg-js';
+import { Worker, isMainThread, parentPort } from 'worker_threads';
+import { fileURLToPath } from 'url';
 
-// Setup TF.js to use CPU backend (since we don't have C++ node bindings for portability)
-tf.setBackend('cpu');
+if (isMainThread) {
+  let worker = null;
+  let taskId = 0;
+  const callbacks = new Map();
 
-let modelPromise = null;
+  export async function getModel() {
+    // Dummy function for compatibility if called
+    return true;
+  }
 
-export async function getModel() {
-  if (!modelPromise) {
-    console.log("[AI] Loading COCO-SSD model...");
-    modelPromise = cocoSsd.load({
-      base: 'mobilenet_v2' // Very lightweight model
-    }).then(model => {
-      console.log("[AI] COCO-SSD model loaded successfully.");
-      return model;
-    }).catch(err => {
-      console.error("[AI] Failed to load COCO-SSD model:", err);
-      modelPromise = null;
-      throw err;
+  export async function detectObjects(jpegBuffer) {
+    if (!worker) {
+      worker = new Worker(fileURLToPath(import.meta.url));
+      worker.on('message', (msg) => {
+        if (msg.type === 'ready') {
+          console.log("[AI] Worker is ready and model loaded.");
+        } else if (msg.type === 'result' || msg.type === 'error') {
+          const cb = callbacks.get(msg.id);
+          if (cb) {
+            callbacks.delete(msg.id);
+            if (msg.type === 'result') cb.resolve(msg.predictions);
+            else cb.reject(new Error(msg.error));
+          }
+        }
+      });
+      worker.on('error', (err) => {
+        console.error("[AI Worker Error]", err);
+      });
+      worker.on('exit', (code) => {
+        if (code !== 0) console.error(`[AI Worker] Stopped with exit code ${code}`);
+        worker = null;
+      });
+    }
+    
+    return new Promise((resolve, reject) => {
+      const id = taskId++;
+      callbacks.set(id, { resolve, reject });
+      worker.postMessage({ id, buffer: jpegBuffer });
+      
+      // Auto timeout after 15 seconds if worker gets stuck
+      setTimeout(() => {
+        if (callbacks.has(id)) {
+          callbacks.delete(id);
+          resolve([]); // Just return empty on timeout
+        }
+      }, 15000);
     });
   }
-  return modelPromise;
-}
+} else {
+  // Worker Thread
+  (async () => {
+    try {
+      const tf = await import('@tensorflow/tfjs');
+      tf.setBackend('cpu');
+      const cocoSsd = await import('@tensorflow-models/coco-ssd');
+      const jpeg = await import('jpeg-js');
+      
+      console.log("[AI Worker] Loading COCO-SSD model...");
+      const model = await cocoSsd.load({ base: 'mobilenet_v2' });
+      parentPort.postMessage({ type: 'ready' });
 
-/**
- * Run object detection on a raw JPEG buffer.
- * @param {Buffer} jpegBuffer - Raw JPEG bytes from MJPEG stream
- * @returns {Promise<Array>} - Array of detection objects { class, score, bbox }
- */
-export async function detectObjects(jpegBuffer) {
-  try {
-    const model = await getModel();
-    if (!model) return [];
+      parentPort.on('message', async (msg) => {
+        if (!msg.buffer) return;
+        try {
+          const rawImageData = jpeg.default.decode(msg.buffer, { useTArray: true });
+          const numPixels = rawImageData.width * rawImageData.height;
+          const values = new Int32Array(numPixels * 3);
+          
+          for (let i = 0; i < numPixels; i++) {
+            values[i * 3 + 0] = rawImageData.data[i * 4 + 0]; // R
+            values[i * 3 + 1] = rawImageData.data[i * 4 + 1]; // G
+            values[i * 3 + 2] = rawImageData.data[i * 4 + 2]; // B
+          }
 
-    // Decode JPEG buffer to raw pixels
-    const rawImageData = jpeg.decode(jpegBuffer, { useTArray: true });
-    
-    // Create a 3D tensor from the flat pixel array [height, width, 4] -> [height, width, 3]
-    const numPixels = rawImageData.width * rawImageData.height;
-    const values = new Int32Array(numPixels * 3);
-    
-    // Drop the alpha channel for RGB tensor
-    for (let i = 0; i < numPixels; i++) {
-      values[i * 3 + 0] = rawImageData.data[i * 4 + 0]; // R
-      values[i * 3 + 1] = rawImageData.data[i * 4 + 1]; // G
-      values[i * 3 + 2] = rawImageData.data[i * 4 + 2]; // B
+          const outShape = [rawImageData.height, rawImageData.width, 3];
+          const imageTensor = tf.tensor3d(values, outShape, 'int32');
+          
+          const start = Date.now();
+          const predictions = await model.detect(imageTensor);
+          const duration = Date.now() - start;
+          
+          imageTensor.dispose();
+
+          const formatted = predictions.map(p => ({
+            class: p.class,
+            score: p.score,
+            bbox: p.bbox,
+            frameWidth: rawImageData.width,
+            frameHeight: rawImageData.height
+          }));
+
+          if (formatted.length > 0) {
+            console.log(`[AI Worker] Detection took ${duration}ms. Found: ${formatted.map(p => `${p.class} (${Math.round(p.score * 100)}%)`).join(', ')}`);
+          }
+
+          parentPort.postMessage({ type: 'result', id: msg.id, predictions: formatted });
+        } catch (err) {
+          parentPort.postMessage({ type: 'error', id: msg.id, error: err.message });
+        }
+      });
+    } catch (err) {
+      console.error("[AI Worker Init Error]", err);
     }
-
-    const outShape = [rawImageData.height, rawImageData.width, 3];
-    const imageTensor = tf.tensor3d(values, outShape, 'int32');
-
-    const start = Date.now();
-    const predictions = await model.detect(imageTensor);
-    const duration = Date.now() - start;
-    
-    // Free tensor memory immediately
-    imageTensor.dispose();
-
-    if (predictions.length > 0) {
-      console.log(`[AI] Detection took ${duration}ms. Found: ${predictions.map(p => `${p.class} (${Math.round(p.score * 100)}%)`).join(', ')}`);
-    }
-
-    return predictions.map(p => ({
-      class: p.class,
-      score: p.score,
-      bbox: p.bbox,
-      frameWidth: rawImageData.width,
-      frameHeight: rawImageData.height
-    }));
-  } catch (err) {
-    console.error("[AI] Error during detection:", err);
-    return [];
-  }
+  })();
 }
