@@ -66,7 +66,7 @@ function copyHlsArgs(camera, output, dir, options, audioFallback) {
     ...audioArgs(camera, audioFallback),
     "-hls_flags", flags.join("+"),
     "-f", "hls",
-    "-hls_time", "1",
+    "-hls_time", "2",
     "-hls_list_size", "20",
     "-hls_delete_threshold", "3",
     "-hls_segment_type", "mpegts",
@@ -114,7 +114,7 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   return [
     "-hide_banner", "-nostdin",
     "-fflags", "nobuffer+genpts",
-    "-flags", "low_delay",
+    ...(lowLatency ? ["-flags", "low_delay"] : []),
     "-loglevel", options.ffmpegLogLevel || "warning",
 
     ...buildRtspInputArgs(camera, options),
@@ -122,9 +122,12 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
     "-filter_complex", `[0:v:0]split=2[vhls][vdet];[vhls]${hlsFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`,
     "-map", "[vhlsout]",
     "-c:v", options.videoEncoder || "libx264",
-    ...(((options.videoEncoder || "libx264") === "libx264") ? ["-preset", lowLatency ? "ultrafast" : "veryfast", "-tune", "zerolatency"] : []),
-    "-profile:v", "baseline",
-    "-pix_fmt", "yuv420p",
+    ...(((options.videoEncoder || "libx264") === "libx264") ? [
+      "-preset", lowLatency ? "ultrafast" : "veryfast",
+      "-tune", "zerolatency",
+      "-profile:v", "baseline",
+      "-pix_fmt", "yuv420p",
+    ] : []),
     "-vsync", "1",
     "-r", fps,
     "-g", gop,
