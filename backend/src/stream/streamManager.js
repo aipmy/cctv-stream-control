@@ -310,60 +310,6 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     const args = buildHlsArgs({ camera, output, dir, recordDir, options: config, audioFallback });
 
     const hasSmartFeatures = camera.enableRecording || camera.enableNotifications;
-    if (hasSmartFeatures) {
-      let threshold = "0.05";
-      if (typeof camera.motionSensitivity === "number") {
-        threshold = (0.2 - (camera.motionSensitivity / 100) * 0.19).toFixed(3);
-      } else {
-        const sensitivityMap = { high: "0.02", medium: "0.05", low: "0.10" };
-        threshold = sensitivityMap[String(camera.motionSensitivity || "Medium").toLowerCase()] || "0.05";
-      }
-      let vfFilter = "scale=-2:240,";
-      const maskFilters = [];
-      if (Array.isArray(camera.excludeAreas)) {
-        for (const area of camera.excludeAreas) {
-          if (area.type === "polygon") {
-            if (Array.isArray(area.points) && area.points.length > 0) {
-              const xs = area.points.map((p) => p.x);
-              const ys = area.points.map((p) => p.y);
-              const minX = Math.min(...xs);
-              const maxX = Math.max(...xs);
-              const minY = Math.min(...ys);
-              const maxY = Math.max(...ys);
-              const x = minX;
-              const y = minY;
-              const w = maxX - minX;
-              const h = maxY - minY;
-              maskFilters.push(`drawbox=x=iw*${Number(x).toFixed(3)}:y=ih*${Number(y).toFixed(3)}:w=iw*${Number(w).toFixed(3)}:h=ih*${Number(h).toFixed(3)}:color=black:t=fill`);
-            }
-          } else {
-            const { x, y, w, h } = area;
-            maskFilters.push(`drawbox=x=iw*${Number(x).toFixed(3)}:y=ih*${Number(y).toFixed(3)}:w=iw*${Number(w).toFixed(3)}:h=ih*${Number(h).toFixed(3)}:color=black:t=fill`);
-          }
-        }
-      }
-      if (maskFilters.length > 0) {
-        vfFilter += maskFilters.join(",") + ",";
-      }
-
-      if (camera.motionArea && typeof camera.motionArea === "object") {
-        const { x, y, w, h } = camera.motionArea;
-        const xVal = Math.max(0, Math.min(1, Number(x ?? 0)));
-        const yVal = Math.max(0, Math.min(1, Number(y ?? 0)));
-        const wVal = Math.max(0.01, Math.min(1, Number(w ?? 1)));
-        const hVal = Math.max(0.01, Math.min(1, Number(h ?? 1)));
-        if (wVal < 1 || hVal < 1 || xVal > 0 || yVal > 0) {
-          vfFilter += `crop=iw*${wVal.toFixed(3)}:ih*${hVal.toFixed(3)}:iw*${xVal.toFixed(3)}:ih*${yVal.toFixed(3)},`;
-        }
-      }
-      vfFilter += `fps=1,select='gt(scene,${threshold})',showinfo`;
-      args.push("-map", "0:v:0", "-vf", vfFilter, "-f", "null", "-");
-
-      const loglevelIdx = args.indexOf("-loglevel");
-      if (loglevelIdx !== -1 && loglevelIdx < args.length - 1) {
-        args[loglevelIdx + 1] = "info";
-      }
-    }
 
     const child = spawn(config.ffmpegBin, args, { stdio: ["ignore", "pipe", "pipe"] });
     const session = {
@@ -429,24 +375,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       });
     });
 
-    let stderrBuffer = "";
     child.stderr.on("data", (chunk) => {
       writeFfmpegLog(session, chunk);
-      if (hasSmartFeatures) {
-        stderrBuffer += chunk.toString();
-        const lines = stderrBuffer.split("\n");
-        stderrBuffer = lines.pop();
-        for (const line of lines) {
-          if (line.includes("Parsed_showinfo")) {
-            // Ignore false positives during the first 6 seconds of startup/stabilization
-            const elapsed = Date.now() - new Date(session.startedAt).getTime();
-            if (elapsed < 6000) {
-              continue;
-            }
-            void handleMotionDetected(camera);
-          }
-        }
-      }
     });
     child.on("spawn", () => {
       session.status = "starting";
@@ -585,6 +515,7 @@ function proxyHttpMjpeg(id, camera, res) {
 
 function extractJpegs() {
   let buffer = Buffer.alloc(0);
+  let frameCount = 0;
   return (chunk, onFrame) => {
     buffer = Buffer.concat([buffer, chunk]);
     while (true) {
@@ -596,6 +527,8 @@ function extractJpegs() {
       }
       const frame = buffer.slice(start, end + 2);
       buffer = buffer.slice(end + 2);
+      frameCount++;
+      if (frameCount % 10 === 0) console.log(`[extractJpegs] parsed ${frameCount} frames, buffer size ${buffer.length}`);
       onFrame(frame);
     }
   };
