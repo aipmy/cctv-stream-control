@@ -385,13 +385,17 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
         if (hasSmart || hasListeners) {
           try {
-            const engine = getMotionEngine(id);
-            const result = engine.processFrame(frame, {
-              sensitivity: camera.motionSensitivity ?? 50,
-              excludeAreas: camera.excludeAreas || [],
-            });
-            if (result && result.motion && hasSmart) {
-              void handleMotionDetected(camera);
+            const nowMs = Date.now();
+            if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 1000) {
+              session.lastMotionProcess = nowMs;
+              const engine = getMotionEngine(id);
+              const result = engine.processFrame(frame, {
+                sensitivity: camera.motionSensitivity ?? 50,
+                excludeAreas: camera.excludeAreas || [],
+              });
+              if (result && result.motion && hasSmart) {
+                void handleMotionDetected(camera);
+              }
             }
           } catch (e) { /* ignore */ }
         }
