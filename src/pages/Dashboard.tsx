@@ -111,17 +111,22 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [canViewStats]);
 
-  // Fetch Recent Events
+  // Fetch Recent Events — poll every 15s for real-time updates
   useEffect(() => {
+    const fetchEvents = () => {
+      eventApi.list()
+        .then((data) => {
+          const sorted = data.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+          setEvents(sorted.slice(0, 5));
+        })
+        .catch((err) => console.error("Failed to fetch dashboard events", err))
+        .finally(() => setLoadingEvents(false));
+    };
+
     setLoadingEvents(true);
-    eventApi.list()
-      .then((data) => {
-        // Sort by timestamp desc and take latest 5
-        const sorted = data.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-        setEvents(sorted.slice(0, 5));
-      })
-      .catch((err) => console.error("Failed to fetch dashboard events", err))
-      .finally(() => setLoadingEvents(false));
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   // Filter cameras to show on Dashboard: pinned cameras, or fallback to active online cameras if nothing is pinned
