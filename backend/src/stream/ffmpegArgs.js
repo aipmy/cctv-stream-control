@@ -87,8 +87,6 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
           "-profile:v", isSubStream ? "main" : "high",
           "-pix_fmt", "yuv420p",
         ]),
-        "-vsync", "1",
-        "-r", fps,
         "-g", gop,
         "-keyint_min", gop,
         "-sc_threshold", "0",

@@ -15,9 +15,9 @@ echo "Deploying to KOST (Raspberry Pi) - Git pull"
 echo "========================================="
 sshpass -p "$KOST_PASS" ssh -o StrictHostKeyChecking=no "$KOST_USER@$KOST_HOST" "
   cd ~/Projects/cctv-stream-control && \
-  git reset --hard HEAD && \
-  git clean -fd && \
-  git pull && \
+  git fetch && \
+  git checkout feature/independent-recording && \
+  git reset --hard origin/feature/independent-recording && \
   sed -i 's/STREAM_READ_TIMEOUT_US=5000000/STREAM_READ_TIMEOUT_US=20000000/g' backend/.env && \
   (grep -q "VIDEO_ENCODER=" backend/.env && sed -i 's/VIDEO_ENCODER=.*/VIDEO_ENCODER=libx264/g' backend/.env || echo "VIDEO_ENCODER=libx264" >> backend/.env) && \
   (grep -q "RTSP_TIMEOUT_OPTION=" backend/.env && sed -i 's/RTSP_TIMEOUT_OPTION=.*/RTSP_TIMEOUT_OPTION=timeout/g' backend/.env || echo "RTSP_TIMEOUT_OPTION=timeout" >> backend/.env) && \
