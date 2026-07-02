@@ -95,6 +95,9 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   const lowLatency = output === "HLS Low Latency";
   const hlsTime = lowLatency ? "1" : "2";
   
+  // Cek apakah ini sub-stream (resolusi kecil, misal channel 102)
+  const isSubStream = camera.sourcePath && (camera.sourcePath.includes("102") || camera.sourcePath.includes("sub"));
+  
   // Jika streamQuality = Auto, pertahankan FPS dan bitrate tinggi setara sumber aslinya
   const isAuto = !camera.streamQuality || camera.streamQuality === "Auto";
   const fps = isAuto ? "20" : (lowLatency ? "15" : "12");
@@ -116,9 +119,14 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
   // Jangan turunkan fps jika source asli fpsnya sama, biarkan natural dengan framerate drop filter
   const hlsFilter = `fps=${fps}${scaleFilter}`;
 
-  const bitrate = isAuto ? "5000k" : (lowLatency ? "2500k" : "3000k");
-  const maxrate = isAuto ? "6000k" : (lowLatency ? "3500k" : "4000k");
-  const bufsize = isAuto ? "12000k" : (lowLatency ? "5000k" : "8000k");
+  // Sesuaikan bitrate jika ini sub-stream agar tidak melanggar limit H.264 Level
+  const autoBitrate = isSubStream ? "1000k" : "5000k";
+  const autoMaxrate = isSubStream ? "1500k" : "6000k";
+  const autoBufsize = isSubStream ? "2000k" : "12000k";
+
+  const bitrate = isAuto ? autoBitrate : (lowLatency ? "2500k" : "3000k");
+  const maxrate = isAuto ? autoMaxrate : (lowLatency ? "3500k" : "4000k");
+  const bufsize = isAuto ? autoBufsize : (lowLatency ? "5000k" : "8000k");
 
   return [
     "-hide_banner", "-nostdin",
@@ -138,7 +146,7 @@ function transcodeHlsArgs(camera, output, dir, options, audioFallback) {
       "-pix_fmt", "yuv420p",
     ] : [
       // Hardware encoder optimizations (e.g. h264_videotoolbox)
-      "-profile:v", "high",
+      "-profile:v", isSubStream ? "main" : "high",
       "-pix_fmt", "yuv420p",
     ]),
     "-vsync", "1",
