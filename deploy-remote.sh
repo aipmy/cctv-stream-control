@@ -21,6 +21,7 @@ sshpass -p "$KOST_PASS" ssh -o StrictHostKeyChecking=no "$KOST_USER@$KOST_HOST" 
   sed -i 's/MJPEG_WIDTH=320/MJPEG_WIDTH=854/g' backend/.env && \
   sed -i 's/MJPEG_QUALITY=7/MJPEG_QUALITY=4/g' backend/.env && \
   sed -i 's/MJPEG_FPS=4/MJPEG_FPS=6/g' backend/.env && \
+  sed -i 's/STREAM_READ_TIMEOUT_US=5000000/STREAM_READ_TIMEOUT_US=20000000/g' backend/.env && \
   ./deploy.sh
 "
 
@@ -47,6 +48,7 @@ sshpass -p "$CAWANG_PASS" ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes 
   sed -i '' 's/MJPEG_WIDTH=320/MJPEG_WIDTH=854/g' backend/.env && \
   sed -i '' 's/MJPEG_QUALITY=7/MJPEG_QUALITY=4/g' backend/.env && \
   sed -i '' 's/MJPEG_FPS=4/MJPEG_FPS=6/g' backend/.env && \
+  sed -i '' 's/STREAM_READ_TIMEOUT_US=5000000/STREAM_READ_TIMEOUT_US=20000000/g' backend/.env && \
   ./deploy.sh
 "
 
