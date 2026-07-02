@@ -55,10 +55,23 @@ function viewerId(req) {
   return String(req.query.vid || req.headers["x-cctv-viewer-id"] || `${req.ip}:${req.get("user-agent") || "ua"}`);
 }
 
+function getClientIp(req) {
+  const cfIp = req.headers["cf-connecting-ip"];
+  if (cfIp) return cfIp;
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  if (xForwardedFor) {
+    const parts = xForwardedFor.split(",");
+    return parts[0].trim();
+  }
+  const xRealIp = req.headers["x-real-ip"];
+  if (xRealIp) return xRealIp;
+  return req.ip || req.socket.remoteAddress || "";
+}
+
 function viewerDetails(req) {
   return {
     username: req.auth?.username || "anonymous",
-    ip: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "",
+    ip: getClientIp(req),
     userAgent: req.get("user-agent") || ""
   };
 }
