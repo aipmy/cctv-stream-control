@@ -355,14 +355,17 @@ async function processSegmentEventRecording({
             const ratio = largestBox.h / largestBox.w;
             const coverage = (largestBox.w * largestBox.h) / (width * height);
 
-            if (coverage > 0.65) {
+            // Kamera CCTV dipasang dari sudut atas → orang terlihat dari atas
+            // dan bounding box-nya cenderung lebar/kotak (rasio h/w bisa < 1.0).
+            // Gunakan coverage dan ukuran absolut sebagai penentu utama,
+            // bukan rasio tinggi/lebar yang hanya cocok untuk kamera depan.
+            if (coverage > 0.80) {
+              // Terlalu besar = perubahan seluruh frame (cahaya, bayangan, dll)
               classifiedMode = "pixel";
-            } else if (ratio > 1.3 && largestBox.h > 30) {
-              // Threshold diturunkan dari 60→30 agar deteksi orang tetap bekerja
-              // pada frame kecil (426x240) dari sub-stream kamera WiFi
-              classifiedMode = "human";
-            } else if (ratio <= 1.3 && largestBox.w > 20 && largestBox.h > 20) {
-              classifiedMode = "pet";
+            } else if (largestBox.w > 20 && largestBox.h > 20) {
+              // Objek cukup besar → kemungkinan besar manusia
+              // (ratio > 0.5 agar tetap exclude noise horizontal tipis)
+              classifiedMode = ratio > 0.5 ? "human" : "pixel";
             } else {
               classifiedMode = "pixel";
             }
