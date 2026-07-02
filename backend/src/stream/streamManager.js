@@ -303,7 +303,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         const sensitivityMap = { high: "0.02", medium: "0.05", low: "0.10" };
         threshold = sensitivityMap[String(camera.motionSensitivity || "Medium").toLowerCase()] || "0.05";
       }
-      let vfFilter = "";
+      let vfFilter = "scale=-2:240,";
       const maskFilters = [];
       if (Array.isArray(camera.excludeAreas)) {
         for (const area of camera.excludeAreas) {
