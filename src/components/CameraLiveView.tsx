@@ -183,12 +183,12 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         hls = new HlsLib({
           lowLatencyMode: output === "HLS Low Latency",
           backBufferLength: 10,
-          liveSyncDurationCount: output === "HLS Low Latency" ? 2 : 3,
-          maxBufferLength: output === "HLS Low Latency" ? 8 : 16,
-          manifestLoadingMaxRetry: 6,
-          manifestLoadingRetryDelay: 700,
-          levelLoadingMaxRetry: 6,
-          fragLoadingMaxRetry: 6,
+          liveSyncDurationCount: output === "HLS Low Latency" ? 3 : 4,
+          maxBufferLength: output === "HLS Low Latency" ? 10 : 20,
+          manifestLoadingMaxRetry: 8,
+          manifestLoadingRetryDelay: 800,
+          levelLoadingMaxRetry: 8,
+          fragLoadingMaxRetry: 8,
         });
         hls.loadSource(src);
         hls.attachMedia(video);
