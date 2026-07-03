@@ -1255,7 +1255,7 @@ function UnifiedMotionEditor({
     const base = (typeof window !== "undefined" && ["5173", "5174", "8080"].includes(window.location.port))
       ? `${window.location.protocol}//${window.location.hostname}:4200`
       : "";
-    return `${base}/api/streams/${cameraId}/video.mjpg?token=${encodeURIComponent(token)}`;
+    return `${base}/api/streams/${cameraId}/video.mjpg?token=${encodeURIComponent(token)}&t=${Date.now()}`;
   }, [cameraId]);
 
   // Reset image loaded status on stream URL change
