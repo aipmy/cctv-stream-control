@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 let worker = null;
 let taskId = 0;
 const callbacks = new Map();
+let isWorkerBusy = false;
 
 export async function getModel() {
   // Dummy function for compatibility if called
@@ -12,6 +13,11 @@ export async function getModel() {
 
 export async function detectObjects(jpegBuffer) {
   if (!isMainThread) return [];
+
+  // Drop frame if AI is already processing another frame (prevents queue buildup across multiple cameras)
+  if (isWorkerBusy) {
+    return [];
+  }
 
   if (!worker) {
       worker = new Worker(fileURLToPath(import.meta.url));
@@ -22,6 +28,7 @@ export async function detectObjects(jpegBuffer) {
           const cb = callbacks.get(msg.id);
           if (cb) {
             callbacks.delete(msg.id);
+            isWorkerBusy = callbacks.size > 0;
             if (msg.type === 'result') cb.resolve(msg.predictions);
             else cb.reject(new Error(msg.error));
           }
@@ -29,16 +36,19 @@ export async function detectObjects(jpegBuffer) {
       });
       worker.on('error', (err) => {
         console.error("[AI Worker Error]", err);
+        isWorkerBusy = false;
       });
       worker.on('exit', (code) => {
         if (code !== 0) console.error(`[AI Worker] Stopped with exit code ${code}`);
         worker = null;
+        isWorkerBusy = false;
       });
     }
     
     return new Promise((resolve, reject) => {
       const id = taskId++;
       callbacks.set(id, { resolve, reject });
+      isWorkerBusy = true;
       worker.postMessage({ id, buffer: jpegBuffer });
       
       // Auto timeout after 15 seconds if worker gets stuck

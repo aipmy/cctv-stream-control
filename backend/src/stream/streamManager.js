@@ -383,9 +383,14 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         // Feed frame to pixel-diff motion engine (non-blocking)
         const hasSmart = Boolean(camera.enableRecording || camera.enableNotifications);
         const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
-        if (hasSmart || hasListeners) {
+        const hasAiListeners = motionEmitter.listenerCount(`ai-motion-${id}`) > 0;
+        
+        if (hasSmart || hasListeners || hasAiListeners) {
           try {
             const nowMs = Date.now();
+            let pixelMotionDetected = false;
+
+            // 1. Basic Motion Engine (runs every 1s)
             if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 1000) {
               session.lastMotionProcess = nowMs;
               const engine = getMotionEngine(id);
@@ -393,33 +398,44 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                 sensitivity: camera.motionSensitivity ?? 50,
                 excludeAreas: camera.excludeAreas || [],
               });
-              if (result && result.motion && hasSmart) {
-                // Background AI check
-                if (!session.lastAiProcess || nowMs - session.lastAiProcess > 2000) {
-                  session.lastAiProcess = nowMs;
-                  import("../core/aiDetector.js").then(ai => {
-                    ai.detectObjects(frame).then(predictions => {
-                      if (predictions && predictions.length > 0) {
-                        void handleMotionDetected(camera, predictions);
-                        // Emit AI results to frontend
-                        import("../core/motionEngine.js").then(({ motionEmitter }) => {
-                          motionEmitter.emit(`ai-motion-${id}`, {
-                            ts: new Date().toISOString(),
-                            predictions
-                          });
-                        });
-                      } else {
-                        // Fallback to basic motion if AI didn't find anything? 
-                        // No, if AI didn't find anything, it might just be a shadow.
-                        // We will rely on handleMotionDetected filtering it if Smart Type is set.
-                        void handleMotionDetected(camera, []);
-                      }
-                    }).catch(console.error);
-                  }).catch(console.error);
-                } else {
-                  void handleMotionDetected(camera);
-                }
+              pixelMotionDetected = Boolean(result && result.motion);
+              
+              // If basic motion detected something, trigger fallback (especially for 'pixel' mode)
+              if (pixelMotionDetected && hasSmart) {
+                void handleMotionDetected(camera, null); // Pass null so it relies purely on pixel mode
               }
+            }
+
+            // 2. Continuous AI Engine (runs independently, ~1 FPS)
+            // session.aiBusy lock prevents worker queue buildup
+            if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > 1000)) {
+              session.aiBusy = true;
+              session.lastAiProcess = nowMs;
+              
+              import("../core/aiDetector.js").then(ai => {
+                ai.detectObjects(frame).then(predictions => {
+                  session.aiBusy = false;
+                  
+                  // Emit AI results to frontend 24/7 (blue boxes)
+                  import("../core/motionEngine.js").then(({ motionEmitter }) => {
+                    motionEmitter.emit(`ai-motion-${id}`, {
+                      ts: new Date().toISOString(),
+                      predictions: predictions || []
+                    });
+                  });
+
+                  // If AI found objects, trigger recording/notification
+                  if (predictions && predictions.length > 0 && hasSmart) {
+                    void handleMotionDetected(camera, predictions);
+                  }
+                }).catch(err => {
+                  session.aiBusy = false;
+                  console.error("[AI Engine Error]", err);
+                });
+              }).catch(err => {
+                session.aiBusy = false;
+                console.error("[AI Load Error]", err);
+              });
             }
           } catch (e) { /* ignore */ }
         }
