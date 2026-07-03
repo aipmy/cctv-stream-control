@@ -1024,6 +1024,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   cameraEnabled={Boolean(camera?.enabled)}
                   value={form.excludeAreas || []}
                   onChange={(areas) => setForm({ ...form, excludeAreas: areas })}
+                  showPixelMotion={form.detectionModes?.includes("pixel") ?? false}
                 />
               </div>
             </>
@@ -1223,11 +1224,13 @@ function UnifiedMotionEditor({
   cameraEnabled,
   value,
   onChange,
+  showPixelMotion = true,
 }: {
   cameraId: string;
   cameraEnabled: boolean;
   value: MotionArea[];
   onChange: (areas: MotionArea[]) => void;
+  showPixelMotion?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -1419,7 +1422,7 @@ function UnifiedMotionEditor({
       }
 
       // 4. Draw real-time motion bounding boxes (Green)
-      if (boxesRef.current.length > 0) {
+      if (showPixelMotion && boxesRef.current.length > 0) {
         const fw = frameDims.current.width || 640;
         const fh = frameDims.current.height || 480;
         const sx = w / fw;
