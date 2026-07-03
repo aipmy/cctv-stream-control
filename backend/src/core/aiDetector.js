@@ -16,7 +16,7 @@ export async function detectObjects(jpegBuffer) {
 
   // Drop frame if AI is already processing another frame (prevents queue buildup across multiple cameras)
   if (isWorkerBusy) {
-    return [];
+    return null;
   }
 
   if (!worker) {

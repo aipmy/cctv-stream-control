@@ -416,6 +416,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                 ai.detectObjects(frame).then(predictions => {
                   session.aiBusy = false;
                   
+                  if (predictions === null) return; // Frame was dropped, do not wipe previous UI boxes
+                  
                   // Emit AI results to frontend 24/7 (blue boxes)
                   import("../core/motionEngine.js").then(({ motionEmitter }) => {
                     motionEmitter.emit(`ai-motion-${id}`, {
