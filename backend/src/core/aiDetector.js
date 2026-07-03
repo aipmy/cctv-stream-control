@@ -91,7 +91,7 @@ if (!isMainThread) {
           const imageTensor = tf.tensor3d(values, outShape, 'int32');
           
           const start = Date.now();
-          const predictions = await model.detect(imageTensor);
+          const predictions = await model.detect(imageTensor, 20, 0.3);
           const duration = Date.now() - start;
           
           imageTensor.dispose();
