@@ -5,6 +5,8 @@ let worker = null;
 let taskId = 0;
 const callbacks = new Map();
 let isWorkerBusy = false;
+let isWorkerReady = false;
+let messageQueue = [];
 
 export async function getModel() {
   // Dummy function for compatibility if called
@@ -20,10 +22,15 @@ export async function detectObjects(jpegBuffer) {
   }
 
   if (!worker) {
+      isWorkerReady = false;
       worker = new Worker(fileURLToPath(import.meta.url));
       worker.on('message', (msg) => {
         if (msg.type === 'ready') {
           console.log("[AI] Worker is ready and model loaded.");
+          isWorkerReady = true;
+          // Process queued messages
+          messageQueue.forEach(m => worker.postMessage(m));
+          messageQueue = [];
         } else if (msg.type === 'result' || msg.type === 'error') {
           const cb = callbacks.get(msg.id);
           if (cb) {
@@ -46,10 +53,16 @@ export async function detectObjects(jpegBuffer) {
     }
     
     return new Promise((resolve, reject) => {
-      const id = taskId++;
+      const id = ++taskId;
       callbacks.set(id, { resolve, reject });
       isWorkerBusy = true;
-      worker.postMessage({ id, buffer: jpegBuffer });
+      
+      const msg = { id, buffer: jpegBuffer };
+      if (isWorkerReady) {
+        worker.postMessage(msg);
+      } else {
+        messageQueue.push(msg);
+      }
       
       // Auto timeout after 15 seconds if worker gets stuck
       setTimeout(() => {

@@ -390,8 +390,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             const nowMs = Date.now();
             let pixelMotionDetected = false;
 
-            // 1. Basic Motion Engine (runs every 1s)
-            if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 1000) {
+            // 1. Basic Motion Engine (runs every 250ms for smooth UI tracking)
+            if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 250) {
               session.lastMotionProcess = nowMs;
               const engine = getMotionEngine(id);
               const result = engine.processFrame(frame, {
@@ -406,7 +406,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               }
             }
 
-            // 2. Continuous AI Engine (runs independently, ~1 FPS)
+            // 2. Continuous AI Engine (runs independently)
             // session.aiBusy lock prevents worker queue buildup
             if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > 1000)) {
               session.aiBusy = true;
