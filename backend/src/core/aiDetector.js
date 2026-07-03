@@ -71,7 +71,7 @@ if (!isMainThread) {
       const jpeg = await import('jpeg-js');
       
       console.log("[AI Worker] Loading COCO-SSD model...");
-      const model = await cocoSsd.load({ base: 'mobilenet_v2' });
+      const model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
       parentPort.postMessage({ type: 'ready' });
 
       parentPort.on('message', async (msg) => {
