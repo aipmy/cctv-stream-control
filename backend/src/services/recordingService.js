@@ -124,7 +124,7 @@ export async function clearAllEvents() {
 /**
  * Triggers a smart CCTV event (motion or sound detection).
  */
-export async function triggerEvent(cameraId, type, { req = null, predictions = null } = {}) {
+export async function triggerEvent(cameraId, type, { req = null, predictions = null, pixelBoxes = null } = {}) {
   const camera = await getCamera(cameraId, { revealSecret: true });
   if (!camera) {
     throw new Error(`Camera with ID ${cameraId} not found`);
@@ -204,6 +204,7 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
       site: camera.site,
       type,
       predictions,
+      pixelBoxes,
     });
   } else {
     void processFallbackEventRecording({
@@ -216,6 +217,7 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
       settings,
       type,
       predictions,
+      pixelBoxes,
     });
   }
 
@@ -257,6 +259,7 @@ async function processSegmentEventRecording({
   site,
   type,
   predictions,
+  pixelBoxes,
 }) {
   const triggerUnixTime = Math.floor(Date.now() / 1000);
   let classifiedMode = "pixel";
@@ -384,6 +387,26 @@ async function processSegmentEventRecording({
                 w: Math.round(bw * scaleX),
                 h: Math.round(bh * scaleY),
                 color: p.class === "person" ? [239, 68, 68] : [16, 185, 129] // Match frontend: Red for person, Green for pet/objects
+              });
+            }
+          } else if (pixelBoxes && pixelBoxes.length > 0) {
+            classifiedMode = "pixel";
+            const isMatch = detectionModes.includes(classifiedMode);
+            if (!isMatch) {
+              console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
+              ignored = true;
+              return;
+            }
+            // Scale pixelBoxes to snapshot dimensions
+            for (const b of pixelBoxes) {
+              const scaleX = width / b.frameWidth;
+              const scaleY = height / b.frameHeight;
+              boxesToDraw.push({
+                x: Math.round(b.x * scaleX),
+                y: Math.round(b.y * scaleY),
+                w: Math.round(b.w * scaleX),
+                h: Math.round(b.h * scaleY),
+                color: [251, 191, 36] // Amber for pixel motion
               });
             }
           } else {
@@ -578,6 +601,7 @@ async function processFallbackEventRecording({
   settings,
   type,
   predictions,
+  pixelBoxes,
 }) {
   try {
     const sourceUrl = buildSourceUrl(camera);
@@ -613,6 +637,60 @@ async function processFallbackEventRecording({
     if (type === "motion" && !detectionModes.includes("pixel")) {
       console.log(`[Fallback Event] Event ${eventId} ignored. Camera only allows '${detectionModes.join(", ")}' but fallback does not support classification.`);
       return;
+    }
+
+    // Draw bounding boxes if we have any
+    let boxesToDraw = [];
+    if (predictions && predictions.length > 0) {
+      boxesToDraw = predictions.map(p => ({ ...p, color: p.class === "person" ? [239, 68, 68] : [16, 185, 129] }));
+    } else if (pixelBoxes && pixelBoxes.length > 0) {
+      boxesToDraw = pixelBoxes.map(b => ({ ...b, color: [251, 191, 36] }));
+    }
+
+    if (boxesToDraw.length > 0) {
+      try {
+        const buf = fsSync.readFileSync(snapshotFile);
+        const img = jpeg.decode(buf, { useTArray: true });
+        const width = img.width;
+        const height = img.height;
+
+        for (const box of boxesToDraw) {
+          const scaleX = width / box.frameWidth;
+          const scaleY = height / box.frameHeight;
+          const bx = Math.max(0, Math.round((box.x || box.bbox?.[0]) * scaleX));
+          const by = Math.max(0, Math.round((box.y || box.bbox?.[1]) * scaleY));
+          const bw = Math.max(1, Math.round((box.w || box.bbox?.[2]) * scaleX));
+          const bh = Math.max(1, Math.round((box.h || box.bbox?.[3]) * scaleY));
+          
+          const bx2 = Math.min(width - 1, bx + bw);
+          const by2 = Math.min(height - 1, by + bh);
+          const [r, g, b] = box.color;
+          const thickness = 3;
+
+          for (let t = 0; t < thickness; t++) {
+            for (let x = bx; x <= bx2; x++) {
+              for (const row of [by + t, by2 - t]) {
+                if (row >= 0 && row < height) {
+                  const idx = (width * row + x) << 2;
+                  img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b;
+                }
+              }
+            }
+            for (let y = by; y <= by2; y++) {
+              for (const col of [bx + t, bx2 - t]) {
+                if (col >= 0 && col < width) {
+                  const idx = (width * y + col) << 2;
+                  img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b;
+                }
+              }
+            }
+          }
+        }
+        const encoded = jpeg.encode({ data: img.data, width, height }, 85);
+        fsSync.writeFileSync(snapshotFile, encoded.data);
+      } catch (err) {
+        console.error(`[Fallback Event Overlay] Processing failed for ${eventId}:`, err);
+      }
     }
 
     // 2. Start Video Recording in background (if enabled)

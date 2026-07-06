@@ -24,7 +24,7 @@ const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
 const lastTriggered = new Map(); // cameraId -> timestamp
 
-async function handleMotionDetected(camera, predictions = null) {
+async function handleMotionDetected(camera, predictions = null, pixelBoxes = null) {
   const now = Date.now();
 
   // Always update last motion timestamp (used by smart recording stop)
@@ -76,7 +76,7 @@ async function handleMotionDetected(camera, predictions = null) {
 
   console.log(`[Motion Detection] ⚠️ ${reason} detected on camera: ${camera.name} (${camera.id})!`);
   try {
-    await triggerEvent(camera.id, reason, { predictions });
+    await triggerEvent(camera.id, reason, { predictions, pixelBoxes });
   } catch (err) {
     console.error(`[Motion Detection] Failed to trigger event for camera ${camera.id}:`, err);
   }
@@ -402,7 +402,12 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               
               // If basic motion detected something, trigger fallback (especially for 'pixel' mode)
               if (pixelMotionDetected && hasSmart) {
-                void handleMotionDetected(camera, null); // Pass null so it relies purely on pixel mode
+                const pixelBoxes = result.boxes.map(b => ({
+                  ...b,
+                  frameWidth: frame.width,
+                  frameHeight: frame.height
+                }));
+                void handleMotionDetected(camera, null, pixelBoxes); // Pass null so it relies purely on pixel mode
               }
             }
 
