@@ -893,35 +893,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           {/* Motion detection settings - displayed if notifications are enabled OR event-based recording is enabled */}
           {(form.enableNotifications || form.enableRecording) && (
             <>
-              {/* ──── Sensitivity Slider (1-100%) ──── */}
-              <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 pr-2 flex-1">
-                    <Label className="text-sm font-semibold">{t("motionSensitivity")}</Label>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {t("motionSensitivityDesc")}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0 ml-2 tabular-nums">
-                    <span className="text-lg font-bold text-primary">{form.motionSensitivity ?? 50}%</span>
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={100}
-                  step={1}
-                  value={form.motionSensitivity ?? 50}
-                  onChange={(e) => setForm({ ...form, motionSensitivity: Number(e.target.value) })}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
-                />
-                <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
-                  <span>{t("sensLargeOnly")}</span>
-                  <span>{t("sensStandard")}</span>
-                  <span>{t("sensVerySensitive")}</span>
-                </div>
-              </div>
-
               {/* ──── Detection Resolution ──── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:col-span-2 animate-fade-in">
                 <div className="flex items-center justify-between rounded-md border p-3">
@@ -1005,8 +976,14 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     if (val) modes.add("pixel"); else modes.delete("pixel");
                     setForm({ ...form, detectionModes: Array.from(modes) });
                   }}
-                  onAiSensitivityChange={setSdAiSensitivity}
-                  onMotionSensitivityChange={setSdMotionSensitivity}
+                  onAiSensitivityChange={(val) => {
+                    setSdAiSensitivity(val);
+                    setForm({ ...form, aiSensitivity: val });
+                  }}
+                  onMotionSensitivityChange={(val) => {
+                    setSdMotionSensitivity(val);
+                    setForm({ ...form, motionSensitivity: val });
+                  }}
                   enableSoundDetection={form.enableSoundDetection}
                   onEnableSoundDetectionChange={(val) => setForm({ ...form, enableSoundDetection: val })}
                 />
