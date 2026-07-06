@@ -69,7 +69,7 @@ export async function detectObjects(jpegBuffer, threshold = 0.5) {
         messageQueue.push(msg);
       }
       
-      // Auto timeout after 15 seconds if worker gets stuck
+      // Auto timeout after 60 seconds if worker gets stuck (Raspberry Pi pure JS can take 20s+)
       setTimeout(() => {
         if (callbacks.has(id)) {
           callbacks.delete(id);
@@ -78,7 +78,7 @@ export async function detectObjects(jpegBuffer, threshold = 0.5) {
           }
           resolve([]); // Just return empty on timeout
         }
-      }, 15000);
+      }, 60000);
     });
 }
 
