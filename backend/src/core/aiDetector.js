@@ -42,6 +42,7 @@ export async function detectObjects(jpegBuffer, threshold = 0.5) {
             else cb.reject(new Error(msg.error));
           } else {
             console.log(`[AI Detector] No callback found for id ${msg.id}`);
+            isWorkerBusy = callbacks.size > 0;
           }
         }
       });
@@ -72,6 +73,9 @@ export async function detectObjects(jpegBuffer, threshold = 0.5) {
       setTimeout(() => {
         if (callbacks.has(id)) {
           callbacks.delete(id);
+          if (callbacks.size === 0) {
+            isWorkerBusy = false;
+          }
           resolve([]); // Just return empty on timeout
         }
       }, 15000);
