@@ -408,24 +408,22 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
             // 2. Continuous AI Engine (runs independently)
             // session.aiBusy lock prevents worker queue buildup
-            if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > 1000)) {
+            const aiIntervalMs = Math.max(200, 1000 / (camera.detectFps || 1));
+            if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
               session.aiBusy = true;
-              console.log(`[streamManager] Triggering AI for ${id}. Frame size: ${frame.length}`);
+              
               
               import("../core/aiDetector.js").then(ai => {
                 ai.detectObjects(frame).then(predictions => {
-                  console.log(`[streamManager] AI returned ${predictions ? predictions.length : 'null'} predictions for ${id}`);
                   session.aiBusy = false;
                   session.lastAiProcess = Date.now();
                   
                   if (predictions === null) return; // Frame was dropped, do not wipe previous UI boxes
                   
-                  // Emit AI results to frontend 24/7 (blue boxes)
-                  import("../core/motionEngine.js").then(({ motionEmitter }) => {
-                    motionEmitter.emit(`ai-motion-${id}`, {
-                      ts: new Date().toISOString(),
-                      predictions: predictions || []
-                    });
+                  // Emit AI results to frontend via SSE
+                  motionEmitter.emit(`ai-motion-${id}`, {
+                    ts: new Date().toISOString(),
+                    predictions: predictions || []
                   });
 
                   // If AI found objects, trigger recording/notification
