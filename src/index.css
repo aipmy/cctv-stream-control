@@ -156,14 +156,4 @@
   .animate-blink {
     animation: blink 2s ease-in-out infinite;
   }
-  .playback-sticky-header {
-    position: static;
-  }
-  @media (min-width: 1024px) {
-    .playback-sticky-header {
-      position: sticky;
-      top: 72px;
-      z-index: 10;
-    }
-  }
 }

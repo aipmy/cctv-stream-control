@@ -1359,10 +1359,12 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       {/* 2-Column Responsive Layout with Sticky Left Pane */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left Column: Sticky Player, Seekbar, and Downloader */}
-        <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin max-lg:contents">
+        <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin">
+          {/* Mobile Spacer to match the height of fixed video player */}
+          <div className="h-[56.25vw] lg:hidden w-full flex-shrink-0" />
           <Card 
             ref={playerContainerRef} 
-            className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group sticky top-14 z-20 lg:relative lg:top-auto lg:z-auto"
+            className="overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-border/40 shadow-glow group fixed top-14 left-0 right-0 z-20 rounded-none border-x-0 border-t-0 lg:relative lg:top-auto lg:left-auto lg:right-auto lg:z-auto lg:rounded-xl lg:border lg:w-auto"
           >
             {loading && (
               <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-full text-white text-[10px] font-medium z-25 shadow-lg animate-fade-in">
@@ -1659,10 +1661,10 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         </div>
 
         {/* Right Column: Scrollable Detection Events List */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto pr-1 pb-4 scrollbar-thin">
           {selectedCameraId && playbackInfo && (
-            <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card overflow-hidden">
-               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 playback-sticky-header bg-card shadow-sm">
+            <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card">
+               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 lg:sticky lg:top-0 bg-card z-10 shadow-sm">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
