@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const getClassificationBadge = (classification?: string, t?: any) => {
   if (classification === "person" || classification === "human") {
@@ -280,6 +281,28 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const hlsRef = useRef<Hls | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const autoSeekEventTsRef = useRef<string | null>(null);
+
+  const isMobile = useIsMobile();
+  const [playerHeight, setPlayerHeight] = useState(0);
+
+  useEffect(() => {
+    if (!playerContainerRef.current) return;
+    
+    const updateHeight = () => {
+      if (playerContainerRef.current) {
+        setPlayerHeight(playerContainerRef.current.getBoundingClientRect().height);
+      }
+    };
+    
+    updateHeight();
+    
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(playerContainerRef.current);
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   // Download Preview States and Refs
   const [isPreviewDownloadOpen, setIsPreviewDownloadOpen] = useState(false);
@@ -1230,7 +1253,12 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     if (!selectedCameraId || !playbackInfo) return null;
     return (
       <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card">
-         <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 lg:sticky lg:top-0 bg-card z-10 shadow-sm">
+         <div 
+           className="flex items-center justify-between px-5 py-4 border-b border-border/10 sticky bg-card z-10 shadow-sm"
+           style={{
+             top: isMobile ? `calc(56px + ${playerHeight}px)` : '0px'
+           }}
+         >
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
