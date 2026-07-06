@@ -257,33 +257,32 @@ export default function Events() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60 transition-opacity duration-500" />
                     
-                    {/* Event Type Badge */}
+                    {/* Event Type Badge (Left) */}
                     <div className="absolute top-3 left-3 flex gap-2 items-center z-5">
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider bg-slate-950/85 backdrop-blur-md border border-white/10 text-white shadow-lg">
-                        <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
-                          evt.type === "sound" ? "bg-cyan-400 shadow-[0_0_8px_#06b6d4]" : "bg-amber-400 shadow-[0_0_8px_#f59e0b]"
-                        }`} />
-                        {evt.type === "sound" 
-                          ? t("sound") 
-                          : evt.type === "motion" 
-                            ? t("motion") 
-                            : (evt.type === "person" || evt.type === "human"
-                              ? (lang === "id" ? "Orang" : "Person")
-                              : ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)
-                                ? (lang === "id" ? "Hewan" : "Pet")
-                                : evt.type)}
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider bg-slate-950/85 backdrop-blur-md border border-white/10 text-white shadow-lg">
+                        {(() => {
+                          if (evt.type === "sound") {
+                            return <>🔊 {t("sound")}</>;
+                          }
+                          if (evt.type === "person" || evt.type === "human") {
+                            return <>🚶 {lang === "id" ? "Manusia" : "Human"}</>;
+                          }
+                          if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
+                            return <>🐕 {lang === "id" ? "Hewan" : "Pet"}</>;
+                          }
+                          if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
+                            return <>🚗 {lang === "id" ? "Kendaraan" : "Vehicle"}</>;
+                          }
+                          return <>🏃 {t("motion")}</>;
+                        })()}
                       </span>
                     </div>
 
-                    {/* Motion Classification Badge */}
-                    {evt.type !== "sound" && (
+                    {/* AI Confidence Badge (Right) */}
+                    {evt.score !== undefined && evt.score !== null && (
                       <div className="absolute top-3 right-3 z-5">
-                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold bg-slate-950/85 backdrop-blur-md border border-white/10 text-white/90 shadow-lg">
-                          {(evt.type === "person" || evt.type === "human") && <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]" />}
-                          {["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type) && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />}
-                          {evt.type === "pixel" && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6]" />}
-                          {evt.type === "motion" && <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
-                          {evt.type === "person" ? (lang === "id" ? "Orang" : "Person") : evt.type === "motion" || evt.type === "pixel" ? "Gerakan" : evt.type}
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold bg-slate-950/85 backdrop-blur-md border border-white/10 text-emerald-400 shadow-lg animate-fade-in">
+                          ⚡ {evt.score}%
                         </span>
                       </div>
                     )}

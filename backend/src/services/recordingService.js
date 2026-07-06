@@ -163,6 +163,16 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
     playlistFile = standardPlaylistFile;
   }
 
+  let score = undefined;
+  if (predictions && predictions.length > 0) {
+    const matched = predictions.find(p => p.class === type || (type === "person" && p.class === "person"));
+    if (matched) {
+      score = Math.round(matched.score * 100);
+    } else {
+      score = Math.round(Math.max(...predictions.map(p => p.score || 0)) * 100);
+    }
+  }
+
   // Create Event record (optimistically assumed to be created)
   const newEvent = {
     id: eventId,
@@ -171,6 +181,7 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
     site: camera.site,
     ts: new Date().toISOString(),
     type,
+    score,
     snapshotPath: `/api/events/snapshot/${eventId}`,
     videoPath: camera.enableRecording ? `/api/events/video/${eventId}` : "",
   };

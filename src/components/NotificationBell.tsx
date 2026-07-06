@@ -13,6 +13,34 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+function formatRelativeTime(timestamp: number, lang: string) {
+  const diffMs = Date.now() - timestamp;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+
+  if (diffSec < 15) {
+    return lang === "id" ? "Baru saja" : "Just now";
+  }
+  if (diffSec < 60) {
+    return lang === "id" ? `${diffSec} detik lalu` : `${diffSec}s ago`;
+  }
+  if (diffMin < 60) {
+    return lang === "id" ? `${diffMin} menit lalu` : `${diffMin}m ago`;
+  }
+  if (diffHr < 24) {
+    return lang === "id" ? `${diffHr} jam lalu` : `${diffHr}h ago`;
+  }
+  const date = new Date(timestamp);
+  return date.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 export function NotificationBell() {
   const { data: cameras = [] } = useCamerasQuery();
   const { data: streamStatus = [] } = useQuery({
@@ -219,7 +247,7 @@ export function NotificationBell() {
                     <div className="text-[10px] text-muted-foreground mt-2">
                       <span className="font-mono">{notif.site}</span>
                       <span className="mx-1">·</span>
-                      <span className="font-mono">{new Date(notif.time).toLocaleTimeString("id-ID", { hour12: false })}</span>
+                      <span className="font-mono">{formatRelativeTime(notif.time, lang)}</span>
                     </div>
                   </div>
                   {notif.type === "warning" && notif.eventId && (
