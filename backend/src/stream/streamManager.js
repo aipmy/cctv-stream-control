@@ -410,9 +410,11 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             // session.aiBusy lock prevents worker queue buildup
             if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > 1000)) {
               session.aiBusy = true;
+              console.log(`[streamManager] Triggering AI for ${id}. Frame size: ${frame.length}`);
               
               import("../core/aiDetector.js").then(ai => {
                 ai.detectObjects(frame).then(predictions => {
+                  console.log(`[streamManager] AI returned ${predictions ? predictions.length : 'null'} predictions for ${id}`);
                   session.aiBusy = false;
                   session.lastAiProcess = Date.now();
                   

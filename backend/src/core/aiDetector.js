@@ -32,12 +32,16 @@ export async function detectObjects(jpegBuffer) {
           messageQueue.forEach(m => worker.postMessage(m));
           messageQueue = [];
         } else if (msg.type === 'result' || msg.type === 'error') {
+          console.log(`[AI Detector] Received ${msg.type} for id ${msg.id}`);
           const cb = callbacks.get(msg.id);
           if (cb) {
             callbacks.delete(msg.id);
             isWorkerBusy = callbacks.size > 0;
+            console.log(`[AI Detector] Resolving callback. isWorkerBusy=${isWorkerBusy}`);
             if (msg.type === 'result') cb.resolve(msg.predictions);
             else cb.reject(new Error(msg.error));
+          } else {
+            console.log(`[AI Detector] No callback found for id ${msg.id}`);
           }
         }
       });
@@ -130,10 +134,37 @@ if (!isMainThread) {
           }
           
           const start = Date.now();
-          const predictions = await model.detect(imageTensor, 40, 0.01);
+          
+          // Downscale tensor for performance (max 640x480)
+          let processTensor = imageTensor;
+          let scaleX = 1;
+          let scaleY = 1;
+          
+          if (frameWidth > 640 || frameHeight > 480) {
+            const scale = Math.min(640 / frameWidth, 480 / frameHeight);
+            const newWidth = Math.round(frameWidth * scale);
+            const newHeight = Math.round(frameHeight * scale);
+            processTensor = tf.image.resizeBilinear(imageTensor, [newHeight, newWidth]);
+            scaleX = frameWidth / newWidth;
+            scaleY = frameHeight / newHeight;
+          }
+          
+          const rawPredictions = await model.detect(processTensor, 40, 0.01);
           const duration = Date.now() - start;
           
+          if (processTensor !== imageTensor) processTensor.dispose();
           imageTensor.dispose();
+          
+          // Rescale boxes back to original coordinates
+          const predictions = rawPredictions.map(p => ({
+            ...p,
+            bbox: [
+              p.bbox[0] * scaleX,
+              p.bbox[1] * scaleY,
+              p.bbox[2] * scaleX,
+              p.bbox[3] * scaleY
+            ]
+          }));
 
           const formatted = predictions.map(p => ({
             class: p.class,

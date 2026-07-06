@@ -1285,7 +1285,10 @@ function UnifiedMotionEditor({
         }
 
         if (data.type === "ai-motion") {
-          if (data.predictions) aiBoxesRef.current = data.predictions;
+          if (data.predictions) {
+            console.log("Received AI predictions:", data.predictions);
+            aiBoxesRef.current = data.predictions;
+          }
           // Auto clear ai boxes after 2 seconds
           if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
           (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 10000);
