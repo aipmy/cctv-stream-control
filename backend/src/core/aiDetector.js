@@ -13,7 +13,7 @@ export async function getModel() {
   return true;
 }
 
-export async function detectObjects(jpegBuffer) {
+export async function detectObjects(jpegBuffer, threshold = 0.5) {
   if (!isMainThread) return [];
 
   // Drop frame if AI is already processing another frame (prevents queue buildup across multiple cameras)
@@ -61,7 +61,7 @@ export async function detectObjects(jpegBuffer) {
       callbacks.set(id, { resolve, reject });
       isWorkerBusy = true;
       
-      const msg = { id, buffer: jpegBuffer };
+      const msg = { id, buffer: jpegBuffer, threshold };
       if (isWorkerReady) {
         worker.postMessage(msg);
       } else {
@@ -151,7 +151,7 @@ if (!isMainThread) {
             scaleY = frameHeight / newHeight;
           }
           
-          const rawPredictions = await model.detect(processTensor, 20, 0.30);
+          const rawPredictions = await model.detect(processTensor, 20, msg.threshold || 0.5);
           const duration = Date.now() - start;
           
           if (processTensor !== imageTensor) processTensor.dispose();

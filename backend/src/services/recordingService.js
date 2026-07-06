@@ -383,7 +383,7 @@ async function processSegmentEventRecording({
                 y: Math.round(by * scaleY),
                 w: Math.round(bw * scaleX),
                 h: Math.round(bh * scaleY),
-                color: p.class === "person" ? [0, 255, 255] : [255, 165, 0] // Cyan for person, Orange for pet
+                color: p.class === "person" ? [239, 68, 68] : [16, 185, 129] // Match frontend: Red for person, Green for pet/objects
               });
             }
           } else {
@@ -410,7 +410,7 @@ async function processSegmentEventRecording({
                 ignored = true;
                 return;
               }
-              boxesToDraw = motionResult.boxes.map(b => ({ ...b, color: [255, 0, 0] })); // Red for pixel motion
+              boxesToDraw = motionResult.boxes.map(b => ({ ...b, color: [251, 191, 36] })); // Amber for pixel motion
             }
           }
 

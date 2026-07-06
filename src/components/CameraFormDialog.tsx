@@ -389,6 +389,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       excludeAreas: form.excludeAreas,
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
+      aiSensitivity: form.aiSensitivity,
       enableSoundDetection: form.enableSoundDetection,
       recordingMode: form.recordingMode ?? "continuous",
       recordMode: form.recordMode,

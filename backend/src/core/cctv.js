@@ -154,6 +154,11 @@ export function normalizeCamera(input, existing = {}) {
       : Array.isArray(existing.detectionModes)
         ? existing.detectionModes
         : ["pixel", "human", "pet"],
+    aiSensitivity: input.aiSensitivity !== undefined
+      ? Number(input.aiSensitivity)
+      : existing.aiSensitivity !== undefined
+        ? Number(existing.aiSensitivity)
+        : 50,
   };
   if (!camera.enabled) camera.status = "offline";
   camera.rtspUrl = buildSourceUrl(camera);

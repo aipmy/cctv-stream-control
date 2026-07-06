@@ -414,7 +414,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               
               
               import("../core/aiDetector.js").then(ai => {
-                ai.detectObjects(frame).then(predictions => {
+                const threshold = (camera.aiSensitivity ?? 50) / 100;
+                ai.detectObjects(frame, threshold).then(predictions => {
                   session.aiBusy = false;
                   session.lastAiProcess = Date.now();
                   

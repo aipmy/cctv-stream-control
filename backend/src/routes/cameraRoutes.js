@@ -84,7 +84,7 @@ cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, ne
     const streamFields = [
       "streamType", "hlsMode", "streamQuality", "audioMode", "sourcePath",
       "ip", "rtspPort", "rtspTransport", "sourceType", "username", "password",
-      "excludeAreas", "motionSensitivity", "motionArea", "detectionModes",
+      "excludeAreas", "motionSensitivity", "aiSensitivity", "motionArea", "detectionModes",
       "enableNotifications", "enableRecording", "detectResolution"
     ];
     const needsRestart = camera.enabled && oldCamera && streamFields.some(
