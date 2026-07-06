@@ -172,9 +172,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const [siteOpen, setSiteOpen] = useState(false);
 
   // Smart Detection preview filter toggles (now synced with form.detectionModes)
-  const [sdShowPerson, setSdShowPerson] = useState(form.detectionModes.includes("human"));
-  const [sdShowPet, setSdShowPet] = useState(form.detectionModes.includes("pet"));
-  const [sdShowMotion, setSdShowMotion] = useState(form.detectionModes.includes("pixel"));
+  const [sdShowPerson, setSdShowPerson] = useState(camera?.detectionModes?.includes("human") ?? true);
+  const [sdShowPet, setSdShowPet] = useState(camera?.detectionModes?.includes("pet") ?? true);
+  const [sdShowObject, setSdShowObject] = useState(camera?.detectionModes?.includes("object") ?? true);
+  const [sdShowMotion, setSdShowMotion] = useState(camera?.detectionModes?.includes("pixel") ?? true);
   const [sdAiSensitivity, setSdAiSensitivity] = useState(50);
   const [sdMotionSensitivity, setSdMotionSensitivity] = useState(10);
 
@@ -974,23 +975,30 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     showPixelMotion={sdShowMotion}
                     showPerson={sdShowPerson}
                     showPet={sdShowPet}
+                    showObject={sdShowObject}
                     aiSensitivity={sdAiSensitivity}
                     motionSensitivityValue={sdMotionSensitivity}
                     onShowPersonChange={(val) => {
                       setSdShowPerson(val);
-                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet", "object"]);
                       if (val) modes.add("human"); else modes.delete("human");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}
                     onShowPetChange={(val) => {
                       setSdShowPet(val);
-                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet", "object"]);
                       if (val) modes.add("pet"); else modes.delete("pet");
+                      setForm({ ...form, detectionModes: Array.from(modes) });
+                    }}
+                    onShowObjectChange={(val) => {
+                      setSdShowObject(val);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet", "object"]);
+                      if (val) modes.add("object"); else modes.delete("object");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}
                     onShowPixelMotionChange={(val) => {
                       setSdShowMotion(val);
-                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet", "object"]);
                       if (val) modes.add("pixel"); else modes.delete("pixel");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}

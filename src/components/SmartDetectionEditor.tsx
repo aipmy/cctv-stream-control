@@ -11,11 +11,14 @@ export function SmartDetectionEditor({
   showPixelMotion = true,
   showPerson = true,
   showPet = true,
+  showObject = true,
+  showPixelMotion = true,
   aiSensitivity = 50,
   motionSensitivityValue = 10,
   enableSoundDetection = false,
   onShowPersonChange,
   onShowPetChange,
+  onShowObjectChange,
   onShowPixelMotionChange,
   onAiSensitivityChange,
   onMotionSensitivityChange,
@@ -28,11 +31,13 @@ export function SmartDetectionEditor({
   showPixelMotion?: boolean;
   showPerson?: boolean;
   showPet?: boolean;
+  showObject?: boolean;
   aiSensitivity?: number;
   motionSensitivityValue?: number;
   enableSoundDetection?: boolean;
   onShowPersonChange?: (v: boolean) => void;
   onShowPetChange?: (v: boolean) => void;
+  onShowObjectChange?: (v: boolean) => void;
   onShowPixelMotionChange?: (v: boolean) => void;
   onAiSensitivityChange?: (v: number) => void;
   onMotionSensitivityChange?: (v: number) => void;
@@ -63,10 +68,12 @@ export function SmartDetectionEditor({
   // Refs for filter state (avoid re-creating draw loop on every toggle)
   const showPersonRef = useRef(showPerson);
   const showPetRef = useRef(showPet);
+  const showObjectRef = useRef(showObject);
   const showPixelMotionRef = useRef(showPixelMotion);
   const aiSensitivityRef = useRef(aiSensitivity);
   useEffect(() => { showPersonRef.current = showPerson; }, [showPerson]);
   useEffect(() => { showPetRef.current = showPet; }, [showPet]);
+  useEffect(() => { showObjectRef.current = showObject; }, [showObject]);
   useEffect(() => { showPixelMotionRef.current = showPixelMotion; }, [showPixelMotion]);
   useEffect(() => { aiSensitivityRef.current = aiSensitivity; }, [aiSensitivity]);
 
@@ -297,11 +304,21 @@ export function SmartDetectionEditor({
         for (const box of aiBoxesRef.current) {
           if (box.score < aiThreshold) continue;
 
-          const isPerson = box.class === "person";
+          let isPerson = false;
+          let isPet = false;
+          let isObj = false;
+
+          const personClasses = ["person"];
+          const petClasses = ["cat", "dog", "bird", "horse", "sheep", "cow"];
+          
+          if (personClasses.includes(box.class)) isPerson = true;
+          else if (petClasses.includes(box.class)) isPet = true;
+          else isObj = true;
 
           // Filter by checkbox
           if (isPerson && !showPersonRef.current) continue;
-          if (!isPerson && !showPetRef.current) continue;
+          if (isPet && !showPetRef.current) continue;
+          if (isObj && !showObjectRef.current) continue;
 
           filteredCount++;
 
@@ -312,9 +329,9 @@ export function SmartDetectionEditor({
           const bw = box.bbox[2] * sx;
           const bh = box.bbox[3] * sy;
 
-          const borderColor = isPerson ? "#ef4444" : "#10b981";
-          const fillColor = isPerson ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)";
-          const labelBg = isPerson ? "#ef4444" : "#10b981";
+          const borderColor = isPerson ? "#ef4444" : isPet ? "#10b981" : "#3b82f6";
+          const fillColor = isPerson ? "rgba(239, 68, 68, 0.15)" : isPet ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)";
+          const labelBg = isPerson ? "#ef4444" : isPet ? "#10b981" : "#3b82f6";
 
           ctx.strokeStyle = borderColor;
           ctx.fillStyle = fillColor;
@@ -495,32 +512,35 @@ export function SmartDetectionEditor({
       {/* ══════ Inline Filter Controls ══════ */}
       <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3 space-y-3">
         {/* Row 1: Detection type toggles */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
-            <input
-              type="checkbox"
-              checked={showPerson}
-              onChange={(e) => onShowPersonChange?.(e.target.checked)}
-              className="w-4 h-4 accent-red-500 cursor-pointer rounded"
-            />
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500" />
-              Human / Person
-            </span>
+        <div className="flex flex-wrap items-center gap-4 text-sm px-2">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <div className="relative flex items-center">
+              <input type="checkbox" checked={showPerson} onChange={(e) => onShowPersonChange?.(e.target.checked)} className="peer sr-only" />
+              <div className="h-4 w-4 rounded-sm border border-slate-700 bg-slate-900 peer-checked:bg-rose-500 peer-checked:border-rose-500"></div>
+              <svg className="absolute left-0 top-0 h-4 w-4 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+            <span className="font-medium text-slate-200">Human / Person</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
-            <input
-              type="checkbox"
-              checked={showPet}
-              onChange={(e) => onShowPetChange?.(e.target.checked)}
-              className="w-4 h-4 accent-emerald-500 cursor-pointer rounded"
-            />
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-              Pet / Object
-            </span>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <div className="relative flex items-center">
+              <input type="checkbox" checked={showPet} onChange={(e) => onShowPetChange?.(e.target.checked)} className="peer sr-only" />
+              <div className="h-4 w-4 rounded-sm border border-slate-700 bg-slate-900 peer-checked:bg-emerald-500 peer-checked:border-emerald-500"></div>
+              <svg className="absolute left-0 top-0 h-4 w-4 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+            <span className="font-medium text-slate-200">Pet</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <div className="relative flex items-center">
+              <input type="checkbox" checked={showObject} onChange={(e) => onShowObjectChange?.(e.target.checked)} className="peer sr-only" />
+              <div className="h-4 w-4 rounded-sm border border-slate-700 bg-slate-900 peer-checked:bg-blue-500 peer-checked:border-blue-500"></div>
+              <svg className="absolute left-0 top-0 h-4 w-4 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+            <span className="font-medium text-slate-200">Object</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer ml-4">
             <input
               type="checkbox"
               checked={showPixelMotion}
