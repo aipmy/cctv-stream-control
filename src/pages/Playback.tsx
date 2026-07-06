@@ -218,12 +218,9 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   return blocks;
 }
 
-  const [sidebarTab, setSidebarTab] = useState<"events" | "recordings">("events");
-
-  const formatRecTime = (ts: number) => {
-    if (!ts || isNaN(ts)) return "--:--";
+  const formatEventTime = (ts: string | number) => {
     try {
-      return new Date(ts * 1000).toLocaleTimeString("id-ID", {
+      return new Date(ts).toLocaleTimeString("id-ID", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
@@ -231,13 +228,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     } catch {
       return "--:--";
     }
-  };
-
-  const formatRecDuration = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return "0\"";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return secs > 0 ? `${mins}'${secs}"` : `${mins}'`;
   };
 
   const [playbackInfo, setPlaybackInfo] = useState<{
@@ -298,27 +288,26 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const previewHlsRef = useRef<any | null>(null);
 
-  const groupedBlocks = useMemo(() => {
-    if (!playbackInfo?.segmentMappings) return [];
-    const blocks = getRecordingBlocks(playbackInfo.segmentMappings);
-    const groups: { [hour: string]: RecordingBlock[] } = {};
+  const groupedEvents = useMemo(() => {
+    if (!events || events.length === 0) return [];
     
-    blocks.forEach((b) => {
-      const date = new Date(b.startTs * 1000);
+    const groups: { [hour: string]: SmartEvent[] } = {};
+    events.forEach((evt) => {
+      const date = new Date(evt.ts);
       const hourStr = `${String(date.getHours()).padStart(2, "0")}:00`;
       if (!groups[hourStr]) {
         groups[hourStr] = [];
       }
-      groups[hourStr].push(b);
+      groups[hourStr].push(evt);
     });
 
     return Object.keys(groups)
       .map((hour) => ({
         hour,
-        blocks: groups[hour].sort((a, b) => b.startTs - a.startTs),
+        events: groups[hour].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()),
       }))
       .sort((a, b) => b.hour.localeCompare(a.hour));
-  }, [playbackInfo?.segmentMappings]);
+  }, [events]);
 
   useEffect(() => {
     const video = previewVideoRef.current;
@@ -1556,7 +1545,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               </div>
             </Card>
           )}
-          {/* Recordings List Card */}
+          {/* Detection Events List Card */}
           {selectedCameraId && playbackInfo && (
             <Card className="p-5 border border-border/40 flex flex-col min-h-[300px]">
               <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4">
@@ -1589,69 +1578,74 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                   <h3 className="font-semibold text-xs text-muted-foreground ml-2">
-                    {lang === "id" ? "Daftar Rekaman Kontinu" : "Continuous Recordings"}
+                    {lang === "id" ? "Daftar Event Deteksi" : "Detection Events List"}
                   </h3>
                 </div>
 
                 <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
-                  {groupedBlocks.reduce((acc, curr) => acc + curr.blocks.length, 0)} Clip
+                  {events.length} {lang === "id" ? "Event" : "Events"}
                 </span>
               </div>
 
               <div className="space-y-4">
-                {groupedBlocks.length === 0 ? (
+                {groupedEvents.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center py-12">
-                    {lang === "id" ? "Tidak ada rekaman kontinu untuk tanggal ini" : "No continuous recordings for this date"}
+                    {lang === "id" ? "Tidak ada event deteksi untuk tanggal ini" : "No detection events for this date"}
                   </div>
                 ) : (
-                  groupedBlocks.map((group) => (
+                  groupedEvents.map((group) => (
                     <div key={group.hour} className="space-y-2">
                       <div className="text-xs font-bold text-muted-foreground font-mono sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-10">
                         {group.hour}
                       </div>
                       <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {group.blocks.map((block) => (
-                          <button
-                            key={block.startTs}
-                            className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
-                            onClick={() => {
-                              const video = videoRef.current;
-                              if (video && playbackInfo?.firstSegmentUnixTime) {
-                                const targetOffset = block.startTs - playbackInfo.firstSegmentUnixTime;
-                                video.currentTime = targetOffset;
-                                setCurrentPlaybackTs(block.startTs);
-                                setIsPlaying(true);
-                                video.play().catch(() => {});
-                              }
-                            }}
-                          >
-                            <img
-                              src={`${API_BASE}/api/streams/${selectedCameraId}/snapshot-at?time=${Math.floor(block.startTs)}&token=${encodeURIComponent(getApiToken() || "")}`}
-                              alt={`Segment ${formatRecTime(block.startTs)}`}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = "none";
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                            
-                            {/* Start Time */}
-                            <span className="absolute bottom-1.5 left-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
-                              {formatRecTime(block.startTs)}
-                            </span>
+                        {group.events.map((evt) => {
+                          const badge = getClassificationBadge(evt.type, t);
+                          return (
+                            <button
+                              key={evt.id}
+                              className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
+                              onClick={() => handleEventClick(evt)}
+                            >
+                              <img
+                                src={eventApi.snapshotUrl(evt.id)}
+                                alt={evt.type}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                              
+                              {/* Event Time */}
+                              <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
+                                {formatEventTime(evt.ts)}
+                              </span>
 
-                            {/* Duration */}
-                            <span className="absolute top-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-medium bg-black/75 text-slate-300 leading-none">
-                              {formatRecDuration(block.duration)}
-                            </span>
+                              {/* Classification Badge (Top Left) */}
+                              <span className={cn(
+                                "absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-semibold flex items-center gap-1 backdrop-blur-sm shadow-sm leading-none border border-white/5 text-white",
+                                badge.bgColor
+                              )}>
+                                <span>{badge.icon}</span>
+                                <span className="uppercase tracking-wider text-[7px]">{getClassificationLabel(evt.type, evt.typeDescription, t)}</span>
+                              </span>
 
-                            {/* Play Overlay */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                              <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
-                            </div>
-                          </button>
-                        ))}
+                              {/* Score (Top Right) */}
+                              {evt.score !== undefined && evt.score !== null && (
+                                <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-emerald-400 backdrop-blur-sm leading-none border border-white/5 shadow-md">
+                                  ⚡ {evt.score}%
+                                </span>
+                              )}
+
+                              {/* Play Overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                                <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))
