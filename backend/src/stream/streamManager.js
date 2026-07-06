@@ -420,15 +420,28 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   
                   if (predictions === null) return; // Frame was dropped, do not wipe previous UI boxes
                   
-                  // Emit AI results to frontend via SSE
+                  // Filter predictions by camera detection modes
+                  const modes = camera.detectionModes || ["pixel", "human", "pet"];
+                  const PERSON_CLASSES = ["person"];
+                  const PET_CLASSES = ["cat", "dog", "bird", "horse", "sheep", "cow"];
+                  const VEHICLE_CLASSES = ["car", "motorcycle", "bus", "truck", "bicycle"];
+                  
+                  const filtered = (predictions || []).filter(p => {
+                    if (modes.includes("human") && PERSON_CLASSES.includes(p.class)) return true;
+                    if (modes.includes("pet") && PET_CLASSES.includes(p.class)) return true;
+                    if (modes.includes("vehicle") && VEHICLE_CLASSES.includes(p.class)) return true;
+                    return false;
+                  });
+                  
+                  // Emit filtered AI results to frontend via SSE
                   motionEmitter.emit(`ai-motion-${id}`, {
                     ts: new Date().toISOString(),
-                    predictions: predictions || []
+                    predictions: filtered
                   });
 
-                  // If AI found objects, trigger recording/notification
-                  if (predictions && predictions.length > 0 && hasSmart) {
-                    void handleMotionDetected(camera, predictions);
+                  // If AI found matching objects, trigger recording/notification
+                  if (filtered.length > 0 && hasSmart) {
+                    void handleMotionDetected(camera, filtered);
                   }
                 }).catch(err => {
                   session.aiBusy = false;
