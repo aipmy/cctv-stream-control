@@ -28,9 +28,6 @@ const getClassificationLabel = (classification?: string, fallback?: string) => {
 
 export default function Events() {
   const user = useAuth((s) => s.user);
-  if (user && user.role !== "admin" && !user.permissions?.canViewEvents) {
-    return <Navigate to="/" replace />;
-  }
 
   const navigate = useNavigate();
   const { t, lang } = useTranslation();
@@ -155,6 +152,10 @@ export default function Events() {
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedEvents = filteredEvents.slice(startIndex, startIndex + itemsPerPage);
+
+  if (user && user.role !== "admin" && !user.permissions?.canViewEvents) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="space-y-6 max-w-7xl pb-10">

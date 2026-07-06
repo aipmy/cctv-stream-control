@@ -78,9 +78,6 @@ const getClassificationLabel = (classification?: string, fallback?: string, t?: 
 
 export default function Playback() {
   const user = useAuth((s) => s.user);
-  if (user && user.role !== "admin" && !user.permissions?.canViewPlayback) {
-    return <Navigate to="/" replace />;
-  }
 
   const { t } = useTranslation();
   
@@ -1235,6 +1232,10 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
 
     return matchKeyword && matchScore && matchTime;
   });
+
+  if (user && user.role !== "admin" && !user.permissions?.canViewPlayback) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="space-y-6 max-w-7xl pb-10 select-none">
