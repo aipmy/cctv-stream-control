@@ -1363,7 +1363,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin">
           <Card 
             ref={playerContainerRef} 
-            className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group"
+            className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group sticky top-14 z-20 lg:relative lg:top-auto lg:z-auto"
           >
             {loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 z-25 text-white text-xs gap-2">
