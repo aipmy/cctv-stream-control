@@ -11,6 +11,26 @@ import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const streamRoutes = Router();
 
+// Validate camera access by user's allowedGroups/sites
+streamRoutes.param("id", async (req, res, next, id) => {
+  try {
+    if (!config.requireAuth) return next();
+    if (req.auth?.role === "admin") return next();
+
+    const camera = await getCamera(id);
+    if (!camera) return next(); // Let downstream routes handle 404
+
+    if (Array.isArray(req.auth?.allowedGroups)) {
+      if (req.auth.allowedGroups.length > 0 && !req.auth.allowedGroups.includes(camera.site)) {
+        return res.status(403).json({ error: "Aksi tidak diizinkan untuk akun Anda" });
+      }
+    }
+    return next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ──────────────────── SSE: Real-time Motion Events ────────────────────
 streamRoutes.get("/:id/events", async (req, res) => {
   const { id } = req.params;

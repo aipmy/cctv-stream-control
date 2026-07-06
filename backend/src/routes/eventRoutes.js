@@ -22,6 +22,27 @@ import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const eventRoutes = Router();
 
+// Validate event access by user's allowedGroups/sites
+eventRoutes.param("id", async (req, res, next, id) => {
+  try {
+    if (!config.requireAuth) return next();
+    if (req.auth?.role === "admin") return next();
+
+    const events = await listEvents();
+    const event = events.find(e => e.id === id);
+    if (!event) return next(); // Let the route handle 404
+
+    if (Array.isArray(req.auth?.allowedGroups)) {
+      if (req.auth.allowedGroups.length > 0 && !req.auth.allowedGroups.includes(event.site)) {
+        return res.status(403).json({ error: "Aksi tidak diizinkan untuk akun Anda" });
+      }
+    }
+    return next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get settings
 eventRoutes.get("/settings", async (req, res, next) => {
   try {
@@ -45,7 +66,12 @@ eventRoutes.post("/settings", async (req, res, next) => {
 // List events
 eventRoutes.get("/", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
-    const events = await listEvents();
+    let events = await listEvents();
+    if (req.auth?.role !== "admin" && Array.isArray(req.auth?.allowedGroups)) {
+      if (req.auth.allowedGroups.length > 0) {
+        events = events.filter((evt) => req.auth.allowedGroups.includes(evt.site));
+      }
+    }
     res.json(events);
   } catch (err) {
     next(err);
