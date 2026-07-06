@@ -1226,6 +1226,117 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     return matchKeyword && matchScore && matchTime;
   });
 
+  const renderEventsList = () => {
+    if (!selectedCameraId || !playbackInfo) return null;
+    return (
+      <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card">
+         <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 lg:sticky lg:top-0 bg-card z-10 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() - 1);
+                setSelectedDate(d.toISOString().split("T")[0]);
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-bold tracking-tight font-mono">
+              {new Date(selectedDate).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "2-digit", day: "2-digit" })}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + 1);
+                setSelectedDate(d.toISOString().split("T")[0]);
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <h3 className="font-semibold text-xs text-muted-foreground ml-2">
+              {lang === "id" ? "Daftar Event Deteksi" : "Detection Events List"}
+            </h3>
+          </div>
+
+          <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
+            {events.length} {lang === "id" ? "Event" : "Events"}
+          </span>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {groupedEvents.length === 0 ? (
+            <div className="text-xs text-muted-foreground text-center py-12">
+              {lang === "id" ? "Tidak ada event deteksi untuk tanggal ini" : "No detection events for this date"}
+            </div>
+          ) : (
+            groupedEvents.map((group) => (
+              <div key={group.hour} className="space-y-2">
+                <div className="text-xs font-bold text-muted-foreground font-mono py-1 mb-2">
+                  {group.hour}
+                </div>
+                <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-2 xl:grid-cols-2 gap-3">
+                  {group.events.map((evt) => {
+                    const badge = getClassificationBadge(evt.type, t);
+                    return (
+                      <button
+                        key={evt.id}
+                        className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
+                        onClick={() => handleEventClick(evt)}
+                      >
+                        <img
+                          src={eventApi.snapshotUrl(evt.id)}
+                          alt={evt.type}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        
+                        {/* Event Time */}
+                        <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
+                          {formatEventTime(evt.ts)}
+                        </span>
+
+                        {/* Classification Badge (Top Left) */}
+                        <span className={cn(
+                          "absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-semibold flex items-center gap-1 backdrop-blur-sm shadow-sm leading-none border border-white/5 text-white",
+                          badge.bgColor
+                        )}>
+                          <span>{badge.icon}</span>
+                          <span className="uppercase tracking-wider text-[7px]">{getClassificationLabel(evt.type, evt.typeDescription, t)}</span>
+                        </span>
+
+                        {/* Score (Top Right) */}
+                        {evt.score !== undefined && evt.score !== null && (
+                          <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-emerald-400 backdrop-blur-sm leading-none border border-white/5 shadow-md">
+                            ⚡ {evt.score}%
+                          </span>
+                        )}
+
+                        {/* Play Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                          <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+    );
+  };
+
   if (user && user.role !== "admin" && !user.permissions?.canViewPlayback) {
     return <Navigate to="/" replace />;
   }
@@ -1360,11 +1471,9 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left Column: Sticky Player, Seekbar, and Downloader */}
         <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin">
-          {/* Mobile Spacer to match the height of fixed video player */}
-          <div className="h-[56.25vw] lg:hidden w-full flex-shrink-0" />
           <Card 
             ref={playerContainerRef} 
-            className="overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-border/40 shadow-glow group fixed top-14 left-0 right-0 z-20 rounded-none border-x-0 border-t-0 lg:relative lg:top-auto lg:left-auto lg:right-auto lg:z-auto lg:rounded-xl lg:border lg:w-auto"
+            className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group sticky top-14 z-20 lg:relative lg:top-auto lg:z-auto"
           >
             {loading && (
               <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-full text-white text-[10px] font-medium z-25 shadow-lg animate-fade-in">
@@ -1658,117 +1767,15 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               </div>
             </Card>
           )}
+          {/* Mobile Events List */}
+          <div className="lg:hidden">
+            {renderEventsList()}
+          </div>
         </div>
 
-        {/* Right Column: Scrollable Detection Events List */}
-        <div className="lg:col-span-1 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto pr-1 pb-4 scrollbar-thin">
-          {selectedCameraId && playbackInfo && (
-            <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card">
-               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 lg:sticky lg:top-0 bg-card z-10 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
-                    onClick={() => {
-                      const d = new Date(selectedDate);
-                      d.setDate(d.getDate() - 1);
-                      setSelectedDate(d.toISOString().split("T")[0]);
-                    }}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm font-bold tracking-tight font-mono">
-                    {new Date(selectedDate).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "2-digit", day: "2-digit" })}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
-                    onClick={() => {
-                      const d = new Date(selectedDate);
-                      d.setDate(d.getDate() + 1);
-                      setSelectedDate(d.toISOString().split("T")[0]);
-                    }}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <h3 className="font-semibold text-xs text-muted-foreground ml-2">
-                    {lang === "id" ? "Daftar Event Deteksi" : "Detection Events List"}
-                  </h3>
-                </div>
-
-                <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
-                  {events.length} {lang === "id" ? "Event" : "Events"}
-                </span>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {groupedEvents.length === 0 ? (
-                  <div className="text-xs text-muted-foreground text-center py-12">
-                    {lang === "id" ? "Tidak ada event deteksi untuk tanggal ini" : "No detection events for this date"}
-                  </div>
-                ) : (
-                  groupedEvents.map((group) => (
-                    <div key={group.hour} className="space-y-2">
-                      <div className="text-xs font-bold text-muted-foreground font-mono sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-10">
-                        {group.hour}
-                      </div>
-                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-2 xl:grid-cols-2 gap-3">
-                        {group.events.map((evt) => {
-                          const badge = getClassificationBadge(evt.type, t);
-                          return (
-                            <button
-                              key={evt.id}
-                              className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
-                              onClick={() => handleEventClick(evt)}
-                            >
-                              <img
-                                src={eventApi.snapshotUrl(evt.id)}
-                                alt={evt.type}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                loading="lazy"
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = "none";
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                              
-                              {/* Event Time */}
-                              <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
-                                {formatEventTime(evt.ts)}
-                              </span>
-
-                              {/* Classification Badge (Top Left) */}
-                              <span className={cn(
-                                "absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-semibold flex items-center gap-1 backdrop-blur-sm shadow-sm leading-none border border-white/5 text-white",
-                                badge.bgColor
-                              )}>
-                                <span>{badge.icon}</span>
-                                <span className="uppercase tracking-wider text-[7px]">{getClassificationLabel(evt.type, evt.typeDescription, t)}</span>
-                              </span>
-
-                              {/* Score (Top Right) */}
-                              {evt.score !== undefined && evt.score !== null && (
-                                <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-emerald-400 backdrop-blur-sm leading-none border border-white/5 shadow-md">
-                                  ⚡ {evt.score}%
-                                </span>
-                              )}
-
-                              {/* Play Overlay */}
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                                <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          )}
+        {/* Right Column: Scrollable Detection Events List (Desktop only) */}
+        <div className="max-lg:hidden lg:col-span-1 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto pr-1 pb-4 scrollbar-thin">
+          {renderEventsList()}
         </div>
       </div>
 
