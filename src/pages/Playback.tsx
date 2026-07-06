@@ -1360,7 +1360,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       {/* 2-Column Responsive Layout with Sticky Left Pane */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left Column: Sticky Player, Seekbar, and Downloader */}
-        <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin">
+        <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin max-lg:contents">
           <Card 
             ref={playerContainerRef} 
             className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group sticky top-14 z-20 lg:relative lg:top-auto lg:z-auto"
