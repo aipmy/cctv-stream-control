@@ -360,9 +360,10 @@ export default function Dashboard() {
                 </div>
               ) : (
                 events.map((evt) => {
-                  const isHuman = evt.classification === "human";
-                  const isPet = evt.classification === "pet";
-                  const isPixel = evt.classification === "pixel";
+                  const isHuman = evt.type === "person" || evt.type === "human";
+                  const isPet = ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type);
+                  const isVehicle = ["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type);
+                  const isSound = evt.type === "sound";
                   
                   return (
                     <div 
@@ -396,9 +397,11 @@ export default function Dashboard() {
                               ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]" 
                               : isPet 
                                 ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" 
-                                : isPixel 
-                                  ? "bg-blue-500 shadow-[0_0_8px_#3b82f6]" 
-                                  : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
+                                : isVehicle 
+                                  ? "bg-blue-500 shadow-[0_0_8px_#3b82f6]"
+                                  : isSound
+                                    ? "bg-cyan-500 shadow-[0_0_8px_#06b6d4]"
+                                    : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
                           )} />
                         </div>
                         <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{getEventLabel(evt)}</div>

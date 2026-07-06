@@ -20,7 +20,7 @@ import {
   PlayCircle, Calendar, Download, Eye, ShieldAlert, AlertTriangle, Loader2, 
   User, Footprints, Activity, Trash2, Play, Pause, RotateCcw, RotateCw, 
   Volume2, VolumeX, Maximize, Search, SlidersHorizontal, Info, ChevronsUpDown,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Car
 } from "lucide-react";
 import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
@@ -29,9 +29,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const getClassificationBadge = (classification?: string, t?: any) => {
   if (classification === "person" || classification === "human") {
     return {
-      icon: <User className="h-3 w-3 text-red-500" />,
+      icon: <User className="h-3 w-3 text-rose-500" />,
       label: t ? t("humanBadge") : "Manusia",
-      bgColor: "bg-red-500/10 border-red-500/20 text-red-500"
+      bgColor: "bg-rose-500/10 border-rose-500/20 text-rose-500"
     };
   }
   if (classification === "sound") {
@@ -43,22 +43,29 @@ const getClassificationBadge = (classification?: string, t?: any) => {
   }
   if (classification && ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(classification)) {
     return {
-      icon: <Footprints className="h-3 w-3 text-amber-500" />,
+      icon: <Footprints className="h-3 w-3 text-emerald-500" />,
       label: t ? t("petBadge") : "Hewan/Objek",
-      bgColor: "bg-amber-500/10 border-amber-500/20 text-amber-500"
+      bgColor: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+    };
+  }
+  if (classification && ["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(classification)) {
+    return {
+      icon: <Car className="h-3 w-3 text-blue-500" />,
+      label: t ? t("vehicleBadge") : "Kendaraan",
+      bgColor: "bg-blue-500/10 border-blue-500/20 text-blue-500"
     };
   }
   if (classification === "pixel" || classification === "motion") {
     return {
-      icon: <Activity className="h-3 w-3 text-primary" />,
+      icon: <Activity className="h-3 w-3 text-amber-500" />,
       label: t ? t("pixelBadge") : "Gerakan",
-      bgColor: "bg-primary/10 border-primary/20 text-primary"
+      bgColor: "bg-amber-500/10 border-amber-500/20 text-amber-500"
     };
   }
   return {
-    icon: <Activity className="h-3 w-3 text-primary" />,
+    icon: <Activity className="h-3 w-3 text-amber-500" />,
     label: classification || (t ? t("motionBadge") : "Gerakan"),
-    bgColor: "bg-primary/10 border-primary/20 text-primary"
+    bgColor: "bg-amber-500/10 border-amber-500/20 text-amber-500"
   };
 };
 
@@ -71,6 +78,9 @@ const getClassificationLabel = (classification?: string, fallback?: string, t?: 
   }
   if (classification && ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(classification)) {
     return t ? t("petLabel") : "Deteksi Hewan";
+  }
+  if (classification && ["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(classification)) {
+    return t ? t("vehicleLabel") : "Deteksi Kendaraan";
   }
   if (classification === "pixel" || classification === "motion") {
     return t ? t("pixelLabel") : "Gerakan (Pixel)";
@@ -954,10 +964,11 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       const evtUnix = Math.floor(new Date(evt.ts).getTime() / 1000);
       if (evtUnix >= zoomStart && evtUnix <= zoomEnd) {
         const x = ((evtUnix - zoomStart) / timeSpan) * width;
-        let color = "#3b82f6"; // default blue
+        let color = "#64748b"; // default slate-500
         if (evt.type === "person" || evt.type === "human") color = "#f43f5e"; // rose-500
         else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) color = "#10b981"; // emerald-500
         else if (evt.type === "sound") color = "#06b6d4"; // cyan-400
+        else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) color = "#3b82f6"; // blue-500
         else if (evt.type === "motion" || evt.type === "pixel") color = "#f59e0b"; // amber-500
         
         ctx.beginPath();

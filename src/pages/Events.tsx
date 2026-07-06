@@ -260,23 +260,39 @@ export default function Events() {
                     
                     {/* Event Type Badge (Left) */}
                     <div className="absolute top-3 left-3 flex gap-2 items-center z-5">
-                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider bg-slate-950/85 backdrop-blur-md border border-white/10 text-white shadow-lg">
-                        {(() => {
-                          if (evt.type === "sound") {
-                            return <>🔊 {t("sound")}</>;
-                          }
-                          if (evt.type === "person" || evt.type === "human") {
-                            return <>🚶 {lang === "id" ? "Manusia" : "Human"}</>;
-                          }
-                          if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
-                            return <>🐕 {lang === "id" ? "Hewan" : "Pet"}</>;
-                          }
-                          if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
-                            return <>🚗 {lang === "id" ? "Kendaraan" : "Vehicle"}</>;
-                          }
-                          return <>🏃 {t("motion")}</>;
-                        })()}
-                      </span>
+                      {(() => {
+                        let label = t("motion");
+                        let emoji = "🏃";
+                        let colorClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
+                        
+                        if (evt.type === "sound") {
+                          label = t("sound");
+                          emoji = "🔊";
+                          colorClass = "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
+                        } else if (evt.type === "person" || evt.type === "human") {
+                          label = lang === "id" ? "Manusia" : "Human";
+                          emoji = "🚶";
+                          colorClass = "bg-rose-500/10 border-rose-500/20 text-rose-400";
+                        } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
+                          label = lang === "id" ? "Hewan" : "Pet";
+                          emoji = "🐕";
+                          colorClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+                        } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
+                          label = lang === "id" ? "Kendaraan" : "Vehicle";
+                          emoji = "🚗";
+                          colorClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
+                        }
+                        
+                        return (
+                          <span className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider backdrop-blur-md shadow-lg border",
+                            colorClass
+                          )}>
+                            <span>{emoji}</span>
+                            <span>{label}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* AI Confidence Badge (Right) */}

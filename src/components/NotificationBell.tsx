@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { Bell, AlertCircle, ChevronRight, ShieldAlert, Volume2 } from "lucide-react";
+import { Bell, AlertCircle, ChevronRight, ShieldAlert, Volume2, Car, User, Footprints, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -154,21 +154,24 @@ export function NotificationBell() {
     events.slice(0, 10).forEach(evt => {
       let typeLabel = t("motion");
       let typeMsg = t("motion");
-      let EvtIcon = <ShieldAlert className="h-4 w-4 text-warning" />;
+      let EvtIcon = <Activity className="h-4 w-4 text-amber-500" />;
       
       if (evt.type === "sound") {
         typeLabel = t("sound");
         typeMsg = t("sound");
-        EvtIcon = <Volume2 className="h-4 w-4 text-info" />;
+        EvtIcon = <Volume2 className="h-4 w-4 text-cyan-500" />;
       } else if (evt.type === "person" || evt.type === "human") {
         typeLabel = lang === "id" ? "Orang" : "Person";
         typeMsg = typeLabel;
+        EvtIcon = <User className="h-4 w-4 text-rose-500" />;
       } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
         typeLabel = lang === "id" ? "Hewan" : "Pet";
         typeMsg = typeLabel;
+        EvtIcon = <Footprints className="h-4 w-4 text-emerald-500" />;
       } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
         typeLabel = lang === "id" ? "Kendaraan" : "Vehicle";
         typeMsg = typeLabel;
+        EvtIcon = <Car className="h-4 w-4 text-blue-500" />;
       } else if (evt.type !== "motion") {
         typeLabel = evt.type;
         typeMsg = evt.type;
