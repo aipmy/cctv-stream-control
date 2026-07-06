@@ -696,13 +696,7 @@ export function SmartDetectionEditor({
           }}
         />
 
-        {/* SSE connection indicator */}
-        <div className={cn(
-          "absolute top-2 left-2 px-2 py-0.5 rounded text-[9px] font-mono font-bold z-20 transition-all",
-          connected ? "bg-green-600/80 text-white" : "bg-red-600/80 text-white"
-        )}>
-          {connected ? "● LIVE STREAM DETECT" : "○ RECONNECTING..."}
-        </div>
+        {/* Removed overlay SSE connection indicator to avoid blocking camera timestamp */}
         {showPixelMotion && (
           <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
             Activity: {activity} blocks
@@ -719,13 +713,19 @@ export function SmartDetectionEditor({
       </div>
 
       {/* ══════ Status Bar ══════ */}
-      <div className="text-xs text-slate-400 font-mono px-1">
-        Objects: <span className="text-white font-semibold">{detectionCount}</span>
-        {" | "}
-        <span className="font-semibold">FPS: {currentFps}</span>
-        {isMotionDetected && showPixelMotion && (
-          <span className="text-red-400 font-bold animate-pulse ml-2">● MOTION DETECTED</span>
-        )}
+      <div className="text-xs text-slate-400 font-mono px-1 flex items-center justify-between">
+        <div>
+          Objects: <span className="text-white font-semibold">{detectionCount}</span>
+          {" | "}
+          <span className="font-semibold">FPS: {currentFps}</span>
+          {isMotionDetected && showPixelMotion && (
+            <span className="text-red-400 font-bold animate-pulse ml-2">● MOTION DETECTED</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <span className={cn("w-1.5 h-1.5 rounded-full", connected ? "bg-green-500" : "bg-red-500 animate-pulse")} />
+          <span>{connected ? "Connected" : "Reconnecting"}</span>
+        </div>
       </div>
 
       {/* Ignore Areas list */}
