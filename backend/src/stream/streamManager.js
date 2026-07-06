@@ -434,7 +434,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   
                   const filtered = (predictions || []).filter(p => {
                     if (modes.includes("human") && PERSON_CLASSES.includes(p.class)) return true;
-                    if (modes.includes("pet") && PET_CLASSES.includes(p.class)) return true;
+                    if (modes.includes("pet") && !PERSON_CLASSES.includes(p.class)) return true; // "Pet / Object" catches all non-human objects
                     if (modes.includes("vehicle") && VEHICLE_CLASSES.includes(p.class)) return true;
                     return false;
                   });

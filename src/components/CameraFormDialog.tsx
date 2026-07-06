@@ -978,19 +978,19 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     motionSensitivityValue={sdMotionSensitivity}
                     onShowPersonChange={(val) => {
                       setSdShowPerson(val);
-                      const modes = new Set(form.detectionModes);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
                       if (val) modes.add("human"); else modes.delete("human");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}
                     onShowPetChange={(val) => {
                       setSdShowPet(val);
-                      const modes = new Set(form.detectionModes);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
                       if (val) modes.add("pet"); else modes.delete("pet");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}
                     onShowPixelMotionChange={(val) => {
                       setSdShowMotion(val);
-                      const modes = new Set(form.detectionModes);
+                      const modes = new Set(form.detectionModes || ["pixel", "human", "pet"]);
                       if (val) modes.add("pixel"); else modes.delete("pixel");
                       setForm({ ...form, detectionModes: Array.from(modes) });
                     }}
