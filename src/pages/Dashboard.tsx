@@ -160,12 +160,12 @@ export default function Dashboard() {
 
   const getEventLabel = (evt: SmartEvent) => {
     if (evt.type === "sound") return t("sound");
-    switch (evt.classification) {
-      case "human": return "Orang Terdeteksi";
-      case "pet": return "Hewan Terdeteksi";
-      case "pixel": return "Gerakan Umum";
-      default: return evt.typeDescription || "Gerakan Terdeteksi";
-    }
+    if (evt.type === "person" || evt.type === "human") return "Orang Terdeteksi";
+    if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) return "Hewan Terdeteksi";
+    if (evt.type === "pixel") return "Gerakan Umum";
+    if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) return "Kendaraan Terdeteksi";
+    if (evt.type === "motion") return "Gerakan Terdeteksi";
+    return evt.typeDescription || evt.type || "Gerakan Terdeteksi";
   };
 
   const enabled = cameras.filter((c) => c.enabled).length;

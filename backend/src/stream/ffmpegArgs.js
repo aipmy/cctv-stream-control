@@ -32,10 +32,16 @@ export function buildRtspInputArgs(camera, options = {}) {
   return args;
 }
 
-function audioArgs(camera, audioFallback) {
-  if (camera.audioMode === "Disable") return ["-an"];
-  if (camera.audioMode === "Auto" && audioFallback) return ["-an"];
-  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2", "-af", "volume=3.0,aresample=async=1"];
+function isAudioEnabled(camera, audioFallback) {
+  if (camera.audioMode === "Disable") return false;
+  if (camera.audioMode === "Auto" && audioFallback) return false;
+  return true;
+}
+
+// Audio args untuk record output (tanpa filter_complex — pakai direct map)
+function audioArgsRecord(camera, audioFallback) {
+  if (!isAudioEnabled(camera, audioFallback)) return ["-an"];
+  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2"];
 }
 
 export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, audioFallback = false }) {
@@ -108,19 +114,25 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-i", source,
   ];
 
+  const audioEnabled = isAudioEnabled(camera, audioFallback);
+
+  // Audio filter masuk ke dalam filter_complex untuk menghindari konflik -af vs -filter_complex
+  // (FFmpeg 7+ tidak mengizinkan -af bersamaan dengan -filter_complex)
+  const audioFilterChain = audioEnabled ? ";[0:a]volume=3.0,aresample=async=1[aout]" : "";
+
   let filterComplex = "";
   if (streamMode === "transcode" && recordDir && recordMode === "transcode") {
     const streamTc = buildTranscodeArgs(streamResolution, lowLatency);
     const recordTc = buildTranscodeArgs(recordResolution, false);
-    filterComplex = `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamTc.filter}[vhlsout];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]`;
+    filterComplex = `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamTc.filter}[vhlsout];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]${audioFilterChain}`;
   } else if (streamMode === "transcode") {
     const streamTc = buildTranscodeArgs(streamResolution, lowLatency);
-    filterComplex = `[0:v:0]split=2[vhls][vdet];[vhls]${streamTc.filter}[vhlsout];[vdet]${detectFilter}[vdetout]`;
+    filterComplex = `[0:v:0]split=2[vhls][vdet];[vhls]${streamTc.filter}[vhlsout];[vdet]${detectFilter}[vdetout]${audioFilterChain}`;
   } else if (recordDir && recordMode === "transcode") {
     const recordTc = buildTranscodeArgs(recordResolution, false);
-    filterComplex = `[0:v:0]split=2[vrec][vdet];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]`;
+    filterComplex = `[0:v:0]split=2[vrec][vdet];[vrec]${recordTc.filter}[vrecout];[vdet]${detectFilter}[vdetout]${audioFilterChain}`;
   } else {
-    filterComplex = `[0:v:0]${detectFilter}[vdetout]`;
+    filterComplex = `[0:v:0]${detectFilter}[vdetout]${audioFilterChain}`;
   }
 
   args.push("-filter_complex", filterComplex);
@@ -132,9 +144,15 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   } else {
     args.push("-map", "0:v:0", "-vsync", "0", "-vcodec", "copy");
   }
-  
+
+  // Audio: gunakan [aout] dari filter_complex jika audio enabled, atau -an jika disabled
+  if (audioEnabled) {
+    args.push("-map", "[aout]", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2");
+  } else {
+    args.push("-an");
+  }
+
   args.push(
-    ...audioArgs(camera, audioFallback),
     "-f", "hls",
     "-hls_time", hlsTime,
     "-hls_list_size", lowLatency ? "20" : "15",
@@ -154,9 +172,10 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     } else {
       args.push("-map", "0:v:0", "-vsync", "0", "-vcodec", "copy");
     }
-    
+
+    // Record audio: direct map dari input (tidak perlu volume boost)
     args.push(
-      ...audioArgs(camera, audioFallback),
+      ...audioArgsRecord(camera, audioFallback),
       "-f", "hls",
       "-hls_time", "2",
       "-hls_list_size", "20",

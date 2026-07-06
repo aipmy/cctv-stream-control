@@ -45,8 +45,25 @@ export function NotificationBell() {
       if (!seenEventIds.has(evt.id)) {
         const elapsed = Date.now() - new Date(evt.ts).getTime();
         if (elapsed < 15000) {
-          const typeLabel = evt.type === "motion" ? t("motion") : t("sound");
-          const emoji = evt.type === "motion" ? "🏃" : "🔊";
+          let typeLabel = t("motion");
+          let emoji = "🏃";
+          
+          if (evt.type === "sound") {
+            typeLabel = t("sound");
+            emoji = "🔊";
+          } else if (evt.type === "person" || evt.type === "human") {
+            typeLabel = lang === "id" ? "Orang" : "Person";
+            emoji = "🧍";
+          } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
+            typeLabel = lang === "id" ? "Hewan" : "Pet";
+            emoji = "🐕";
+          } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
+            typeLabel = lang === "id" ? "Kendaraan" : "Vehicle";
+            emoji = "🚗";
+          } else if (evt.type !== "motion") {
+            typeLabel = evt.type;
+          }
+
           toast.warning(`${emoji} ${evt.cameraName} - ${typeLabel} Terdeteksi!`, {
             description: `${evt.site} · ${new Date(evt.ts).toLocaleTimeString("id-ID", { hour12: false })}`,
             action: {
@@ -104,19 +121,36 @@ export function NotificationBell() {
 
     // Add smart events to notifications (show latest 10 events)
     events.slice(0, 10).forEach(evt => {
-      const typeLabel = evt.type === "motion" ? t("motion") : t("sound");
+      let typeLabel = t("motion");
+      let typeMsg = t("motion");
+      let EvtIcon = <ShieldAlert className="h-4 w-4 text-warning" />;
+      
+      if (evt.type === "sound") {
+        typeLabel = t("sound");
+        typeMsg = t("sound");
+        EvtIcon = <Volume2 className="h-4 w-4 text-info" />;
+      } else if (evt.type === "person" || evt.type === "human") {
+        typeLabel = lang === "id" ? "Orang" : "Person";
+        typeMsg = typeLabel;
+      } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
+        typeLabel = lang === "id" ? "Hewan" : "Pet";
+        typeMsg = typeLabel;
+      } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
+        typeLabel = lang === "id" ? "Kendaraan" : "Vehicle";
+        typeMsg = typeLabel;
+      } else if (evt.type !== "motion") {
+        typeLabel = evt.type;
+        typeMsg = evt.type;
+      }
+
       items.push({
         id: `event_${evt.id}`,
         type: "warning",
         title: `${evt.cameraName} - ${typeLabel}`,
-        message: evt.type === "motion" 
-          ? `${t("motion")} terdeteksi di site ${evt.site}.` 
-          : `${t("sound")} terdeteksi di site ${evt.site}.`,
+        message: `${typeMsg} terdeteksi di site ${evt.site}.`,
         site: evt.site,
         time: new Date(evt.ts).getTime(),
-        icon: evt.type === "motion" 
-          ? <ShieldAlert className="h-4 w-4 text-warning" /> 
-          : <Volume2 className="h-4 w-4 text-info" />,
+        icon: EvtIcon,
       });
     });
 

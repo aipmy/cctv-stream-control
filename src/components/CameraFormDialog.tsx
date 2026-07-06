@@ -50,8 +50,9 @@ const empty = {
   motionSensitivity: 50,
   motionArea: null as MotionArea | null,
   excludeAreas: [] as MotionArea[],
-  detectionModes: [] as string[],
+  detectionModes: ["pixel", "human", "pet"] as string[],
   detectResolution: "480p" as Camera["detectResolution"],
+  enableSoundDetection: false,
   recordingMode: "continuous",
   recordMode: "" as Camera["recordMode"],
   recordResolution: "Auto" as Camera["recordResolution"],
@@ -165,6 +166,13 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   } | null>(null);
   const [isNewSite, setIsNewSite] = useState(false);
   const [siteOpen, setSiteOpen] = useState(false);
+
+  // Smart Detection preview filter toggles (local UI state, not persisted)
+  const [sdShowPerson, setSdShowPerson] = useState(true);
+  const [sdShowPet, setSdShowPet] = useState(true);
+  const [sdShowMotion, setSdShowMotion] = useState(true);
+  const [sdAiSensitivity, setSdAiSensitivity] = useState(50);
+  const [sdMotionSensitivity, setSdMotionSensitivity] = useState(10);
 
   const runAutoDetect = async () => {
     if (!form.ip.trim()) {
@@ -307,6 +315,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
         detectionModes: Array.isArray(camera.detectionModes) ? camera.detectionModes : ["pixel", "human", "pet"],
         detectResolution: camera.detectResolution ?? "480p",
+        enableSoundDetection: camera.enableSoundDetection ?? false,
         recordingMode: camera.recordingMode ?? "continuous",
         recordMode: camera.recordMode ?? "",
         recordResolution: camera.recordResolution ?? "Auto",
@@ -380,6 +389,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       excludeAreas: form.excludeAreas,
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
+      enableSoundDetection: form.enableSoundDetection,
       recordingMode: form.recordingMode ?? "continuous",
       recordMode: form.recordMode,
       recordResolution: form.recordResolution,
@@ -950,67 +960,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 </div>
               </div>
 
-              {/* ──── Smart Detection Modes ──── */}
-              <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
-                <div>
-                  <Label className="text-sm font-semibold">{t("smartDetectionType")}</Label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{t("smartDetectionTypeHelp")}</p>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="mode-pixel"
-                      checked={form.detectionModes?.includes("pixel")}
-                      onCheckedChange={(checked) => {
-                        const current = form.detectionModes || [];
-                        const next = checked
-                          ? [...current, "pixel"]
-                          : current.filter((m) => m !== "pixel");
-                        setForm({ ...form, detectionModes: next });
-                      }}
-                    />
-                    <label htmlFor="mode-pixel" className="text-xs font-medium leading-none cursor-pointer">
-                      {t("pixelBadge")}
-                    </label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="mode-human"
-                      checked={form.detectionModes?.includes("human")}
-                      onCheckedChange={(checked) => {
-                        const current = form.detectionModes || [];
-                        const next = checked
-                          ? [...current, "human"]
-                          : current.filter((m) => m !== "human");
-                        setForm({ ...form, detectionModes: next });
-                      }}
-                    />
-                    <label htmlFor="mode-human" className="text-xs font-medium leading-none cursor-pointer">
-                      {t("humanBadge")}
-                    </label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="mode-pet"
-                      checked={form.detectionModes?.includes("pet")}
-                      onCheckedChange={(checked) => {
-                        const current = form.detectionModes || [];
-                        const next = checked
-                          ? [...current, "pet"]
-                          : current.filter((m) => m !== "pet");
-                        setForm({ ...form, detectionModes: next });
-                      }}
-                    />
-                    <label htmlFor="mode-pet" className="text-xs font-medium leading-none cursor-pointer">
-                      {t("petBadge")}
-                    </label>
-                  </div>
-                </div>
-              </div>
-
               {/* ──── Smart Detection Live View & Masking Area ──── */}
               <div className="md:col-span-2 rounded-md border p-4 space-y-3 animate-fade-in">
                 <div>
@@ -1024,7 +973,18 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   cameraEnabled={Boolean(camera?.enabled)}
                   value={form.excludeAreas || []}
                   onChange={(areas) => setForm({ ...form, excludeAreas: areas })}
-                  showPixelMotion={form.detectionModes?.includes("pixel") ?? false}
+                  showPixelMotion={sdShowMotion}
+                  showPerson={sdShowPerson}
+                  showPet={sdShowPet}
+                  aiSensitivity={sdAiSensitivity}
+                  motionSensitivityValue={sdMotionSensitivity}
+                  onShowPersonChange={setSdShowPerson}
+                  onShowPetChange={setSdShowPet}
+                  onShowPixelMotionChange={setSdShowMotion}
+                  onAiSensitivityChange={setSdAiSensitivity}
+                  onMotionSensitivityChange={setSdMotionSensitivity}
+                  enableSoundDetection={form.enableSoundDetection}
+                  onEnableSoundDetectionChange={(val) => setForm({ ...form, enableSoundDetection: val })}
                 />
               </div>
             </>
@@ -1225,12 +1185,34 @@ function UnifiedMotionEditor({
   value,
   onChange,
   showPixelMotion = true,
+  showPerson = true,
+  showPet = true,
+  aiSensitivity = 50,
+  motionSensitivityValue = 10,
+  enableSoundDetection = false,
+  onShowPersonChange,
+  onShowPetChange,
+  onShowPixelMotionChange,
+  onAiSensitivityChange,
+  onMotionSensitivityChange,
+  onEnableSoundDetectionChange,
 }: {
   cameraId: string;
   cameraEnabled: boolean;
   value: MotionArea[];
   onChange: (areas: MotionArea[]) => void;
   showPixelMotion?: boolean;
+  showPerson?: boolean;
+  showPet?: boolean;
+  aiSensitivity?: number;
+  motionSensitivityValue?: number;
+  enableSoundDetection?: boolean;
+  onShowPersonChange?: (v: boolean) => void;
+  onShowPetChange?: (v: boolean) => void;
+  onShowPixelMotionChange?: (v: boolean) => void;
+  onAiSensitivityChange?: (v: number) => void;
+  onMotionSensitivityChange?: (v: number) => void;
+  onEnableSoundDetectionChange?: (v: boolean) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -1244,10 +1226,25 @@ function UnifiedMotionEditor({
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
   const [isHoveringZone, setIsHoveringZone] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [isMotionDetected, setIsMotionDetected] = useState(false);
+  const [detectionCount, setDetectionCount] = useState(0);
+  const [currentFps, setCurrentFps] = useState(0);
 
   const boxesRef = useRef<Array<{ x: number; y: number; w: number; h: number; blocks?: number }>>([]);
   const aiBoxesRef = useRef<Array<{ class: string; score: number; bbox: number[]; frameWidth: number; frameHeight: number }>>([]);
   const frameDims = useRef({ width: 640, height: 480 });
+  const frameCountRef = useRef(0);
+  const lastFpsTimeRef = useRef(Date.now());
+
+  // Refs for filter state (avoid re-creating draw loop on every toggle)
+  const showPersonRef = useRef(showPerson);
+  const showPetRef = useRef(showPet);
+  const showPixelMotionRef = useRef(showPixelMotion);
+  const aiSensitivityRef = useRef(aiSensitivity);
+  useEffect(() => { showPersonRef.current = showPerson; }, [showPerson]);
+  useEffect(() => { showPetRef.current = showPet; }, [showPet]);
+  useEffect(() => { showPixelMotionRef.current = showPixelMotion; }, [showPixelMotion]);
+  useEffect(() => { aiSensitivityRef.current = aiSensitivity; }, [aiSensitivity]);
 
   // Build MJPEG src URL
   const mjpegSrc = useMemo(() => {
@@ -1277,6 +1274,16 @@ function UnifiedMotionEditor({
       try {
         const data = JSON.parse(evt.data);
         if (data.connected) return;
+
+        // FPS calculation
+        frameCountRef.current++;
+        const now = Date.now();
+        if (now - lastFpsTimeRef.current >= 1000) {
+          setCurrentFps(Math.round((frameCountRef.current * 1000) / (now - lastFpsTimeRef.current)));
+          frameCountRef.current = 0;
+          lastFpsTimeRef.current = now;
+        }
+
         if (data.type === "ai-motion") {
           if (data.predictions) aiBoxesRef.current = data.predictions;
           // Auto clear ai boxes after 2 seconds
@@ -1287,6 +1294,7 @@ function UnifiedMotionEditor({
         if (data.boxes) boxesRef.current = data.boxes;
         if (data.frame) frameDims.current = data.frame;
         if (data.activity != null) setActivity(data.activity);
+        if (data.motion != null) setIsMotionDetected(data.motion);
       } catch { /* ignore */ }
     };
     es.onerror = () => setConnected(false);
@@ -1326,7 +1334,7 @@ function UnifiedMotionEditor({
 
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Draw existing exclusion zones (Red)
+      // 1. Draw existing exclusion zones (Red dashed)
       const activeAreas = value || [];
       activeAreas.forEach((zone, idx) => {
         if (zone.enabled === false) return;
@@ -1343,7 +1351,6 @@ function UnifiedMotionEditor({
           ctx.fill();
           ctx.stroke();
 
-          // Draw a small DELETE label
           ctx.fillStyle = "#ff8888";
           ctx.font = "bold 9px monospace";
           ctx.fillText(`MASK ${idx + 1}`, zone.points[0].x * w + 5, zone.points[0].y * h + 12);
@@ -1391,7 +1398,7 @@ function UnifiedMotionEditor({
           ctx.fill();
         }
 
-        // Highlight first point if hover is close (close indicator)
+        // Highlight first point if hover is close
         if (polyPoints.length >= 3 && hoverPoint) {
           const first = polyPoints[0];
           const dx = hoverPoint.x - first.x;
@@ -1418,20 +1425,20 @@ function UnifiedMotionEditor({
         const rh = Math.abs(rectStart.y - rectCurrent.y) * h;
         ctx.fillRect(rx, ry, rw, rh);
         ctx.strokeRect(rx, ry, rw, rh);
-        ctx.setLineDash([]); // Reset dash
+        ctx.setLineDash([]);
       }
 
-      // 4. Draw real-time motion bounding boxes (Green)
-      if (showPixelMotion && boxesRef.current.length > 0) {
+      // ──── 4. Motion pixel bounding boxes (Green — like reference) ────
+      if (showPixelMotionRef.current && boxesRef.current.length > 0) {
         const fw = frameDims.current.width || 640;
         const fh = frameDims.current.height || 480;
         const sx = w / fw;
         const sy = h / fh;
 
-        ctx.strokeStyle = "rgba(34, 197, 94, 0.98)";
-        ctx.fillStyle = "rgba(34, 197, 94, 0.15)";
-        ctx.lineWidth = 2;
-        ctx.font = "bold 10px monospace";
+        ctx.strokeStyle = "rgba(16, 185, 129, 0.95)";
+        ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
+        ctx.lineWidth = 3;
+        ctx.font = "bold 12px sans-serif";
         for (const box of boxesRef.current) {
           const bx = box.x * sx;
           const by = box.y * sy;
@@ -1440,51 +1447,102 @@ function UnifiedMotionEditor({
           ctx.strokeRect(bx, by, bw, bh);
           ctx.fillRect(bx, by, bw, bh);
 
-          ctx.fillStyle = "rgba(22, 163, 74, 0.9)";
-          const labelWidth = Math.max(70, String(box.blocks || "").length * 6 + 45);
-          ctx.fillRect(bx, Math.max(0, by - 16), labelWidth, 16);
+          // Label
+          const labelText = `motion`;
+          const textMetrics = ctx.measureText(labelText);
+          const labelW = textMetrics.width + 12;
+          ctx.fillStyle = "#10b981";
+          ctx.fillRect(bx - 1.5, Math.max(0, by - 22), labelW, 20);
           ctx.fillStyle = "#ffffff";
-          ctx.fillText(`motion ${box.blocks || ""}`, bx + 4, Math.max(12, by - 4));
-          ctx.fillStyle = "rgba(34, 197, 94, 0.15)"; // restore fill
+          ctx.fillText(labelText, bx + 4, Math.max(14, by - 6));
+          ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
         }
       }
 
-      // 5. Draw AI bounding boxes
+      // ──── 5. AI bounding boxes (Person=Red, Pet/Object=Green — like reference) ────
+      const aiThreshold = (aiSensitivityRef.current || 50) / 100;
+      let filteredCount = 0;
+
       if (aiBoxesRef.current.length > 0) {
-        ctx.lineWidth = 2;
-        ctx.font = "bold 11px monospace";
+        ctx.lineWidth = 3;
+        ctx.font = "bold 14px sans-serif";
+
         for (const box of aiBoxesRef.current) {
+          if (box.score < aiThreshold) continue;
+
+          const isPerson = box.class === "person";
+
+          // Filter by checkbox
+          if (isPerson && !showPersonRef.current) continue;
+          if (!isPerson && !showPetRef.current) continue;
+
+          filteredCount++;
+
           const sx = w / box.frameWidth;
           const sy = h / box.frameHeight;
           const bx = box.bbox[0] * sx;
           const by = box.bbox[1] * sy;
           const bw = box.bbox[2] * sx;
           const bh = box.bbox[3] * sy;
-          
-          const isPerson = box.class === "person";
-          const colorHex = isPerson ? "#06b6d4" : "#f59e0b"; // Cyan or Amber
-          const colorFill = isPerson ? "rgba(6, 182, 212, 0.15)" : "rgba(245, 158, 11, 0.15)";
-          
-          ctx.strokeStyle = colorHex;
-          ctx.fillStyle = colorFill;
+
+          // Person = Red (like reference), Pet/Object = Green (like reference)
+          const borderColor = isPerson ? "#ef4444" : "#10b981";
+          const fillColor = isPerson ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)";
+          const labelBg = isPerson ? "#ef4444" : "#10b981";
+
+          ctx.strokeStyle = borderColor;
+          ctx.fillStyle = fillColor;
           ctx.strokeRect(bx, by, bw, bh);
           ctx.fillRect(bx, by, bw, bh);
 
-          ctx.fillStyle = colorHex;
-          const labelText = `${box.class} ${Math.round(box.score * 100)}%`;
-          const labelWidth = labelText.length * 7 + 10;
-          ctx.fillRect(bx, Math.max(0, by - 18), labelWidth, 18);
+          // Label box
+          const labelText = `${box.class} (${Math.round(box.score * 100)}%)`;
+          const textMetrics = ctx.measureText(labelText);
+          const labelW = textMetrics.width + 16;
+          const labelH = 22;
+          const labelY = Math.max(0, by - labelH - 2);
+
+          ctx.fillStyle = labelBg;
+          // Rounded label background
+          const radius = 4;
+          ctx.beginPath();
+          ctx.moveTo(bx - 1.5 + radius, labelY);
+          ctx.lineTo(bx - 1.5 + labelW - radius, labelY);
+          ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY, bx - 1.5 + labelW, labelY + radius);
+          ctx.lineTo(bx - 1.5 + labelW, labelY + labelH - radius);
+          ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY + labelH, bx - 1.5 + labelW - radius, labelY + labelH);
+          ctx.lineTo(bx - 1.5 + radius, labelY + labelH);
+          ctx.quadraticCurveTo(bx - 1.5, labelY + labelH, bx - 1.5, labelY + labelH - radius);
+          ctx.lineTo(bx - 1.5, labelY + radius);
+          ctx.quadraticCurveTo(bx - 1.5, labelY, bx - 1.5 + radius, labelY);
+          ctx.closePath();
+          ctx.fill();
+
           ctx.fillStyle = "#ffffff";
-          ctx.fillText(labelText, bx + 4, Math.max(12, by - 5));
+          ctx.font = "bold 14px sans-serif";
+          ctx.fillText(labelText, bx + 5, labelY + 16);
         }
+      }
+
+      // Update detection count for status bar
+      if (filteredCount !== detectionCount) {
+        // We can't call setState in rAF efficiently, so we use a ref trick
+        (window as any).__detCount = filteredCount;
       }
 
       raf = requestAnimationFrame(draw);
     };
 
     draw();
-    return () => cancelAnimationFrame(raf);
-  }, [value, mode, polyPoints, hoverPoint, isDrawingRect, rectStart, rectCurrent]);
+
+    // Poll detection count from rAF
+    const countInterval = setInterval(() => {
+      const c = (window as any).__detCount;
+      if (c !== undefined) setDetectionCount(c);
+    }, 500);
+
+    return () => { cancelAnimationFrame(raf); clearInterval(countInterval); };
+  }, [value, mode, polyPoints, hoverPoint, isDrawingRect, rectStart, rectCurrent, detectionCount]);
 
   if (!cameraId || !cameraEnabled) {
     return (
@@ -1524,7 +1582,6 @@ function UnifiedMotionEditor({
     onChange(value.filter((_, i) => i !== index));
   };
 
-  // Mouse handlers for drawing rect
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (mode !== "rect") return;
     const coords = getRelativeCoords(e);
@@ -1544,20 +1601,13 @@ function UnifiedMotionEditor({
       setHoverPoint(coords);
     }
 
-    // Hover detection for existing zones
     if (mode === "none" || (mode === "polygon" && polyPoints.length === 0)) {
       let hovering = false;
       for (const zone of value) {
         if (zone.type === "polygon" && zone.points) {
-          if (isPointInPolygon(coords, zone.points)) {
-            hovering = true;
-            break;
-          }
+          if (isPointInPolygon(coords, zone.points)) { hovering = true; break; }
         } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
-          if (coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h) {
-            hovering = true;
-            break;
-          }
+          if (coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h) { hovering = true; break; }
         }
       }
       setIsHoveringZone(hovering);
@@ -1571,14 +1621,12 @@ function UnifiedMotionEditor({
     setIsDrawingRect(false);
     const coords = getRelativeCoords(e);
     if (!coords) return;
-
     const x = Math.min(rectStart.x, coords.x);
     const y = Math.min(rectStart.y, coords.y);
-    const w = Math.max(0.01, Math.abs(rectStart.x - coords.x));
-    const h = Math.max(0.01, Math.abs(rectStart.y - coords.y));
-
-    if (w > 0.02 && h > 0.02) {
-      onChange([...value, { type: "rect", x, y, w, h, enabled: true, name: `Mask Kotak ${value.length + 1}` }]);
+    const mw = Math.max(0.01, Math.abs(rectStart.x - coords.x));
+    const mh = Math.max(0.01, Math.abs(rectStart.y - coords.y));
+    if (mw > 0.02 && mh > 0.02) {
+      onChange([...value, { type: "rect", x, y, w: mw, h: mh, enabled: true, name: `Mask Kotak ${value.length + 1}` }]);
     }
   };
 
@@ -1592,44 +1640,123 @@ function UnifiedMotionEditor({
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getRelativeCoords(e);
     if (!coords) return;
-
     if (mode === "polygon") {
-      // Check if clicking near first point to close
       if (polyPoints.length >= 3) {
         const first = polyPoints[0];
         const dx = coords.x - first.x;
         const dy = coords.y - first.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 0.03) {
-          finishPolygon();
-          return;
-        }
+        if (Math.sqrt(dx * dx + dy * dy) < 0.03) { finishPolygon(); return; }
       }
       setPolyPoints((prev) => [...prev, coords]);
     } else if (mode === "none" || (mode === "rect" && !isDrawingRect)) {
-      // Check if clicking existing zone to delete
       for (let i = value.length - 1; i >= 0; i--) {
         const zone = value[i];
         let hit = false;
-        if (zone.type === "polygon" && zone.points) {
-          hit = isPointInPolygon(coords, zone.points);
-        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+        if (zone.type === "polygon" && zone.points) { hit = isPointInPolygon(coords, zone.points); }
+        else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
           hit = coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h;
         }
-        if (hit) {
-          removeArea(i);
-          return;
-        }
+        if (hit) { removeArea(i); return; }
       }
     }
   };
 
-  const undoPoint = () => {
-    setPolyPoints((prev) => prev.slice(0, -1));
-  };
+  const undoPoint = () => { setPolyPoints((prev) => prev.slice(0, -1)); };
+
+  // Motion sensitivity label
+  const motionSensLabel = motionSensitivityValue < 15 ? "Very High" : motionSensitivityValue < 25 ? "High" : motionSensitivityValue < 35 ? "Medium" : "Low";
 
   return (
     <div className="space-y-3">
-      {/* Drawing Toolbar */}
+      {/* ══════ Inline Filter Controls (like reference project) ══════ */}
+      <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3 space-y-3">
+        {/* Row 1: Detection type toggles */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
+            <input
+              type="checkbox"
+              checked={showPerson}
+              onChange={(e) => onShowPersonChange?.(e.target.checked)}
+              className="w-4 h-4 accent-red-500 cursor-pointer rounded"
+            />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500" />
+              Human / Person
+            </span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
+            <input
+              type="checkbox"
+              checked={showPet}
+              onChange={(e) => onShowPetChange?.(e.target.checked)}
+              className="w-4 h-4 accent-emerald-500 cursor-pointer rounded"
+            />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+              Pet / Object
+            </span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200">
+            <input
+              type="checkbox"
+              checked={showPixelMotion}
+              onChange={(e) => onShowPixelMotionChange?.(e.target.checked)}
+              className="w-4 h-4 accent-amber-500 cursor-pointer rounded"
+            />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" />
+              Image Change (Motion)
+            </span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-200 ml-4">
+            <input
+              type="checkbox"
+              checked={enableSoundDetection}
+              onChange={(e) => onEnableSoundDetectionChange?.(e.target.checked)}
+              className="w-4 h-4 accent-indigo-500 cursor-pointer rounded"
+            />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-indigo-500" />
+              Sound Detection
+            </span>
+          </label>
+        </div>
+
+        <hr className="border-slate-700/40" />
+
+        {/* Row 2: Sensitivity controls */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <label htmlFor="ai-sens-select" className="font-medium whitespace-nowrap">AI Sensitivity:</label>
+            <select
+              id="ai-sens-select"
+              value={aiSensitivity}
+              onChange={(e) => onAiSensitivityChange?.(Number(e.target.value))}
+              className="px-2 py-1 rounded bg-slate-800 text-white border border-slate-600 outline-none text-xs cursor-pointer"
+            >
+              <option value={30}>Low (30%)</option>
+              <option value={50}>Medium (50%)</option>
+              <option value={70}>High (70%)</option>
+              <option value={90}>Very High (90%)</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <label htmlFor="motion-sens-slider" className="font-medium whitespace-nowrap">Motion Sensitivity:</label>
+            <input
+              id="motion-sens-slider"
+              type="range"
+              min={1}
+              max={50}
+              value={motionSensitivityValue}
+              onChange={(e) => onMotionSensitivityChange?.(Number(e.target.value))}
+              className="w-24 accent-amber-500 cursor-pointer"
+            />
+            <span className="text-amber-400 font-semibold min-w-[60px]">{motionSensLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════ Drawing Toolbar ══════ */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -1648,9 +1775,7 @@ function UnifiedMotionEditor({
           type="button"
           variant={mode === "rect" ? "default" : "outline"}
           size="sm"
-          onClick={() => {
-            setMode(mode === "rect" ? "none" : "rect");
-          }}
+          onClick={() => { setMode(mode === "rect" ? "none" : "rect"); }}
           className="text-[11px] h-7"
         >
           ▭ Gambar Kotak
@@ -1691,7 +1816,7 @@ function UnifiedMotionEditor({
         )}
       </div>
 
-      {/* Editor & Live Preview Stage */}
+      {/* ══════ Editor & Live Preview Stage ══════ */}
       <div className="relative w-full aspect-video border bg-slate-950 rounded-lg overflow-hidden border-slate-800 select-none">
         <img
           ref={imgRef}
@@ -1741,6 +1866,16 @@ function UnifiedMotionEditor({
               ? "💡 Klik pada video untuk menambah titik. Klik lingkaran titik awal (pertama) untuk menyimpan polygon mask."
               : "💡 Klik dan seret mouse pada video untuk menggambar kotak mask."}
           </div>
+        )}
+      </div>
+
+      {/* ══════ Status Bar (like reference) ══════ */}
+      <div className="text-xs text-slate-400 font-mono px-1">
+        Objects: <span className="text-white font-semibold">{detectionCount}</span>
+        {" | "}
+        <span className="font-semibold">FPS: {currentFps}</span>
+        {isMotionDetected && showPixelMotion && (
+          <span className="text-red-400 font-bold animate-pulse ml-2">● MOTION DETECTED</span>
         )}
       </div>
 

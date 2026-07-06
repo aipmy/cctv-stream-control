@@ -24,45 +24,55 @@ import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
 
 const getClassificationBadge = (classification?: string, t?: any) => {
-  switch (classification) {
-    case "human":
-      return {
-        icon: <User className="h-3 w-3 text-red-500" />,
-        label: t ? t("humanBadge") : "Manusia",
-        bgColor: "bg-red-500/10 border-red-500/20 text-red-500"
-      };
-    case "pet":
-      return {
-        icon: <Footprints className="h-3 w-3 text-amber-500" />,
-        label: t ? t("petBadge") : "Hewan/Objek",
-        bgColor: "bg-amber-500/10 border-amber-500/20 text-amber-500"
-      };
-    case "pixel":
-      return {
-        icon: <Activity className="h-3 w-3 text-primary" />,
-        label: t ? t("pixelBadge") : "Perubahan Gambar",
-        bgColor: "bg-primary/10 border-primary/20 text-primary"
-      };
-    default:
-      return {
-        icon: <Activity className="h-3 w-3 text-primary" />,
-        label: t ? t("motionBadge") : "Gerakan",
-        bgColor: "bg-primary/10 border-primary/20 text-primary"
-      };
+  if (classification === "person" || classification === "human") {
+    return {
+      icon: <User className="h-3 w-3 text-red-500" />,
+      label: t ? t("humanBadge") : "Manusia",
+      bgColor: "bg-red-500/10 border-red-500/20 text-red-500"
+    };
   }
+  if (classification === "sound") {
+    return {
+      icon: <Volume2 className="h-3 w-3 text-cyan-500" />,
+      label: t ? t("sound") : "Suara",
+      bgColor: "bg-cyan-500/10 border-cyan-500/20 text-cyan-500"
+    };
+  }
+  if (classification && ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(classification)) {
+    return {
+      icon: <Footprints className="h-3 w-3 text-amber-500" />,
+      label: t ? t("petBadge") : "Hewan/Objek",
+      bgColor: "bg-amber-500/10 border-amber-500/20 text-amber-500"
+    };
+  }
+  if (classification === "pixel" || classification === "motion") {
+    return {
+      icon: <Activity className="h-3 w-3 text-primary" />,
+      label: t ? t("pixelBadge") : "Gerakan",
+      bgColor: "bg-primary/10 border-primary/20 text-primary"
+    };
+  }
+  return {
+    icon: <Activity className="h-3 w-3 text-primary" />,
+    label: classification || (t ? t("motionBadge") : "Gerakan"),
+    bgColor: "bg-primary/10 border-primary/20 text-primary"
+  };
 };
 
 const getClassificationLabel = (classification?: string, fallback?: string, t?: any) => {
-  switch (classification) {
-    case "human":
-      return t ? t("humanLabel") : "Deteksi Manusia";
-    case "pet":
-      return t ? t("petLabel") : "Deteksi Hewan";
-    case "pixel":
-      return t ? t("pixelLabel") : "Perubahan Gambar";
-    default:
-      return fallback || (t ? t("motionLabel") : "Deteksi Gerakan");
+  if (classification === "person" || classification === "human") {
+    return t ? t("humanLabel") : "Deteksi Manusia";
   }
+  if (classification === "sound") {
+    return t ? t("sound") : "Deteksi Suara";
+  }
+  if (classification && ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(classification)) {
+    return t ? t("petLabel") : "Deteksi Hewan";
+  }
+  if (classification === "pixel" || classification === "motion") {
+    return t ? t("pixelLabel") : "Gerakan (Pixel)";
+  }
+  return fallback || classification || (t ? t("motionLabel") : "Deteksi Gerakan");
 };
 
 export default function Playback() {
@@ -325,7 +335,8 @@ export default function Playback() {
           const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
           return (
             e.cameraId === selectedCameraId &&
-            e.type === "motion" &&
+            e.cameraId === selectedCameraId &&
+            e.type !== "sound" &&
             eventLocalDate === selectedDate
           );
         });
@@ -360,7 +371,7 @@ export default function Playback() {
       setLoading(true);
       eventApi.list()
         .then((allEvents) => {
-          const filtered = allEvents.filter((e) => e.type === "motion");
+          const filtered = allEvents.filter((e) => e.type !== "sound");
           filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
           setEvents(filtered);
         })
@@ -847,7 +858,13 @@ export default function Playback() {
       const evtUnix = Math.floor(new Date(evt.ts).getTime() / 1000);
       if (evtUnix >= zoomStart && evtUnix <= zoomEnd) {
         const x = ((evtUnix - zoomStart) / timeSpan) * width;
-        ctx.fillStyle = evt.classification === "human" ? "#ef4444" : "#f59e0b"; // red vs amber
+        let color = "#3b82f6"; // default blue
+        if (evt.type === "person" || evt.type === "human") color = "#f43f5e"; // rose-500
+        else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) color = "#10b981"; // emerald-500
+        else if (evt.type === "sound") color = "#06b6d4"; // cyan-400
+        else if (evt.type === "motion" || evt.type === "pixel") color = "#f59e0b"; // amber-500
+        
+        ctx.fillStyle = color;
         ctx.fillRect(x - 1, 0, 2, height - 16);
       }
     }
@@ -1115,7 +1132,7 @@ export default function Playback() {
   const filteredEvents = events.filter((evt) => {
     // 1. Keyword filter
     const keyword = searchKeyword.toLowerCase();
-    const label = getClassificationLabel(evt.classification, evt.typeDescription, t).toLowerCase();
+    const label = getClassificationLabel(evt.type, evt.typeDescription, t).toLowerCase();
     const matchKeyword = !searchKeyword || label.includes(keyword) || evt.id.toLowerCase().includes(keyword);
 
     // 2. Score threshold filter
@@ -1650,10 +1667,10 @@ export default function Playback() {
                   </div>
                 ) : (
                   filteredEvents.map((evt) => {
-                    const badge = getClassificationBadge(evt.classification, t);
-                    const isHuman = evt.classification === "human";
-                    const isPet = evt.classification === "pet";
-                    const isPixel = evt.classification === "pixel";
+                    const badge = getClassificationBadge(evt.type, t);
+                    const isHuman = evt.type === "human" || evt.type === "person";
+                    const isPet = ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type);
+                    const isPixel = evt.type === "pixel";
                     
                     return (
                       <div
@@ -1708,7 +1725,7 @@ export default function Playback() {
                               <div className="text-[10px] text-muted-foreground dark:text-slate-400 flex flex-col gap-0.5 font-mono">
                                 <span>{t("startLabel")} {new Date(new Date(evt.ts).getTime() - 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
                                 <span className="text-[11px] font-bold text-foreground dark:text-slate-200 font-sans mt-0.5">
-                                  {getClassificationLabel(evt.classification, evt.typeDescription, t)}
+                                  {getClassificationLabel(evt.type, evt.typeDescription, t)}
                                 </span>
                                 <span>{t("untilLabel")} {new Date(new Date(evt.ts).getTime() + 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
                               </div>

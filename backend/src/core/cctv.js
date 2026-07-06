@@ -90,6 +90,7 @@ export function normalizeCamera(input, existing = {}) {
     enablePTZ: Boolean(input.enablePTZ ?? existing.enablePTZ ?? false),
     enableRecording: Boolean(input.enableRecording ?? existing.enableRecording ?? false),
     enableNotifications: Boolean(input.enableNotifications ?? existing.enableNotifications ?? false),
+    enableSoundDetection: Boolean(input.enableSoundDetection ?? existing.enableSoundDetection ?? false),
     motionSensitivity: input.motionSensitivity !== undefined
       ? (isNaN(input.motionSensitivity) ? (String(input.motionSensitivity).toLowerCase() === "high" ? 80 : String(input.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(input.motionSensitivity))
       : (existing.motionSensitivity !== undefined ? (isNaN(existing.motionSensitivity) ? (String(existing.motionSensitivity).toLowerCase() === "high" ? 80 : String(existing.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(existing.motionSensitivity)) : 50),

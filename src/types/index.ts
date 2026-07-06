@@ -96,7 +96,7 @@ export interface SmartEvent {
   cameraName: string;
   site: string;
   ts: string; // ISO
-  type: "motion" | "sound";
+  type: string;
   snapshotPath: string; // File name or relative URL path
   videoPath: string; // File name or relative URL path
   typeDescription?: string;
