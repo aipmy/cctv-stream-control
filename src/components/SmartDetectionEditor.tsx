@@ -12,7 +12,6 @@ export function SmartDetectionEditor({
   showPerson = true,
   showPet = true,
   showObject = true,
-  showPixelMotion = true,
   aiSensitivity = 50,
   motionSensitivityValue = 10,
   enableSoundDetection = false,
