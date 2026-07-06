@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import { 
   PlayCircle, Calendar, Download, Eye, ShieldAlert, AlertTriangle, Loader2, 
   User, Footprints, Activity, Trash2, Play, Pause, RotateCcw, RotateCw, 
-  Volume2, VolumeX, Maximize, Search, SlidersHorizontal, Info, ChevronsUpDown
+  Volume2, VolumeX, Maximize, Search, SlidersHorizontal, Info, ChevronsUpDown,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
@@ -1555,9 +1556,112 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               </div>
             </Card>
           )}
+          {/* Recordings List Card */}
+          {selectedCameraId && playbackInfo && (
+            <Card className="p-5 border border-border/40 flex flex-col min-h-[300px]">
+              <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
+                    onClick={() => {
+                      const d = new Date(selectedDate);
+                      d.setDate(d.getDate() - 1);
+                      setSelectedDate(d.toISOString().split("T")[0]);
+                    }}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-bold tracking-tight font-mono">
+                    {new Date(selectedDate).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "2-digit", day: "2-digit" })}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 rounded-md border-border/40 hover:bg-muted"
+                    onClick={() => {
+                      const d = new Date(selectedDate);
+                      d.setDate(d.getDate() + 1);
+                      setSelectedDate(d.toISOString().split("T")[0]);
+                    }}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <h3 className="font-semibold text-xs text-muted-foreground ml-2">
+                    {lang === "id" ? "Daftar Rekaman Kontinu" : "Continuous Recordings"}
+                  </h3>
+                </div>
+
+                <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
+                  {groupedBlocks.reduce((acc, curr) => acc + curr.blocks.length, 0)} Clip
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                {groupedBlocks.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-12">
+                    {lang === "id" ? "Tidak ada rekaman kontinu untuk tanggal ini" : "No continuous recordings for this date"}
+                  </div>
+                ) : (
+                  groupedBlocks.map((group) => (
+                    <div key={group.hour} className="space-y-2">
+                      <div className="text-xs font-bold text-muted-foreground font-mono sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-10">
+                        {group.hour}
+                      </div>
+                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {group.blocks.map((block) => (
+                          <button
+                            key={block.startTs}
+                            className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
+                            onClick={() => {
+                              const video = videoRef.current;
+                              if (video && playbackInfo?.firstSegmentUnixTime) {
+                                const targetOffset = block.startTs - playbackInfo.firstSegmentUnixTime;
+                                video.currentTime = targetOffset;
+                                setCurrentPlaybackTs(block.startTs);
+                                setIsPlaying(true);
+                                video.play().catch(() => {});
+                              }
+                            }}
+                          >
+                            <img
+                              src={`${API_BASE}/api/streams/${selectedCameraId}/snapshot-at?time=${Math.floor(block.startTs)}&token=${encodeURIComponent(getApiToken() || "")}`}
+                              alt={`Segment ${formatRecTime(block.startTs)}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                            
+                            {/* Start Time */}
+                            <span className="absolute bottom-1.5 left-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
+                              {formatRecTime(block.startTs)}
+                            </span>
+
+                            {/* Duration */}
+                            <span className="absolute top-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-medium bg-black/75 text-slate-300 leading-none">
+                              {formatRecDuration(block.duration)}
+                            </span>
+
+                            {/* Play Overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                              <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          )}
         </div>
 
-        {/* Sidebar Controls and Event Search Filters */}
+        {/* Sidebar Controls */}
         <div className="space-y-6">
           <Card className="p-5 border border-border/40 space-y-4">
             <div className="space-y-1">
@@ -1643,7 +1747,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                 onValueChange={(val) => {
                   setPlaybackWindowMinutes(val);
                   if (val !== "none") {
-                    // Default center to current time
                     setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(new Date(`${selectedDate}T12:00:00`).getTime() / 1000));
                   } else {
                     setPlaybackWindowCenterTs(null);
@@ -1676,275 +1779,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               </div>
             )}
           </Card>
-
-          {/* Event Search and Filter Controls */}
-          {playbackInfo?.hasRecording && (
-            <Card className="p-5 border border-border/40 space-y-4">
-              <div className="flex items-center gap-1.5 font-semibold text-xs border-b pb-2 mb-1">
-                <SlidersHorizontal className="h-4 w-4 text-primary" />
-                <span>{t("motionMarkerFilter")}</span>
-              </div>
-
-              {/* Keyword Search */}
-              <div className="space-y-1">
-                <Label className="text-xs">{t("searchDetailType")}</Label>
-                <div className="relative">
-                  <Input
-                    placeholder="Keyword..."
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    className="h-8 text-xs pl-8"
-                  />
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-              </div>
-
-              {/* Min Activity Score */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <Label>{t("minActivityScore")}</Label>
-                  <span className="font-mono text-primary font-semibold">{minScore}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={minScore}
-                  onChange={(e) => setMinScore(Number(e.target.value))}
-                  className="w-full h-1 bg-slate-900 border border-border/45 rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-
-              {/* Time Range */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px]">{t("fromHour")}</Label>
-                  <input
-                    type="text"
-                    placeholder="00:00"
-                    value={filterStartTime}
-                    onChange={(e) => setFilterStartTime(e.target.value.replace(/[^0-9:]/g, ""))}
-                    className="w-full px-2 py-1 border rounded bg-background text-xs font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px]">{t("toHour")}</Label>
-                  <input
-                    type="text"
-                    placeholder="23:59"
-                    value={filterEndTime}
-                    onChange={(e) => setFilterEndTime(e.target.value.replace(/[^0-9:]/g, ""))}
-                    className="w-full px-2 py-1 border rounded bg-background text-xs font-mono"
-                  />
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Event markers list & Recordings List */}
-          {(!selectedCameraId || playbackInfo?.hasRecording) && (
-            <Card className="p-5 border border-border/40 flex-1 flex flex-col min-h-[350px] max-h-[550px] overflow-hidden">
-              <div className="flex items-center justify-between pb-3 border-b mb-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSidebarTab("events")}
-                    className={cn(
-                      "text-xs font-semibold pb-1.5 border-b-2 transition-all px-1",
-                      sidebarTab === "events" 
-                        ? "border-primary text-primary" 
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("motionMarkers")}
-                  </button>
-                  {selectedCameraId && playbackInfo?.hasRecording && (
-                    <button
-                      onClick={() => setSidebarTab("recordings")}
-                      className={cn(
-                        "text-xs font-semibold pb-1.5 border-b-2 transition-all px-1",
-                        sidebarTab === "recordings" 
-                          ? "border-primary text-primary" 
-                          : "border-transparent text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {lang === "id" ? "Daftar Rekaman" : "Recordings List"}
-                    </button>
-                  )}
-                </div>
-                
-                {sidebarTab === "events" ? (
-                  <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
-                    {t("nMatched").replace("{n}", String(filteredEvents.length))}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
-                    {groupedBlocks.reduce((acc, curr) => acc + curr.blocks.length, 0)} Clip
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 select-none py-1">
-                {sidebarTab === "recordings" ? (
-                  groupedBlocks.length === 0 ? (
-                    <div className="text-xs text-muted-foreground text-center py-12">
-                      {lang === "id" ? "Tidak ada rekaman kontinu untuk tanggal ini" : "No continuous recordings for this date"}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {groupedBlocks.map((group) => (
-                        <div key={group.hour} className="space-y-2">
-                          <div className="text-xs font-bold text-muted-foreground font-mono sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-10">
-                            {group.hour}
-                          </div>
-                          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-3 gap-2">
-                            {group.blocks.map((block) => (
-                              <button
-                                key={block.startTs}
-                                className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
-                                onClick={() => {
-                                  const video = videoRef.current;
-                                  if (video && playbackInfo?.firstSegmentUnixTime) {
-                                    const targetOffset = block.startTs - playbackInfo.firstSegmentUnixTime;
-                                    video.currentTime = targetOffset;
-                                    setCurrentPlaybackTs(block.startTs);
-                                    setIsPlaying(true);
-                                    video.play().catch(() => {});
-                                  }
-                                }}
-                              >
-                                <img
-                                  src={`${API_BASE}/api/streams/${selectedCameraId}/snapshot-at?time=${Math.floor(block.startTs)}&token=${encodeURIComponent(getApiToken() || "")}`}
-                                  alt={`Segment ${formatRecTime(block.startTs)}`}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = "none";
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                                
-                                {/* Start Time */}
-                                <span className="absolute bottom-1 left-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
-                                  {formatRecTime(block.startTs)}
-                                </span>
-
-                                {/* Duration */}
-                                <span className="absolute top-1 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-medium bg-black/75 text-slate-300 leading-none">
-                                  {formatRecDuration(block.duration)}
-                                </span>
-
-                                {/* Play Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                                  <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  filteredEvents.length === 0 ? (
-                    <div className="text-xs text-muted-foreground text-center py-12">
-                      {t("noMotionDetectedMatch")}
-                    </div>
-                  ) : (
-                    filteredEvents.map((evt) => {
-                      const badge = getClassificationBadge(evt.type, t);
-                      const isHuman = evt.type === "human" || evt.type === "person";
-                      const isPet = ["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type);
-                      const isPixel = evt.type === "pixel";
-                      
-                      return (
-                        <div
-                          key={evt.id}
-                          className="group flex gap-3 relative pb-4 last:pb-0"
-                        >
-                          {/* Vertical Timeline Axis */}
-                          <div className="flex flex-col items-center shrink-0 relative">
-                            <div className={`h-3 w-3 rounded-full border-2 bg-background dark:bg-slate-955 z-5 transition-all duration-300 ${
-                              isHuman 
-                                ? "border-rose-500 shadow-[0_0_8px_#f43f5e]" 
-                                : isPet 
-                                  ? "border-emerald-500 shadow-[0_0_8px_#10b981]" 
-                                  : isPixel 
-                                    ? "border-blue-500 shadow-[0_0_8px_#3b82f6]" 
-                                    : "border-amber-500 shadow-[0_0_8px_#f59e0b]"
-                            }`} />
-                            <div className="w-0.5 bg-border/20 flex-1 absolute top-3 bottom-0" />
-                          </div>
-
-                          {/* Node Card */}
-                          <div
-                            className="flex-1 group/item flex items-center justify-between gap-3 p-2 rounded-xl border border-border/40 dark:border-white/5 bg-card/60 hover:bg-muted/50 dark:bg-slate-900/20 dark:hover:bg-slate-900/60 hover:border-primary/20 transition-all duration-300 shadow-sm relative overflow-hidden"
-                          >
-                            <div 
-                              onClick={() => handleEventClick(evt)}
-                              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer animate-fade-in"
-                            >
-                              <div className="w-14 h-9 bg-muted/40 dark:bg-slate-955 border border-border/40 dark:border-white/5 rounded-lg overflow-hidden relative shrink-0">
-                                <img
-                                  src={eventApi.snapshotUrl(evt.id)}
-                                  alt="Event"
-                                  loading="lazy"
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover/item:scale-105"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = "none";
-                                  }}
-                                />
-                                <div className={cn(
-                                  "absolute bottom-0.5 right-0.5 p-0.5 rounded-sm border backdrop-blur-sm z-10",
-                                  badge.bgColor
-                                )}>
-                                  {badge.icon}
-                                </div>
-                              </div>
-                              <div className="leading-tight min-w-0 flex-1 space-y-0.5">
-                                {!selectedCameraId && (
-                                  <div className="text-[9px] uppercase tracking-wider font-semibold text-primary truncate">
-                                    {evt.cameraName}
-                                  </div>
-                                )}
-                                <div className="text-[10px] text-muted-foreground dark:text-slate-400 flex flex-col gap-0.5 font-mono">
-                                  <span>{t("startLabel")} {new Date(new Date(evt.ts).getTime() - 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
-                                  <span className="text-[11px] font-bold text-foreground dark:text-slate-200 font-sans mt-0.5">
-                                    {getClassificationLabel(evt.type, evt.typeDescription, t)}
-                                  </span>
-                                  <span>{t("untilLabel")} {new Date(new Date(evt.ts).getTime() + 15000).toLocaleTimeString("id-ID", { hour12: false })}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 shrink-0 z-5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-white/10 rounded-md"
-                                onClick={() => handleEventClick(evt)}
-                                title={t("playback")}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/25 rounded-md"
-                                onClick={() => handleDeleteEvent(evt)}
-                                title={t("deleteEvent")}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )
-                )}
-              </div>
-            </Card>
-          )}
         </div>
       </div>
 
