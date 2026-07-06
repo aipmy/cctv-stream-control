@@ -56,6 +56,7 @@ const empty = {
   recordingMode: "continuous",
   recordMode: "" as Camera["recordMode"],
   recordResolution: "Auto" as Camera["recordResolution"],
+  aiSensitivity: 50,
 };
 
 const sourceHelpKeys: Record<SourceType, TranslationKey> = {
@@ -319,7 +320,12 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         recordingMode: camera.recordingMode ?? "continuous",
         recordMode: camera.recordMode ?? "",
         recordResolution: camera.recordResolution ?? "Auto",
+        aiSensitivity: camera.aiSensitivity ?? 50,
       });
+      setSdAiSensitivity(camera.aiSensitivity ?? 50);
+      setSdShowPerson(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("human") : true);
+      setSdShowPet(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("pet") : false);
+      setSdShowMotion(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("pixel") : false);
     } else {
       setForm(emptyWithSite);
     }
