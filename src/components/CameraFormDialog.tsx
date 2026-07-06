@@ -57,6 +57,7 @@ const empty = {
   recordMode: "" as Camera["recordMode"],
   recordResolution: "Auto" as Camera["recordResolution"],
   aiSensitivity: 50,
+  detectFps: 6,
 };
 
 const sourceHelpKeys: Record<SourceType, TranslationKey> = {
@@ -321,6 +322,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         recordMode: camera.recordMode ?? "",
         recordResolution: camera.recordResolution ?? "Auto",
         aiSensitivity: camera.aiSensitivity ?? 50,
+        detectFps: camera.detectFps ?? 6,
       });
       setSdAiSensitivity(camera.aiSensitivity ?? 50);
       setSdShowPerson(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("human") : true);
