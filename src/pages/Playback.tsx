@@ -1662,7 +1662,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         <div className="lg:col-span-1">
           {selectedCameraId && playbackInfo && (
             <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card overflow-hidden">
-               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 sticky top-[calc(56px+56.25vw)] lg:top-[72px] bg-card z-10">
+               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 playback-sticky-header bg-card shadow-sm">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
