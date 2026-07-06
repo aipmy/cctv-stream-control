@@ -367,7 +367,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     if (!selectedCameraId) return;
     setLoading(true);
     setError(null);
-    setPlaybackInfo(null);
     setCurrentPlaybackTs(null);
     setCurrentRecordingTime(null);
     setTimelineCenterTs(null);
@@ -1366,9 +1365,9 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
             className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group sticky top-14 z-20 lg:relative lg:top-auto lg:z-auto"
           >
             {loading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 z-25 text-white text-xs gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span>{t("loadingSegments")}</span>
+              <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-full text-white text-[10px] font-medium z-25 shadow-lg animate-fade-in">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>{t("loadingSegments")}...</span>
               </div>
             )}
 
@@ -1663,7 +1662,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         <div className="lg:col-span-1">
           {selectedCameraId && playbackInfo && (
             <Card className="p-5 border border-border/40 flex flex-col min-h-[300px]">
-              <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4">
+               <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4 sticky top-[calc(56px+56.25vw)] lg:top-[72px] bg-card dark:bg-[#0b1329] z-10 py-2">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
