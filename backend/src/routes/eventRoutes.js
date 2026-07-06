@@ -18,6 +18,7 @@ import {
   runStorageCleanup,
   deleteSnapshotFile,
 } from "../services/recordingService.js";
+import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const eventRoutes = Router();
 
@@ -42,7 +43,7 @@ eventRoutes.post("/settings", async (req, res, next) => {
 });
 
 // List events
-eventRoutes.get("/", async (req, res, next) => {
+eventRoutes.get("/", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     const events = await listEvents();
     res.json(events);
@@ -69,7 +70,7 @@ eventRoutes.post("/trigger", async (req, res, next) => {
 });
 
 // Delete specific event
-eventRoutes.delete("/:id", async (req, res, next) => {
+eventRoutes.delete("/:id", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const deleted = await deleteEvent(id);
@@ -83,7 +84,7 @@ eventRoutes.delete("/:id", async (req, res, next) => {
 });
 
 // Clear all events
-eventRoutes.post("/clear", async (req, res, next) => {
+eventRoutes.post("/clear", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     await clearAllEvents();
     res.json({ ok: true });
@@ -93,7 +94,7 @@ eventRoutes.post("/clear", async (req, res, next) => {
 });
 
 // Serve Snapshot JPG
-eventRoutes.get("/snapshot/:id", async (req, res, next) => {
+eventRoutes.get("/snapshot/:id", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const filePath = path.join(config.storageDir, "events", `${id}.jpg`);
@@ -110,7 +111,7 @@ eventRoutes.get("/snapshot/:id", async (req, res, next) => {
 });
 
 // Serve Video MP4 (Supports range requests automatically)
-eventRoutes.get("/video/:id", async (req, res, next) => {
+eventRoutes.get("/video/:id", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const filePath = path.join(config.storageDir, "events", `${id}.mp4`);
@@ -127,7 +128,7 @@ eventRoutes.get("/video/:id", async (req, res, next) => {
 });
 
 // Storage Status
-eventRoutes.get("/storage-status", async (req, res, next) => {
+eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (req, res, next) => {
   try {
     const settings = await getSettings();
     const eventsDir = path.join(config.storageDir, "events");

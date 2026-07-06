@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, Navigate } from "react-router-dom";
 import type Hls from "hls.js";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useCamerasQuery } from "@/features/cameras/queries";
 import { useSettings } from "@/features/settings/store";
+import { useAuth } from "@/features/auth/store";
 import { eventApi, streamApi, playbackUrl, downloadUrl, getApiToken, API_BASE } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,11 @@ const getClassificationLabel = (classification?: string, fallback?: string, t?: 
 };
 
 export default function Playback() {
+  const user = useAuth((s) => s.user);
+  if (user && user.role !== "admin" && !user.permissions?.canViewPlayback) {
+    return <Navigate to="/" replace />;
+  }
+
   const { t } = useTranslation();
   
   const formatBytes = (bytes?: number) => {

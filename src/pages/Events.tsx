@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useAuth } from "@/features/auth/store";
 import { eventApi } from "@/lib/api";
 import { useCamerasQuery } from "@/features/cameras/queries";
 import { Card } from "@/components/ui/card";
@@ -26,6 +27,11 @@ const getClassificationLabel = (classification?: string, fallback?: string) => {
 };
 
 export default function Events() {
+  const user = useAuth((s) => s.user);
+  if (user && user.role !== "admin" && !user.permissions?.canViewEvents) {
+    return <Navigate to="/" replace />;
+  }
+
   const navigate = useNavigate();
   const { t, lang } = useTranslation();
   const { data: camerasData } = useCamerasQuery();

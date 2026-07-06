@@ -7,6 +7,7 @@ import { config } from "../core/config.js";
 import { getCamera, markCameraStatus } from "../services/cameraService.js";
 import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter } from "../stream/streamManager.js";
 import { classifyStreamError } from "../stream/streamError.js";
+import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const streamRoutes = Router();
 
@@ -198,7 +199,7 @@ streamRoutes.get("/:id/info", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-streamRoutes.get("/:id/playback-info", async (req, res, next) => {
+streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { date } = req.query;
@@ -290,7 +291,7 @@ streamRoutes.get("/:id/playback-info", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-streamRoutes.get("/:id/playback.m3u8", async (req, res, next) => {
+streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { date } = req.query; // format YYYY-MM-DD
@@ -432,7 +433,7 @@ streamRoutes.get("/:id/snapshot-at", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-streamRoutes.delete("/:id/recordings/today", async (req, res, next) => {
+streamRoutes.delete("/:id/recordings/today", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { date } = req.query;
@@ -443,7 +444,7 @@ streamRoutes.delete("/:id/recordings/today", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-streamRoutes.delete("/:id/recordings/all", async (req, res, next) => {
+streamRoutes.delete("/:id/recordings/all", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { deleteAllRecordings } = await import("../services/recordingService.js");
@@ -452,7 +453,7 @@ streamRoutes.delete("/:id/recordings/all", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-streamRoutes.get("/:id/download", async (req, res, next) => {
+streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
     const { id } = req.params;
     const startUnix = parseInt(req.query.start, 10);

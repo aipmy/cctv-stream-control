@@ -42,7 +42,7 @@ export default function Users() {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<UserSummary | null>(null);
   const [del, setDel] = useState<UserSummary | null>(null);
-  const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false, canPlayAudio: false, canViewStats: false, canControlPTZ: false };
+  const emptyPermissions = { canAddCamera: false, canEditCamera: false, canDeleteCamera: false, canRestartStream: false, canViewManagement: false, canPlayAudio: false, canViewStats: false, canControlPTZ: false, canViewPlayback: false, canViewEvents: false };
   const [form, setForm] = useState<CreateUserInput>({ username: "", password: "", role: "guest", active: true, permissions: emptyPermissions, allowedGroups: [] });
   const [saving, setSaving] = useState(false);
   const [auditActor, setAuditActor] = useState("");
@@ -104,6 +104,8 @@ export default function Users() {
             canPlayAudio: true,
             canViewStats: true,
             canControlPTZ: true,
+            canViewPlayback: true,
+            canViewEvents: true,
           }
         : form.permissions;
 
@@ -477,6 +479,8 @@ export default function Users() {
                           canPlayAudio: checked,
                           canViewStats: checked,
                           canControlPTZ: checked,
+                          canViewPlayback: checked,
+                          canViewEvents: checked,
                         };
                         setForm({ ...form, permissions: updated });
                       }}
@@ -490,6 +494,25 @@ export default function Users() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {[
                         { key: "canViewStats", label: t("allowStats") },
+                      ].map((p) => (
+                        <div key={p.key} className="flex items-center justify-between rounded-xl border border-border/40 p-2 bg-muted/10">
+                          <Label className="text-[11px] font-normal cursor-pointer flex-1 text-foreground" htmlFor={`perm-${p.key}`}>{p.label}</Label>
+                          <Switch 
+                            id={`perm-${p.key}`}
+                            checked={!!form.permissions?.[p.key as keyof typeof emptyPermissions]} 
+                            onCheckedChange={(v) => setForm({ ...form, permissions: { ...form.permissions, [p.key]: v } as unknown as typeof emptyPermissions })} 
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-1">{lang === "id" ? "Izin Monitoring" : "Monitoring Permissions"}</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { key: "canViewPlayback", label: lang === "id" ? "Buka Halaman Playback" : "Access Playback Page" },
+                        { key: "canViewEvents", label: lang === "id" ? "Buka Halaman Event" : "Access Smart Events Page" },
                       ].map((p) => (
                         <div key={p.key} className="flex items-center justify-between rounded-xl border border-border/40 p-2 bg-muted/10">
                           <Label className="text-[11px] font-normal cursor-pointer flex-1 text-foreground" htmlFor={`perm-${p.key}`}>{p.label}</Label>

@@ -121,6 +121,8 @@ export interface UserPermissions {
   canPlayAudio?: boolean;
   canViewStats?: boolean;
   canControlPTZ?: boolean;
+  canViewPlayback?: boolean;
+  canViewEvents?: boolean;
 }
 
 export interface UserSummary {

@@ -68,6 +68,8 @@ export function AppSidebar() {
             if (!user) return false;
             if (item.url === "/users") return user.role === "admin";
             if (item.url === "/cameras") return user.role === "admin" || !!user.permissions?.canViewManagement;
+            if (item.url === "/playback") return user.role === "admin" || !!user.permissions?.canViewPlayback;
+            if (item.url === "/events") return user.role === "admin" || !!user.permissions?.canViewEvents;
             return item.roles.includes(user.role);
           });
 
