@@ -960,8 +960,17 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         else if (evt.type === "sound") color = "#06b6d4"; // cyan-400
         else if (evt.type === "motion" || evt.type === "pixel") color = "#f59e0b"; // amber-500
         
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(x - 3, 2, 6, height - 20, 3);
+        } else {
+          ctx.rect(x - 3, 2, 6, height - 20);
+        }
         ctx.fillStyle = color;
-        ctx.fillRect(x - 1, 0, 2, height - 16);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
       }
     }
 
@@ -1161,6 +1170,105 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     setIsScrubbing(false);
     setIsPanning(false);
     dragStartPlayheadRef.current = null;
+  };
+
+  const handleTimelineTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !playbackInfo || e.touches.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const clickX = touch.clientX - rect.left;
+    const clickUnix = getUnixFromX(clickX);
+
+    setIsScrubbing(true);
+    setDragStartX(touch.clientX);
+    dragStartPlayheadRef.current = clickUnix;
+    setCurrentPlaybackTs(clickUnix);
+    setCurrentRecordingTime(new Date(clickUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+
+    const video = videoRef.current;
+    if (video) {
+      const mappings = playbackInfo.segmentMappings || [];
+      if (mappings.length > 0) {
+        const closest = mappings.reduce((prev, curr) => {
+          return Math.abs(curr.ts - clickUnix) < Math.abs(prev.ts - clickUnix) ? curr : prev;
+        });
+        const videoOffset = closest.offset + Math.max(0, clickUnix - closest.ts);
+        video.currentTime = Math.max(0, videoOffset);
+      }
+    }
+  };
+
+  const handleTimelineTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !playbackInfo || e.touches.length === 0 || !isScrubbing) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const mouseX = touch.clientX - rect.left;
+    const currentUnix = getUnixFromX(mouseX);
+
+    setHoverInfo({
+      x: mouseX,
+      time: currentUnix,
+      show: true,
+    });
+
+    const startOfDay = new Date(`${selectedDate}T00:00:00`);
+    const endOfDay = new Date(`${selectedDate}T23:59:59.999`);
+    const startUnix = Math.floor(startOfDay.getTime() / 1000);
+    const endUnix = Math.floor(endOfDay.getTime() / 1000);
+
+    const windowSizes = {
+      "24h": 86400,
+      "6h": 6 * 3600,
+      "1h": 3600,
+      "15m": 15 * 60,
+      "5m": 5 * 60,
+      "1m": 60,
+    };
+    const size = windowSizes[timelineZoom];
+    const current = currentPlaybackTs || startUnix;
+    const center = timelineCenterTs !== null ? timelineCenterTs : current;
+    let zoomStart = center - size / 2;
+    let zoomEnd = center + size / 2;
+    if (zoomStart < startUnix) {
+      zoomStart = startUnix;
+      zoomEnd = Math.min(endUnix, startUnix + size);
+    }
+    if (zoomEnd > endUnix) {
+      zoomEnd = endUnix;
+      zoomStart = Math.max(startUnix, endUnix - size);
+    }
+    const timeSpan = zoomEnd - zoomStart;
+
+    const deltaX = touch.clientX - dragStartX;
+    const startPlayhead = dragStartPlayheadRef.current !== null ? dragStartPlayheadRef.current : currentUnix;
+    const scrubUnix = Math.max(startUnix, Math.min(endUnix, startPlayhead + (deltaX / rect.width) * timeSpan));
+
+    setCurrentPlaybackTs(scrubUnix);
+    setCurrentRecordingTime(new Date(scrubUnix * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+
+    const video = videoRef.current;
+    if (video) {
+      const mappings = playbackInfo.segmentMappings || [];
+      if (mappings.length > 0) {
+        const closest = mappings.reduce((prev, curr) => {
+          return Math.abs(curr.ts - scrubUnix) < Math.abs(prev.ts - scrubUnix) ? curr : prev;
+        });
+        const videoOffset = closest.offset + Math.max(0, scrubUnix - closest.ts);
+        video.currentTime = Math.max(0, videoOffset);
+      }
+    }
+  };
+
+  const handleTimelineTouchEnd = () => {
+    setIsScrubbing(false);
+    setIsPanning(false);
+    setDragStartCenter(null);
+    dragStartPlayheadRef.current = null;
+    setHoverInfo((prev) => ({ ...prev, show: false }));
   };
 
   const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1714,15 +1822,25 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                   <span>Interactive Visual Seekbar</span>
                   <span>{t("endDate")}</span>
                 </div>
-                <div className="relative border border-border/40 rounded-md overflow-hidden bg-slate-950 shadow-inner h-16">
+                <div className="relative border border-border/40 rounded-md overflow-hidden bg-slate-950 shadow-inner h-16 touch-none">
+                  {/* Floating Digital Playhead Time Badge */}
+                  {currentPlaybackTs && (
+                    <div className="absolute top-2.5 left-3 px-2 py-0.5 rounded bg-black/85 backdrop-blur-md border border-white/10 text-white font-mono text-[9px] font-bold pointer-events-none select-none z-10 shadow-lg tracking-wider flex items-center gap-1.5 leading-none">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      {new Date(currentPlaybackTs * 1000).toLocaleTimeString("id-ID", { hour12: false })}
+                    </div>
+                  )}
                   <canvas
                     ref={canvasRef}
                     onMouseDown={handleTimelineMouseDown}
                     onMouseMove={handleTimelineMouseMove}
                     onMouseUp={handleTimelineMouseUp}
                     onMouseLeave={handleTimelineMouseLeave}
+                    onTouchStart={handleTimelineTouchStart}
+                    onTouchMove={handleTimelineTouchMove}
+                    onTouchEnd={handleTimelineTouchEnd}
                     onWheel={handleCanvasWheel}
-                    className="w-full h-full cursor-ew-resize"
+                    className="w-full h-full cursor-ew-resize touch-none"
                   />
 
                   {/* YouTube Hover Tooltip */}
