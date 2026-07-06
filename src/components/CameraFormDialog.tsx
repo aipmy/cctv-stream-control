@@ -1880,11 +1880,11 @@ function UnifiedMotionEditor({
         )}>
           {connected ? "● LIVE STREAM DETECT" : "○ RECONNECTING..."}
         </div>
-        
-        <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
-          Activity: {activity} blocks
-        </div>
-
+        {showPixelMotion && (
+          <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
+            Activity: {activity} blocks
+          </div>
+        )}
         {/* Helper guide */}
         {mode !== "none" && (
           <div className="absolute bottom-2 left-2 right-2 bg-black/85 border border-slate-700/50 backdrop-blur-sm px-2 py-1.5 rounded text-[10px] text-yellow-200 z-20 animate-fade-in font-medium">
