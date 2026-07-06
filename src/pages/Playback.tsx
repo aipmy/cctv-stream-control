@@ -407,20 +407,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
           setCurrentRecordingTime(new Date(startTs * 1000).toLocaleTimeString("id-ID", { hour12: false }));
         }
 
-        // Fetch motion events
-        const allEvents = await eventApi.list();
-        const filtered = allEvents.filter((e) => {
-          const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
-          return (
-            e.cameraId === selectedCameraId &&
-            e.cameraId === selectedCameraId &&
-            e.type !== "sound" &&
-            eventLocalDate === selectedDate
-          );
-        });
-        filtered.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
-        setEvents(filtered);
-
         if (autoSeekEventTsRef.current) {
           const targetTs = autoSeekEventTsRef.current;
           autoSeekEventTsRef.current = null;
@@ -428,9 +414,19 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
             seekToEventDirect(targetTs, info);
           }, 800);
         }
-      } else {
-        setEvents([]);
       }
+
+      // Fetch events unconditionally for the selected camera and date
+      const allEvents = await eventApi.list();
+      const filtered = allEvents.filter((e) => {
+        const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
+        return (
+          e.cameraId === selectedCameraId &&
+          eventLocalDate === selectedDate
+        );
+      });
+      filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+      setEvents(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("failedLoadRecordings"));
       toast.error(t("failedFetchPlayback"));
@@ -1246,9 +1242,122 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Player and Timeline (takes 3 cols on large screens) */}
-        <div className="lg:col-span-3 space-y-6">
+      {/* Horizontal Controls Panel */}
+      <Card className="p-5 border border-border/40 bg-card/65 backdrop-blur-md shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("selectCamera")}</Label>
+            <Popover open={isCameraPopoverOpen} onOpenChange={setIsCameraPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isCameraPopoverOpen}
+                  className="w-full justify-between font-normal text-left h-10 bg-background border-border text-sm"
+                >
+                  <span className="truncate">
+                    {cameras.find((c) => c.id === selectedCameraId)?.name || t("selectCamera")}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-3 space-y-3" align="start">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder={t("searchCameraPlaceholder")}
+                    value={cameraSearchQuery}
+                    onChange={(e) => setCameraSearchQuery(e.target.value)}
+                    className="pl-8 h-8 text-xs"
+                  />
+                </div>
+                <ScrollArea className="h-60">
+                  <div className="space-y-1 pr-2">
+                    {filteredCameras.length === 0 ? (
+                      <div className="text-xs text-muted-foreground p-3 text-center">
+                        {t("cameraNotFound")}
+                      </div>
+                    ) : (
+                      filteredCameras.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedCameraId(c.id);
+                            setIsCameraPopoverOpen(false);
+                          }}
+                          className={cn(
+                            "w-full text-left p-2 rounded-md transition-colors text-xs flex flex-col gap-0.5 hover:bg-accent/50",
+                            selectedCameraId === c.id && "bg-primary/10 text-primary font-medium border border-primary/20"
+                          )}
+                        >
+                          <span className="font-semibold truncate">{c.name}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {c.site} · {c.ip} · {c.brand}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("selectDate")}</Label>
+            <div className="relative">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
+                style={{
+                  colorScheme: theme === "dark" ? "dark" : "light",
+                  boxSizing: "border-box"
+                }}
+              />
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Playback Load Window Filter */}
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("loadWindowLimit")}</Label>
+            <Select 
+              value={playbackWindowMinutes} 
+              onValueChange={(val) => {
+                setPlaybackWindowMinutes(val);
+                if (val !== "none") {
+                  setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(new Date(`${selectedDate}T12:00:00`).getTime() / 1000));
+                } else {
+                  setPlaybackWindowCenterTs(null);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("unlimitedFullDay")}</SelectItem>
+                <SelectItem value="1">{t("minutesUnit").replace("{n}", "1")}</SelectItem>
+                <SelectItem value="5">{t("minutesUnit").replace("{n}", "5")}</SelectItem>
+                <SelectItem value="15">{t("minutesUnit").replace("{n}", "15")}</SelectItem>
+                <SelectItem value="30">{t("minutesUnit").replace("{n}", "30")}</SelectItem>
+                <SelectItem value="60">{t("hoursUnit").replace("{n}", "1")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="h-10 flex items-center justify-between px-3 bg-muted/20 border border-border/40 rounded-md">
+            <span className="text-xs text-muted-foreground font-medium">{t("diskUsage")}</span>
+            <span className="font-semibold text-foreground text-xs font-mono bg-slate-900 border border-border/45 px-1.5 py-0.5 rounded">
+              {selectedCameraId && playbackInfo ? formatBytes(playbackInfo.diskUsageBytes) : "-- B"}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      <div className="space-y-6">
           <Card 
             ref={playerContainerRef} 
             className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group"
@@ -1654,127 +1763,6 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
             </Card>
           )}
         </div>
-
-        {/* Sidebar Controls */}
-        <div className="space-y-6">
-          <Card className="p-5 border border-border/40 space-y-4">
-            <div className="space-y-1">
-              <Label className="text-xs">{t("selectCamera")}</Label>
-              <Popover open={isCameraPopoverOpen} onOpenChange={setIsCameraPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={isCameraPopoverOpen}
-                    className="w-full justify-between font-normal text-left h-10 bg-background border-border text-sm"
-                  >
-                    <span className="truncate">
-                      {cameras.find((c) => c.id === selectedCameraId)?.name || t("selectCamera")}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-3 space-y-3" align="start">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder={t("searchCameraPlaceholder")}
-                      value={cameraSearchQuery}
-                      onChange={(e) => setCameraSearchQuery(e.target.value)}
-                      className="pl-8 h-8 text-xs"
-                    />
-                  </div>
-                  <ScrollArea className="h-60">
-                    <div className="space-y-1 pr-2">
-                      {filteredCameras.length === 0 ? (
-                        <div className="text-xs text-muted-foreground p-3 text-center">
-                          {t("cameraNotFound")}
-                        </div>
-                      ) : (
-                        filteredCameras.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              setSelectedCameraId(c.id);
-                              setIsCameraPopoverOpen(false);
-                            }}
-                            className={cn(
-                              "w-full text-left p-2 rounded-md transition-colors text-xs flex flex-col gap-0.5 hover:bg-accent/50",
-                              selectedCameraId === c.id && "bg-primary/10 text-primary font-medium border border-primary/20"
-                            )}
-                          >
-                            <span className="font-semibold truncate">{c.name}</span>
-                            <span className="text-[10px] text-muted-foreground truncate">
-                              {c.site} · {c.ip} · {c.brand}
-                            </span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">{t("selectDate")}</Label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
-                  style={{
-                    colorScheme: theme === "dark" ? "dark" : "light",
-                    boxSizing: "border-box"
-                  }}
-                />
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Playback Load Window Filter */}
-            <div className="space-y-1 pt-1.5 border-t border-border/10">
-              <Label className="text-xs font-semibold text-primary">{t("loadWindowLimit")}</Label>
-              <Select 
-                value={playbackWindowMinutes} 
-                onValueChange={(val) => {
-                  setPlaybackWindowMinutes(val);
-                  if (val !== "none") {
-                    setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(new Date(`${selectedDate}T12:00:00`).getTime() / 1000));
-                  } else {
-                    setPlaybackWindowCenterTs(null);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("unlimitedFullDay")}</SelectItem>
-                  <SelectItem value="1">{t("minutesUnit").replace("{n}", "1")}</SelectItem>
-                  <SelectItem value="5">{t("minutesUnit").replace("{n}", "5")}</SelectItem>
-                  <SelectItem value="15">{t("minutesUnit").replace("{n}", "15")}</SelectItem>
-                  <SelectItem value="30">{t("minutesUnit").replace("{n}", "30")}</SelectItem>
-                  <SelectItem value="60">{t("hoursUnit").replace("{n}", "1")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground italic leading-tight">
-                {t("loadWindowHelp")}
-              </p>
-            </div>
-
-            {selectedCameraId && playbackInfo && (
-              <div className="text-xs text-muted-foreground pt-2 border-t border-border/10 flex items-center justify-between">
-                <span>{t("diskUsage")}</span>
-                <span className="font-semibold text-foreground font-mono bg-slate-900 border border-border/45 px-1.5 py-0.5 rounded">
-                  {formatBytes(playbackInfo.diskUsageBytes)}
-                </span>
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
 
       {/* Pratinjau Unduhan Dialog */}
       <Dialog open={isPreviewDownloadOpen} onOpenChange={setIsPreviewDownloadOpen}>
