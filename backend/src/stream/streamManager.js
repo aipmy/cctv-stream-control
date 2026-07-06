@@ -434,15 +434,18 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                     return false;
                   });
                   
-                  // Emit filtered AI results to frontend via SSE
+                  // Emit filtered AI results (>= 10%) to frontend via SSE so they appear in live view
                   motionEmitter.emit(`ai-motion-${id}`, {
                     ts: new Date().toISOString(),
                     predictions: filtered
                   });
 
-                  // If AI found matching objects, trigger recording/notification
-                  if (filtered.length > 0 && hasSmart) {
-                    void handleMotionDetected(camera, filtered);
+                  // Filter again strictly for events (must meet camera's AI Sensitivity setting)
+                  const eventFiltered = filtered.filter(p => p.score >= threshold);
+
+                  // If AI found matching objects that meet the sensitivity threshold, trigger recording/notification
+                  if (eventFiltered.length > 0 && hasSmart) {
+                    void handleMotionDetected(camera, eventFiltered);
                   }
                 }).catch(err => {
                   session.aiBusy = false;

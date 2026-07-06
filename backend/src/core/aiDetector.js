@@ -151,7 +151,7 @@ if (!isMainThread) {
             scaleY = frameHeight / newHeight;
           }
           
-          const rawPredictions = await model.detect(processTensor, 20, msg.threshold || 0.5);
+          const rawPredictions = await model.detect(processTensor, 20, 0.10);
           const duration = Date.now() - start;
           
           if (processTensor !== imageTensor) processTensor.dispose();
