@@ -1727,18 +1727,17 @@ function UnifiedMotionEditor({
         {/* Row 2: Sensitivity controls */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-center gap-2 text-xs text-slate-300">
-            <label htmlFor="ai-sens-select" className="font-medium whitespace-nowrap">AI Sensitivity:</label>
-            <select
-              id="ai-sens-select"
+            <label htmlFor="ai-sens-slider" className="font-medium whitespace-nowrap">AI Sensitivity:</label>
+            <input
+              id="ai-sens-slider"
+              type="range"
+              min={1}
+              max={100}
               value={aiSensitivity}
               onChange={(e) => onAiSensitivityChange?.(Number(e.target.value))}
-              className="px-2 py-1 rounded bg-slate-800 text-white border border-slate-600 outline-none text-xs cursor-pointer"
-            >
-              <option value={30}>Low (30%)</option>
-              <option value={50}>Medium (50%)</option>
-              <option value={70}>High (70%)</option>
-              <option value={90}>Very High (90%)</option>
-            </select>
+              className="w-24 accent-rose-500 cursor-pointer"
+            />
+            <span className="text-rose-400 font-semibold min-w-[40px]">{aiSensitivity}%</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-300">
             <label htmlFor="motion-sens-slider" className="font-medium whitespace-nowrap">Motion Sensitivity:</label>
