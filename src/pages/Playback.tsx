@@ -1661,8 +1661,8 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         {/* Right Column: Scrollable Detection Events List */}
         <div className="lg:col-span-1">
           {selectedCameraId && playbackInfo && (
-            <Card className="p-5 border border-border/40 flex flex-col min-h-[300px]">
-               <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4 sticky top-[calc(56px+56.25vw)] lg:top-[72px] bg-card dark:bg-[#0b1329] z-10 py-2">
+            <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card overflow-hidden">
+               <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 sticky top-[calc(56px+56.25vw)] lg:top-[72px] bg-card z-10">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
@@ -1701,7 +1701,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                 </span>
               </div>
 
-              <div className="space-y-4">
+              <div className="p-5 space-y-4">
                 {groupedEvents.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center py-12">
                     {lang === "id" ? "Tidak ada event deteksi untuk tanggal ini" : "No detection events for this date"}
