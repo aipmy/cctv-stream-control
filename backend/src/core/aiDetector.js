@@ -144,7 +144,9 @@ if (!isMainThread) {
             const scale = Math.min(640 / frameWidth, 480 / frameHeight);
             const newWidth = Math.round(frameWidth * scale);
             const newHeight = Math.round(frameHeight * scale);
-            processTensor = tf.image.resizeBilinear(imageTensor, [newHeight, newWidth]);
+            const resized = tf.image.resizeBilinear(imageTensor, [newHeight, newWidth]);
+            processTensor = resized.toInt();
+            resized.dispose();
             scaleX = frameWidth / newWidth;
             scaleY = frameHeight / newHeight;
           }
