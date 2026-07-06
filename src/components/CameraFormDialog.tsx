@@ -316,6 +316,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         enabled: camera.enabled ?? true,
         enableRecording: camera.enableRecording ?? false,
         enableNotifications: camera.enableNotifications ?? false,
+        enableSmartDetection: camera.enableSmartDetection,
         motionSensitivity: camera.motionSensitivity ?? 50,
         motionArea: camera.motionArea || null,
         excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
