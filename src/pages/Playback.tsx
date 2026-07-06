@@ -79,7 +79,7 @@ const getClassificationLabel = (classification?: string, fallback?: string, t?: 
 export default function Playback() {
   const user = useAuth((s) => s.user);
 
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   
   const formatBytes = (bytes?: number) => {
     if (bytes === undefined || bytes === null || isNaN(bytes)) return "0 B";
@@ -186,16 +186,19 @@ interface RecordingBlock {
 function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; duration: number }>) {
   if (!mappings || mappings.length === 0) return [];
   
+  const validMappings = mappings.filter(m => m && typeof m.ts === "number" && !isNaN(m.ts) && typeof m.duration === "number" && !isNaN(m.duration));
+  if (validMappings.length === 0) return [];
+  
   const blocks: RecordingBlock[] = [];
   let currentBlock: RecordingBlock = {
-    startTs: mappings[0].ts,
-    endTs: mappings[0].ts + mappings[0].duration,
-    duration: mappings[0].duration,
-    offset: mappings[0].offset,
+    startTs: validMappings[0].ts,
+    endTs: validMappings[0].ts + validMappings[0].duration,
+    duration: validMappings[0].duration,
+    offset: validMappings[0].offset,
   };
 
-  for (let i = 1; i < mappings.length; i++) {
-    const m = mappings[i];
+  for (let i = 1; i < validMappings.length; i++) {
+    const m = validMappings[i];
     const gap = m.ts - currentBlock.endTs;
     if (gap <= 8) {
       currentBlock.endTs = m.ts + m.duration;
@@ -217,15 +220,20 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const [sidebarTab, setSidebarTab] = useState<"events" | "recordings">("events");
 
   const formatRecTime = (ts: number) => {
-    return new Date(ts * 1000).toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    if (!ts || isNaN(ts)) return "--:--";
+    try {
+      return new Date(ts * 1000).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    } catch {
+      return "--:--";
+    }
   };
 
   const formatRecDuration = (seconds: number) => {
-    if (seconds < 60) return `${seconds}"`;
+    if (!seconds || isNaN(seconds)) return "0\"";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return secs > 0 ? `${mins}'${secs}"` : `${mins}'`;
