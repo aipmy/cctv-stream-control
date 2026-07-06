@@ -167,10 +167,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const [isNewSite, setIsNewSite] = useState(false);
   const [siteOpen, setSiteOpen] = useState(false);
 
-  // Smart Detection preview filter toggles (local UI state, not persisted)
-  const [sdShowPerson, setSdShowPerson] = useState(true);
-  const [sdShowPet, setSdShowPet] = useState(false);
-  const [sdShowMotion, setSdShowMotion] = useState(false);
+  // Smart Detection preview filter toggles (now synced with form.detectionModes)
+  const [sdShowPerson, setSdShowPerson] = useState(form.detectionModes.includes("human"));
+  const [sdShowPet, setSdShowPet] = useState(form.detectionModes.includes("pet"));
+  const [sdShowMotion, setSdShowMotion] = useState(form.detectionModes.includes("pixel"));
   const [sdAiSensitivity, setSdAiSensitivity] = useState(50);
   const [sdMotionSensitivity, setSdMotionSensitivity] = useState(10);
 
@@ -979,9 +979,24 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   showPet={sdShowPet}
                   aiSensitivity={sdAiSensitivity}
                   motionSensitivityValue={sdMotionSensitivity}
-                  onShowPersonChange={setSdShowPerson}
-                  onShowPetChange={setSdShowPet}
-                  onShowPixelMotionChange={setSdShowMotion}
+                  onShowPersonChange={(val) => {
+                    setSdShowPerson(val);
+                    const modes = new Set(form.detectionModes);
+                    if (val) modes.add("human"); else modes.delete("human");
+                    setForm({ ...form, detectionModes: Array.from(modes) });
+                  }}
+                  onShowPetChange={(val) => {
+                    setSdShowPet(val);
+                    const modes = new Set(form.detectionModes);
+                    if (val) modes.add("pet"); else modes.delete("pet");
+                    setForm({ ...form, detectionModes: Array.from(modes) });
+                  }}
+                  onShowPixelMotionChange={(val) => {
+                    setSdShowMotion(val);
+                    const modes = new Set(form.detectionModes);
+                    if (val) modes.add("pixel"); else modes.delete("pixel");
+                    setForm({ ...form, detectionModes: Array.from(modes) });
+                  }}
                   onAiSensitivityChange={setSdAiSensitivity}
                   onMotionSensitivityChange={setSdMotionSensitivity}
                   enableSoundDetection={form.enableSoundDetection}
