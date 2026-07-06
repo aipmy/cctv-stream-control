@@ -1288,7 +1288,7 @@ function UnifiedMotionEditor({
           if (data.predictions) aiBoxesRef.current = data.predictions;
           // Auto clear ai boxes after 2 seconds
           if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-          (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 2000);
+          (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 10000);
           return;
         }
         if (data.boxes) boxesRef.current = data.boxes;
