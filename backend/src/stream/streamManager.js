@@ -404,8 +404,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               if (pixelMotionDetected && hasSmart) {
                 const pixelBoxes = result.boxes.map(b => ({
                   ...b,
-                  frameWidth: frame.width,
-                  frameHeight: frame.height
+                  frameWidth: result.width,
+                  frameHeight: result.height
                 }));
                 void handleMotionDetected(camera, null, pixelBoxes); // Pass null so it relies purely on pixel mode
               }

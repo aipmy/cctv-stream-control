@@ -148,6 +148,8 @@ export class CameraMotionEngine {
       frame: { width: decoded.width, height: decoded.height }
     });
 
+    motion.width = decoded.width;
+    motion.height = decoded.height;
     return motion;
   }
 }
