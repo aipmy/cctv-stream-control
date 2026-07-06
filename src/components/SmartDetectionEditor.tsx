@@ -115,11 +115,15 @@ export function SmartDetectionEditor({
         }
 
         if (data.type === "ai-motion") {
-          if (data.predictions && data.predictions.length > 0) {
-            aiBoxesRef.current = data.predictions;
-            // Auto clear ai boxes after 2 seconds (smooths out AI frame drops)
-            if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-            (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 2000);
+          if (data.predictions) {
+            if (data.predictions.length > 0) {
+              aiBoxesRef.current = data.predictions;
+              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
+              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 400);
+            } else {
+              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
+              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 150);
+            }
           }
           return;
         }
