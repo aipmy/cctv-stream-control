@@ -60,6 +60,9 @@ export interface Camera {
   recordingMode?: string;
   recordMode?: "copy" | "transcode" | "";
   recordResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
+  enableSoundDetection?: boolean;
+  detectFps?: number;
+  aiSensitivity?: number;
 }
 
 export interface MotionArea {
@@ -88,6 +91,9 @@ export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassw
   detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   recordMode?: "copy" | "transcode" | "";
   recordResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
+  enableSoundDetection?: boolean;
+  detectFps?: number;
+  aiSensitivity?: number;
 }
 
 export interface SmartEvent {
