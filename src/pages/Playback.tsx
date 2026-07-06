@@ -1357,7 +1357,10 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
         </div>
       </Card>
 
-      <div className="space-y-6">
+      {/* 2-Column Responsive Layout with Sticky Left Pane */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left Column: Sticky Player, Seekbar, and Downloader */}
+        <div className="lg:col-span-2 lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto space-y-6 pr-1 pb-4 scrollbar-thin">
           <Card 
             ref={playerContainerRef} 
             className="overflow-hidden bg-slate-950 aspect-video relative flex items-center justify-center border border-border/40 shadow-glow group"
@@ -1654,7 +1657,10 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               </div>
             </Card>
           )}
-          {/* Detection Events List Card */}
+        </div>
+
+        {/* Right Column: Scrollable Detection Events List */}
+        <div className="lg:col-span-1">
           {selectedCameraId && playbackInfo && (
             <Card className="p-5 border border-border/40 flex flex-col min-h-[300px]">
               <div className="flex items-center justify-between pb-3 border-b border-border/10 mb-4">
@@ -1707,7 +1713,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                       <div className="text-xs font-bold text-muted-foreground font-mono sticky top-0 bg-background/90 py-1 backdrop-blur-sm z-10">
                         {group.hour}
                       </div>
-                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-2 xl:grid-cols-2 gap-3">
                         {group.events.map((evt) => {
                           const badge = getClassificationBadge(evt.type, t);
                           return (
@@ -1763,6 +1769,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
             </Card>
           )}
         </div>
+      </div>
 
       {/* Pratinjau Unduhan Dialog */}
       <Dialog open={isPreviewDownloadOpen} onOpenChange={setIsPreviewDownloadOpen}>
