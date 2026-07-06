@@ -236,7 +236,10 @@ export default function Events() {
                   onClick={() => handleEventClick(evt)}
                 >
                   {/* Snapshot Image Container */}
-                  <div className="relative aspect-video bg-muted/20 overflow-hidden shrink-0">
+                  <div 
+                    className="relative aspect-video bg-muted/20 overflow-hidden shrink-0 cursor-zoom-in"
+                    onClick={(e) => { e.stopPropagation(); setActiveSnapshot(evt.id); }}
+                  >
                     <img
                       src={eventApi.snapshotUrl(evt.id)}
                       alt="Snapshot"

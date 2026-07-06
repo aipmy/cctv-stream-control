@@ -2,6 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { Bell, AlertCircle, ChevronRight, ShieldAlert, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCamerasQuery } from "@/features/cameras/queries";
@@ -10,6 +11,7 @@ import { streamApi, eventApi } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export function NotificationBell() {
   const { data: cameras = [] } = useCamerasQuery();
@@ -88,6 +90,7 @@ export function NotificationBell() {
       title: string;
       message: string;
       cameraId?: string;
+      eventId?: string;
       site: string;
       time: number;
       icon: React.ReactNode;
@@ -148,6 +151,7 @@ export function NotificationBell() {
         type: "warning",
         title: `${evt.cameraName} - ${typeLabel}`,
         message: `${typeMsg} terdeteksi di site ${evt.site}.`,
+        eventId: evt.id,
         site: evt.site,
         time: new Date(evt.ts).getTime(),
         icon: EvtIcon,
@@ -158,8 +162,10 @@ export function NotificationBell() {
   }, [cameras, streamStatus, events, t, tError]);
 
   const activeCount = notifications.length;
+  const [activeSnapshot, setActiveSnapshot] = useState<string | null>(null);
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
@@ -216,6 +222,22 @@ export function NotificationBell() {
                       <span className="font-mono">{new Date(notif.time).toLocaleTimeString("id-ID", { hour12: false })}</span>
                     </div>
                   </div>
+                  {notif.type === "warning" && notif.eventId && (
+                    <div
+                      className="w-12 h-8 rounded border border-border/40 bg-muted/20 overflow-hidden shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity self-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveSnapshot(notif.eventId!);
+                      }}
+                    >
+                      <img
+                        src={eventApi.snapshotUrl(notif.eventId)}
+                        alt="Event Thumbnail"
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/30 self-center" />
                 </button>
               ))}
@@ -224,5 +246,20 @@ export function NotificationBell() {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+
+    <Dialog open={!!activeSnapshot} onOpenChange={(o) => !o && setActiveSnapshot(null)}>
+      <DialogContent className="max-w-2xl p-1 bg-black border-border/40">
+        {activeSnapshot && (
+          <div className="relative aspect-video">
+            <img
+              src={eventApi.snapshotUrl(activeSnapshot)}
+              alt="Full Snapshot"
+              className="w-full h-full object-contain"
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
