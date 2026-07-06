@@ -115,16 +115,19 @@ export function SmartDetectionEditor({
         }
 
         if (data.type === "ai-motion") {
-          if (data.predictions) {
-            console.log("Received AI predictions:", data.predictions);
+          if (data.predictions && data.predictions.length > 0) {
             aiBoxesRef.current = data.predictions;
+            // Auto clear ai boxes after 2 seconds (smooths out AI frame drops)
+            if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
+            (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 2000);
           }
-          // Auto clear ai boxes after 2 seconds
-          if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-          (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 10000);
           return;
         }
-        if (data.boxes) boxesRef.current = data.boxes;
+        if (data.boxes && data.boxes.length > 0) {
+          boxesRef.current = data.boxes;
+          if ((window as any)._boxClearTimeout) clearTimeout((window as any)._boxClearTimeout);
+          (window as any)._boxClearTimeout = setTimeout(() => { boxesRef.current = []; }, 800);
+        }
         if (data.frame) frameDims.current = data.frame;
         if (data.activity != null) setActivity(data.activity);
         if (data.motion != null) setIsMotionDetected(data.motion);

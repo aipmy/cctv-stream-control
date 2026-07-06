@@ -49,6 +49,7 @@ const empty = {
   enabled: true,
   enableRecording: false,
   enableNotifications: false,
+  enableSmartDetection: undefined as boolean | undefined,
   motionSensitivity: 50,
   motionArea: null as MotionArea | null,
   excludeAreas: [] as MotionArea[],
