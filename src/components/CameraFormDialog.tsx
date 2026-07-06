@@ -169,8 +169,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
   // Smart Detection preview filter toggles (local UI state, not persisted)
   const [sdShowPerson, setSdShowPerson] = useState(true);
-  const [sdShowPet, setSdShowPet] = useState(true);
-  const [sdShowMotion, setSdShowMotion] = useState(true);
+  const [sdShowPet, setSdShowPet] = useState(false);
+  const [sdShowMotion, setSdShowMotion] = useState(false);
   const [sdAiSensitivity, setSdAiSensitivity] = useState(50);
   const [sdMotionSensitivity, setSdMotionSensitivity] = useState(10);
 

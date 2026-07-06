@@ -78,30 +78,56 @@ if (!isMainThread) {
   // Worker Thread
   (async () => {
     try {
-      const tf = await import('@tensorflow/tfjs');
-      tf.setBackend('cpu');
-      const cocoSsd = await import('@tensorflow-models/coco-ssd');
-      const jpeg = await import('jpeg-js');
+      const { createRequire } = await import('module');
+      const require = createRequire(import.meta.url);
+      const util = require('util');
+      if (typeof util.isNullOrUndefined !== 'function') {
+        util.isNullOrUndefined = function (val) {
+          return val === null || val === undefined;
+        };
+      }
       
-      console.log("[AI Worker] Loading COCO-SSD model...");
+      let tf;
+      let isNode = false;
+      try {
+        tf = await import('@tensorflow/tfjs-node');
+        isNode = true;
+      } catch (e) {
+        tf = await import('@tensorflow/tfjs');
+        tf.setBackend('cpu');
+      }
+      
+      const cocoSsd = await import('@tensorflow-models/coco-ssd');
+      
+      console.log(`[AI Worker] Loading COCO-SSD model (using ${isNode ? 'tfjs-node' : 'tfjs-cpu'})...`);
       const model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
       parentPort.postMessage({ type: 'ready' });
 
       parentPort.on('message', async (msg) => {
         if (!msg.buffer) return;
         try {
-          const rawImageData = jpeg.default.decode(msg.buffer, { useTArray: true });
-          const numPixels = rawImageData.width * rawImageData.height;
-          const values = new Int32Array(numPixels * 3);
+          let imageTensor;
+          let frameWidth, frameHeight;
           
-          for (let i = 0; i < numPixels; i++) {
-            values[i * 3 + 0] = rawImageData.data[i * 4 + 0]; // R
-            values[i * 3 + 1] = rawImageData.data[i * 4 + 1]; // G
-            values[i * 3 + 2] = rawImageData.data[i * 4 + 2]; // B
+          if (isNode) {
+            imageTensor = tf.node.decodeImage(msg.buffer);
+            frameWidth = imageTensor.shape[1];
+            frameHeight = imageTensor.shape[0];
+          } else {
+            const jpeg = await import('jpeg-js');
+            const rawImageData = jpeg.default.decode(msg.buffer, { useTArray: true });
+            frameWidth = rawImageData.width;
+            frameHeight = rawImageData.height;
+            const numPixels = frameWidth * frameHeight;
+            const values = new Int32Array(numPixels * 3);
+            for (let i = 0; i < numPixels; i++) {
+              values[i * 3 + 0] = rawImageData.data[i * 4 + 0]; // R
+              values[i * 3 + 1] = rawImageData.data[i * 4 + 1]; // G
+              values[i * 3 + 2] = rawImageData.data[i * 4 + 2]; // B
+            }
+            const outShape = [frameHeight, frameWidth, 3];
+            imageTensor = tf.tensor3d(values, outShape, 'int32');
           }
-
-          const outShape = [rawImageData.height, rawImageData.width, 3];
-          const imageTensor = tf.tensor3d(values, outShape, 'int32');
           
           const start = Date.now();
           const predictions = await model.detect(imageTensor, 40, 0.01);
@@ -113,8 +139,8 @@ if (!isMainThread) {
             class: p.class,
             score: p.score,
             bbox: p.bbox,
-            frameWidth: rawImageData.width,
-            frameHeight: rawImageData.height
+            frameWidth,
+            frameHeight
           }));
 
           if (formatted.length > 0) {
