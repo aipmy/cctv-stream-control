@@ -410,11 +410,11 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             // session.aiBusy lock prevents worker queue buildup
             if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > 1000)) {
               session.aiBusy = true;
-              session.lastAiProcess = nowMs;
               
               import("../core/aiDetector.js").then(ai => {
                 ai.detectObjects(frame).then(predictions => {
                   session.aiBusy = false;
+                  session.lastAiProcess = Date.now();
                   
                   if (predictions === null) return; // Frame was dropped, do not wipe previous UI boxes
                   
@@ -432,10 +432,12 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   }
                 }).catch(err => {
                   session.aiBusy = false;
+                  session.lastAiProcess = Date.now();
                   console.error("[AI Engine Error]", err);
                 });
               }).catch(err => {
                 session.aiBusy = false;
+                session.lastAiProcess = Date.now();
                 console.error("[AI Load Error]", err);
               });
             }
