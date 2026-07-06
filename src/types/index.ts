@@ -52,6 +52,7 @@ export interface Camera {
   errorHistory?: Array<{ timestamp: string; message: string }>;
   enableRecording?: boolean;
   enableNotifications?: boolean;
+  enableSmartDetection?: boolean;
   motionSensitivity?: number;
   motionArea?: MotionArea | null;
   excludeAreas?: MotionArea[] | null;

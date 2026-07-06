@@ -912,7 +912,20 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
             <TabsContent value="smart" className="flex-1 overflow-y-auto px-1 space-y-4 data-[state=active]:block data-[state=inactive]:hidden">
               <div className="space-y-4">
-                {(form.enableNotifications || form.enableRecording) && (
+                <div className="flex items-center justify-between rounded-md border p-3 bg-muted/20">
+                  <div className="min-w-0 pr-2">
+                    <Label className="text-sm font-semibold">Enable Smart Detection & AI</Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Turn on/off motion & AI processing for this camera. Required for events/notifications.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.enableSmartDetection ?? (form.enableRecording || form.enableNotifications)}
+                    onCheckedChange={(v) => setForm({ ...form, enableSmartDetection: v })}
+                  />
+                </div>
+
+                {(form.enableSmartDetection ?? (form.enableRecording || form.enableNotifications)) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in">
                     <div className="flex items-center justify-between rounded-md border p-3">
                       <div className="min-w-0 pr-2 flex-1">
@@ -960,7 +973,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 )}
 
                 {/* ──── Smart Detection Live View & Masking Area ──── */}
-                <div className="rounded-md border p-4 space-y-3 animate-fade-in">
+                {(form.enableSmartDetection ?? (form.enableRecording || form.enableNotifications)) && (
+                  <div className="rounded-md border p-4 space-y-3 animate-fade-in">
                   <div>
                     <Label className="text-sm font-semibold">{t("smartDetectionLiveView")}</Label>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -1014,6 +1028,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     onEnableSoundDetectionChange={(val) => setForm({ ...form, enableSoundDetection: val })}
                   />
                 </div>
+                )}
               </div>
             </TabsContent>
 

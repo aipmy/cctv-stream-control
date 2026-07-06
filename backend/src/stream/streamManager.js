@@ -348,7 +348,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     const audioFallback = audioFailures.has(id);
     const args = buildHlsArgs({ camera, output, dir, recordDir, options: config, audioFallback });
 
-    const hasSmartFeatures = camera.enableRecording || camera.enableNotifications;
+    const hasSmartFeatures = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
 
     const child = spawn(config.ffmpegBin, args, { stdio: ["ignore", "pipe", "pipe"] });
     const session = {
@@ -381,7 +381,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         session.lastFrame = frame;
         
         // Feed frame to pixel-diff motion engine (non-blocking)
-        const hasSmart = Boolean(camera.enableRecording || camera.enableNotifications);
+        const hasSmart = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
         const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
         const hasAiListeners = motionEmitter.listenerCount(`ai-motion-${id}`) > 0;
         
