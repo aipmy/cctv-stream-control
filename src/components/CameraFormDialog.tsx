@@ -332,6 +332,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       setSdAiSensitivity(camera.aiSensitivity ?? 50);
       setSdShowPerson(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("human") : true);
       setSdShowPet(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("pet") : false);
+      setSdShowObject(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("object") : false);
       setSdShowMotion(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("pixel") : false);
     } else {
       setForm(emptyWithSite);
