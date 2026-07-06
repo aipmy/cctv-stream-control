@@ -1668,7 +1668,7 @@ function UnifiedMotionEditor({
   const undoPoint = () => { setPolyPoints((prev) => prev.slice(0, -1)); };
 
   // Motion sensitivity label
-  const motionSensLabel = motionSensitivityValue < 15 ? "Very High" : motionSensitivityValue < 25 ? "High" : motionSensitivityValue < 35 ? "Medium" : "Low";
+  const motionSensLabel = motionSensitivityValue > 85 ? "Extreme" : motionSensitivityValue > 70 ? "Very High" : motionSensitivityValue > 50 ? "High" : motionSensitivityValue > 30 ? "Medium" : "Low";
 
   return (
     <div className="space-y-3">
@@ -1749,7 +1749,7 @@ function UnifiedMotionEditor({
               id="motion-sens-slider"
               type="range"
               min={1}
-              max={50}
+              max={100}
               value={motionSensitivityValue}
               onChange={(e) => onMotionSensitivityChange?.(Number(e.target.value))}
               className="w-24 accent-amber-500 cursor-pointer"
