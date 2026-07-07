@@ -1458,7 +1458,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                     return (
                       <div
                         key={evt.id}
-                        className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full"
+                        className="group relative z-0 aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full"
                         onClick={() => handleEventClick(evt)}
                       >
                         <img
@@ -1496,7 +1496,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                         {/* Mobile Direct Snapshot Trigger Icon (Bottom Left) */}
                         <button
                           type="button"
-                          className="absolute bottom-1.5 left-1.5 p-1 rounded bg-black/75 hover:bg-black text-white border border-white/10 shadow-lg z-20 cursor-pointer transition-colors block md:hidden"
+                          className="absolute bottom-1.5 left-1.5 p-1 rounded bg-black/75 hover:bg-black text-white border border-white/10 shadow-lg z-10 cursor-pointer transition-colors block md:hidden"
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveSnapshot(evt.id);
