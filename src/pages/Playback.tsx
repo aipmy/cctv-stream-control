@@ -254,6 +254,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePosterUrl, setActivePosterUrl] = useState<string | null>(null);
+  const [activeSnapshot, setActiveSnapshot] = useState<string | null>(null);
 
   // Download form states
   const [downloadStart, setDownloadStart] = useState("12:00");
@@ -1448,9 +1449,9 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                   {group.events.map((evt) => {
                     const badge = getClassificationBadge(evt.type, t);
                     return (
-                      <button
+                      <div
                         key={evt.id}
-                        className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full text-left"
+                        className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full"
                         onClick={() => handleEventClick(evt)}
                       >
                         <img
@@ -1485,11 +1486,46 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                           </span>
                         )}
 
-                        {/* Play Overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                          <Play className="h-5 w-5 text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.5)] fill-white" />
+                        {/* Mobile Direct Snapshot Trigger Icon (Bottom Left) */}
+                        <button
+                          type="button"
+                          className="absolute bottom-1.5 left-1.5 p-1 rounded bg-black/75 hover:bg-black text-white border border-white/10 shadow-lg z-20 cursor-pointer transition-colors block md:hidden"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSnapshot(evt.id);
+                          }}
+                          title="Lihat Snapshot"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </button>
+
+                        {/* Desktop Hover Actions Overlay */}
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center gap-1.5 transition-all duration-300 z-10">
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            className="h-7 px-2 text-[10px] bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur-md font-semibold"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveSnapshot(evt.id);
+                            }}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Snapshot
+                          </Button>
+                          <Button
+                            size="xs"
+                            className="h-7 px-2 text-[10px] font-semibold"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEventClick(evt);
+                            }}
+                          >
+                            <Play className="h-3 w-3 mr-1 fill-current" />
+                            Play
+                          </Button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -2017,6 +2053,46 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               {t("downloadMp4")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Zoomed Snapshot Dialog */}
+      <Dialog open={activeSnapshot !== null} onOpenChange={(open) => !open && setActiveSnapshot(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-slate-950/95 border border-white/10 backdrop-blur-xl">
+          {activeSnapshot && (
+            <div className="relative aspect-video w-full">
+              <img
+                src={eventApi.snapshotUrl(activeSnapshot)}
+                alt="Full Snapshot"
+                className="w-full h-full object-contain"
+              />
+              <div className="absolute bottom-4 right-4 flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  className="bg-white/10 text-white hover:bg-white/20 border border-white/10 backdrop-blur-md text-xs font-semibold"
+                  onClick={() => window.open(eventApi.snapshotUrl(activeSnapshot), "_blank")}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                  {lang === "id" ? "Buka Tab Baru" : "Open in New Tab"}
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="text-xs font-semibold"
+                  onClick={() => {
+                    const evt = events.find(e => e.id === activeSnapshot);
+                    if (evt) {
+                      setActiveSnapshot(null);
+                      handleEventClick(evt);
+                    }
+                  }}
+                >
+                  <Video className="h-3.5 w-3.5 mr-1.5" />
+                  {lang === "id" ? "Putar Rekaman" : "Play Recording"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
