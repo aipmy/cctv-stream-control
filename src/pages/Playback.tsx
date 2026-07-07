@@ -718,8 +718,8 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     const video = videoRef.current;
     if (!video || !info || !info.firstSegmentUnixTime) return;
 
-    // Jump 15s before event
-    const eventTime = Math.floor(new Date(eventTs).getTime() / 1000) - 15;
+    // Jump 3s before event
+    const eventTime = Math.floor(new Date(eventTs).getTime() / 1000) - 3;
 
     // If a short HLS window is active, ensure we load HLS playlist around this event
     if (playbackWindowMinutes !== "none") {
@@ -742,7 +742,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     video.muted = isMuted;
     video.play().catch(() => {});
     setIsPlaying(true);
-    toast.info(`Melompat ke 15s sebelum deteksi: ${new Date(eventTs).toLocaleTimeString("id-ID", { hour12: false })}`);
+    toast.info(`Melompat ke 3 detik sebelum deteksi: ${new Date(eventTs).toLocaleTimeString("id-ID", { hour12: false })}`);
   };
 
   const seekToEvent = (eventTs: string) => {
@@ -752,10 +752,8 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const handleEventClick = (evt: SmartEvent) => {
     const eventLocalDate = new Date(evt.ts).toLocaleDateString("sv-SE");
     const isDifferentCameraOrDate = selectedCameraId !== evt.cameraId || selectedDate !== eventLocalDate;
-    const video = videoRef.current;
-    const isPaused = !video || video.paused;
 
-    if (isDifferentCameraOrDate || isPaused) {
+    if (isDifferentCameraOrDate) {
       setActivePosterUrl(eventApi.snapshotUrl(evt.id));
     } else {
       setActivePosterUrl(null);
@@ -1510,34 +1508,34 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
 
                         {/* Desktop Hover Actions Overlay */}
                         <div 
-                          className="absolute inset-0 bg-black/80 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center gap-1.5 transition-all duration-300 z-10"
+                          className="absolute inset-0 bg-black/80 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center gap-3 transition-all duration-300 z-10"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEventClick(evt);
                           }}
                         >
                           <Button
-                            size="xs"
+                            size="icon"
                             variant="secondary"
-                            className="h-7 px-2 text-[10px] bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur-md font-semibold"
+                            className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur-md"
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveSnapshot(evt.id);
                             }}
+                            title="Tampilkan Snapshot"
                           >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Snapshot
+                            <Eye className="h-4 w-4" />
                           </Button>
                           <Button
-                            size="xs"
-                            className="h-7 px-2 text-[10px] font-semibold"
+                            size="icon"
+                            className="h-8 w-8 rounded-full"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEventClick(evt);
                             }}
+                            title="Putar Rekaman"
                           >
-                            <Play className="h-3 w-3 mr-1 fill-current" />
-                            Play
+                            <Play className="h-4 w-4 fill-current" />
                           </Button>
                         </div>
                       </div>
@@ -2072,40 +2070,15 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       </Dialog>
 
       {/* Zoomed Snapshot Dialog */}
-      <Dialog open={activeSnapshot !== null} onOpenChange={(open) => !open && setActiveSnapshot(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-slate-950/95 border border-white/10 backdrop-blur-xl">
+      <Dialog open={!!activeSnapshot} onOpenChange={(o) => !o && setActiveSnapshot(null)}>
+        <DialogContent className="max-w-3xl p-1 bg-black">
           {activeSnapshot && (
-            <div className="relative aspect-video w-full">
+            <div className="relative aspect-video">
               <img
                 src={eventApi.snapshotUrl(activeSnapshot)}
                 alt="Full Snapshot"
                 className="w-full h-full object-contain"
               />
-              <div className="absolute bottom-4 right-4 flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="secondary" 
-                  className="bg-white/10 text-white hover:bg-white/20 border border-white/10 backdrop-blur-md text-xs font-semibold"
-                  onClick={() => window.open(eventApi.snapshotUrl(activeSnapshot), "_blank")}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                  {lang === "id" ? "Buka Tab Baru" : "Open in New Tab"}
-                </Button>
-                <Button 
-                  size="sm" 
-                  className="text-xs font-semibold"
-                  onClick={() => {
-                    const evt = events.find(e => e.id === activeSnapshot);
-                    if (evt) {
-                      setActiveSnapshot(null);
-                      handleEventClick(evt);
-                    }
-                  }}
-                >
-                  <Video className="h-3.5 w-3.5 mr-1.5" />
-                  {lang === "id" ? "Putar Rekaman" : "Play Recording"}
-                </Button>
-              </div>
             </div>
           )}
         </DialogContent>
