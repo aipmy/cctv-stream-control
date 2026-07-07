@@ -20,7 +20,7 @@ import {
   PlayCircle, Calendar, Download, Eye, ShieldAlert, AlertTriangle, Loader2, 
   User, Footprints, Activity, Trash2, Play, Pause, RotateCcw, RotateCw, 
   Volume2, VolumeX, Maximize, Search, SlidersHorizontal, Info, ChevronsUpDown,
-  ChevronLeft, ChevronRight, Car
+  ChevronLeft, ChevronRight, Car, Video
 } from "lucide-react";
 import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
