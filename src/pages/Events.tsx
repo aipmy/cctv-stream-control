@@ -286,11 +286,10 @@ export default function Events() {
                         
                         return (
                           <span className={cn(
-                            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] uppercase font-bold tracking-wider backdrop-blur-md shadow-lg border",
+                            "h-7 w-7 rounded-full flex items-center justify-center text-sm backdrop-blur-md shadow-lg border",
                             colorClass
-                          )}>
-                            <span>{emoji}</span>
-                            <span>{label}</span>
+                          )} title={label}>
+                            {emoji}
                           </span>
                         );
                       })()}

@@ -1477,13 +1477,12 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                           {formatEventTime(evt.ts)}
                         </span>
 
-                        {/* Classification Badge (Top Left) */}
+                        {/* Classification Badge (Top Left) - Icon Only */}
                         <span className={cn(
-                          "absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-semibold flex items-center gap-1 backdrop-blur-sm shadow-sm leading-none border border-white/5 text-white",
+                          "absolute top-1.5 left-1.5 h-5 w-5 rounded-full text-[10px] flex items-center justify-center backdrop-blur-md shadow-md border border-white/10",
                           badge.bgColor
-                        )}>
-                          <span>{badge.icon}</span>
-                          <span className="uppercase tracking-wider text-[7px]">{getClassificationLabel(evt.type, evt.typeDescription, t)}</span>
+                        )} title={getClassificationLabel(evt.type, evt.typeDescription, t)}>
+                          {badge.icon}
                         </span>
 
                         {/* Score (Top Right) */}
