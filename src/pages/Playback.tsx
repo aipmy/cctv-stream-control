@@ -253,6 +253,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   const [events, setEvents] = useState<SmartEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePosterUrl, setActivePosterUrl] = useState<string | null>(null);
 
   // Download form states
   const [downloadStart, setDownloadStart] = useState("12:00");
@@ -459,6 +460,17 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
       });
       filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
       setEvents(filtered);
+
+      if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+        const targetTs = effectiveState.timestamp;
+        const closestEvent = filtered.find(e => {
+          const eUnix = Math.floor(new Date(e.ts).getTime() / 1000);
+          return Math.abs(eUnix - targetTs) <= 2;
+        });
+        if (closestEvent) {
+          setActivePosterUrl(eventApi.snapshotUrl(closestEvent.id));
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("failedLoadRecordings"));
       toast.error(t("failedFetchPlayback"));
@@ -737,6 +749,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   };
 
   const handleEventClick = (evt: SmartEvent) => {
+    setActivePosterUrl(eventApi.snapshotUrl(evt.id));
     if (selectedCameraId === evt.cameraId) {
       seekToEvent(evt.ts);
     } else {
@@ -1060,6 +1073,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     } else {
       // Direct click to seek anywhere on timeline
       setIsScrubbing(true);
+      setActivePosterUrl(null);
       setDragStartX(e.clientX);
       dragStartPlayheadRef.current = clickUnix;
       setCurrentPlaybackTs(clickUnix);
@@ -1193,6 +1207,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
     const clickUnix = getUnixFromX(clickX);
 
     setIsScrubbing(true);
+    setActivePosterUrl(null);
     setDragStartX(touch.clientX);
     dragStartPlayheadRef.current = clickUnix;
     setCurrentPlaybackTs(clickUnix);
@@ -1387,6 +1402,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                 const d = new Date(selectedDate);
                 d.setDate(d.getDate() - 1);
                 setSelectedDate(d.toISOString().split("T")[0]);
+                setActivePosterUrl(null);
               }}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -1402,6 +1418,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                 const d = new Date(selectedDate);
                 d.setDate(d.getDate() + 1);
                 setSelectedDate(d.toISOString().split("T")[0]);
+                setActivePosterUrl(null);
               }}
             >
               <ChevronRight className="h-4 w-4" />
@@ -1540,6 +1557,7 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                           key={c.id}
                           onClick={() => {
                             setSelectedCameraId(c.id);
+                            setActivePosterUrl(null);
                             setIsCameraPopoverOpen(false);
                           }}
                           className={cn(
@@ -1566,7 +1584,10 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setActivePosterUrl(null);
+                }}
                 className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
                 style={{
                   colorScheme: theme === "dark" ? "dark" : "light",
@@ -1638,26 +1659,50 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                 </p>
               </div>
             ) : playbackInfo?.hasRecording ? (
-              <video
-                ref={videoRef}
-                className="w-full h-full object-contain cursor-pointer"
-                crossOrigin="anonymous"
-                muted={isMuted}
-                onTimeUpdate={handleVideoTimeUpdate}
-                onWaiting={() => {
-                  const v = videoRef.current;
-                  if (v && !v.paused) {
-                    setIsBuffering(true);
-                  }
-                }}
-                onPlaying={() => setIsBuffering(false)}
-                onPause={() => {
-                  setIsPlaying(false);
-                  setIsBuffering(false);
-                }}
-                onPlay={() => setIsPlaying(true)}
-                onClick={togglePlay}
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain cursor-pointer"
+                  crossOrigin="anonymous"
+                  muted={isMuted}
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  onWaiting={() => {
+                    const v = videoRef.current;
+                    if (v && !v.paused) {
+                      setIsBuffering(true);
+                    }
+                  }}
+                  onPlaying={() => {
+                    setIsBuffering(false);
+                    setActivePosterUrl(null);
+                  }}
+                  onSeeked={() => {
+                    setActivePosterUrl(null);
+                  }}
+                  onPause={() => {
+                    setIsPlaying(false);
+                    setIsBuffering(false);
+                  }}
+                  onPlay={() => setIsPlaying(true)}
+                  onClick={togglePlay}
+                />
+                {activePosterUrl && (
+                  <div className="absolute inset-0 bg-slate-950 flex items-center justify-center z-10 pointer-events-none">
+                    <img
+                      src={activePosterUrl}
+                      alt="Event Snapshot"
+                      className="w-full h-full object-contain select-none animate-fade-in"
+                    />
+                    <div className="absolute inset-0 bg-black/25" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-black/75 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 text-white text-xs font-semibold shadow-2xl">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span>{t("loadingSegments")}...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                 <PlayCircle className="h-12 w-12 text-muted-foreground/30 mb-3" />
