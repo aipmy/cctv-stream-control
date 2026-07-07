@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Eye, Trash2, Video, Bell, Volume2, ShieldAlert, Sparkles, User, Footprints, Activity, Loader2, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import type { SmartEvent } from "@/types";
+import { cn } from "@/lib/utils";
 
 const getClassificationLabel = (classification?: string, fallback?: string) => {
   switch (classification) {
