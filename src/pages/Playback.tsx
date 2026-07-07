@@ -750,11 +750,20 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
   };
 
   const handleEventClick = (evt: SmartEvent) => {
-    setActivePosterUrl(eventApi.snapshotUrl(evt.id));
+    const eventLocalDate = new Date(evt.ts).toLocaleDateString("sv-SE");
+    const isDifferentCameraOrDate = selectedCameraId !== evt.cameraId || selectedDate !== eventLocalDate;
+    const video = videoRef.current;
+    const isPaused = !video || video.paused;
+
+    if (isDifferentCameraOrDate || isPaused) {
+      setActivePosterUrl(eventApi.snapshotUrl(evt.id));
+    } else {
+      setActivePosterUrl(null);
+    }
+
     if (selectedCameraId === evt.cameraId) {
       seekToEvent(evt.ts);
     } else {
-      const eventLocalDate = new Date(evt.ts).toLocaleDateString("sv-SE");
       autoSeekEventTsRef.current = evt.ts;
       setSelectedCameraId(evt.cameraId);
       setSelectedDate(eventLocalDate);
@@ -1500,7 +1509,13 @@ function getRecordingBlocks(mappings: Array<{ ts: number; offset: number; durati
                         </button>
 
                         {/* Desktop Hover Actions Overlay */}
-                        <div className="absolute inset-0 bg-black/80 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center gap-1.5 transition-all duration-300 z-10">
+                        <div 
+                          className="absolute inset-0 bg-black/80 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center gap-1.5 transition-all duration-300 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEventClick(evt);
+                          }}
+                        >
                           <Button
                             size="xs"
                             variant="secondary"
