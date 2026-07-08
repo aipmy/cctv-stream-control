@@ -41,6 +41,37 @@ function formatRelativeTime(timestamp: number, lang: string) {
   });
 }
 
+const playChime = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
+    const now = audioCtx.currentTime;
+
+    const playTone = (freq: number, start: number, duration: number) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, start);
+      
+      gain.gain.setValueAtTime(0.12, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+
+    playTone(523.25, now, 0.15); // C5
+    playTone(659.25, now + 0.12, 0.25); // E5
+  } catch (err) {
+    console.error("Failed to play notification sound:", err);
+  }
+};
+
 export function NotificationBell() {
   const { data: cameras = [] } = useCamerasQuery();
   const { data: streamStatus = [] } = useQuery({
@@ -71,10 +102,15 @@ export function NotificationBell() {
       return;
     }
 
+    let playedSound = false;
     events.forEach(evt => {
       if (!seenEventIds.has(evt.id)) {
         const elapsed = Date.now() - new Date(evt.ts).getTime();
         if (elapsed < 15000) {
+          if (!playedSound) {
+            playChime();
+            playedSound = true;
+          }
           let typeLabel = t("motion");
           let emoji = "🏃";
           
