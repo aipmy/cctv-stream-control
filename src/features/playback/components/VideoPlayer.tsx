@@ -62,6 +62,7 @@ export function VideoPlayer() {
     async function initializePlayer() {
       if (useNative) {
         video.src = playlistSrc;
+        let nativeRetryAttempts = 0;
         video.onloadedmetadata = () => {
           if (!disposed) {
             video.muted = isMuted;
@@ -71,6 +72,29 @@ export function VideoPlayer() {
             }
             video.play().catch(() => {});
             setIsPlaying(true);
+          }
+        };
+        video.onerror = () => {
+          if (!disposed) {
+            if (video.error && video.error.code === 4 && nativeRetryAttempts < 4) {
+              nativeRetryAttempts += 1;
+              setTimeout(() => {
+                if (!disposed && videoRef.current) {
+                  videoRef.current.src = playlistSrc;
+                  videoRef.current.load();
+                }
+              }, 3000);
+              return;
+            }
+            
+            // If it still fails, show error overlay
+            if (video.error && video.error.code === 4) {
+               setError(t("failedLoadSegments")); // or a translation for code 4
+               setActivePosterUrl(null);
+            } else {
+               setError(t("failedLoadSegments"));
+               setActivePosterUrl(null);
+            }
           }
         };
         return;

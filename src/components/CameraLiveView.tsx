@@ -148,14 +148,31 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
 
         if (useNative) {
           video.src = src;
+          let nativeRetryAttempts = 0;
           video.onloadeddata = () => {
             if (!disposed) setLoading(false);
           };
           video.onerror = () => {
             if (!disposed) {
+              if (video.error && video.error.code === 4 && nativeRetryAttempts < 4) {
+                nativeRetryAttempts += 1;
+                // Wait a bit and retry fetching the stream (FFmpeg might just be slow to produce segments)
+                setTimeout(() => {
+                  if (!disposed && videoRef.current) {
+                    videoRef.current.src = src;
+                    videoRef.current.load();
+                  }
+                }, 3000);
+                return;
+              }
+
               setLoading(false);
-              const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
-              setError(tRef.current("streamFailedToLoadInBrowser", { output, errMsg: errMsg || tRef.current("checkCodecOrTranscode") }));
+              if (video.error && video.error.code === 4) {
+                 setError(tRef.current("fragError"));
+              } else {
+                 const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
+                 setError(tRef.current("streamFailedToLoadInBrowser", { output, errMsg: errMsg || tRef.current("checkCodecOrTranscode") }));
+              }
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
