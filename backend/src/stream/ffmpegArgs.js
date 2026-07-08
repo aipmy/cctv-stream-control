@@ -110,7 +110,6 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const args = [
     "-hide_banner", "-nostdin",
     "-fflags", "nobuffer+genpts",
-    ...(lowLatency ? ["-flags", "low_delay"] : []),
     "-loglevel", options.ffmpegLogLevel || "warning",
     ...buildRtspInputArgs(camera, options),
     "-i", source,
