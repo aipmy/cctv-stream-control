@@ -306,20 +306,34 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
 
     const segmentMappings = [];
     let currentOffset = 0;
-    for (let i = 0; i < segments.length; i++) {
-      let duration = targetDuration;
-      if (i < segments.length - 1) {
-        const diff = segments[i + 1].ts - segments[i].ts;
-        if (diff > 0 && diff <= 5) {
-          duration = diff;
+    if (segments.length > 0) {
+      let activeBlock = null;
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        let duration = targetDuration;
+        let isContiguous = false;
+        if (i < segments.length - 1) {
+          const diff = segments[i + 1].ts - seg.ts;
+          if (diff > 0 && diff <= 5) {
+            duration = diff;
+            isContiguous = true;
+          }
+        }
+        if (!activeBlock) {
+          activeBlock = {
+            ts: seg.ts,
+            offset: currentOffset,
+            duration: duration
+          };
+        } else {
+          activeBlock.duration += duration;
+        }
+        if (!isContiguous) {
+          segmentMappings.push(activeBlock);
+          currentOffset += activeBlock.duration;
+          activeBlock = null;
         }
       }
-      segmentMappings.push({
-        ts: segments[i].ts,
-        offset: currentOffset,
-        duration: duration
-      });
-      currentOffset += duration;
     }
 
     res.json({

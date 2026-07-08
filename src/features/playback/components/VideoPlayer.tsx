@@ -254,7 +254,7 @@ export function VideoPlayer() {
           ref={playerContainerRef} 
           className="overflow-hidden bg-slate-950 aspect-video relative flex flex-col items-center justify-center border border-border/40 shadow-glow group"
         >
-          {loading && (
+          {loading && !activePosterUrl && (
             <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-full text-white text-[10px] font-medium z-25 shadow-lg animate-fade-in">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               <span>{t("loadingSegments")}...</span>

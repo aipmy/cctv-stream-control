@@ -36,6 +36,7 @@ function PlaybackContent() {
     if (!selectedCameraId) return;
     setLoading(true);
     setError(null);
+    setActivePosterUrl(null);
     setCurrentPlaybackTs(null);
     setCurrentRecordingTime(null);
     setTimelineCenterTs(null);
