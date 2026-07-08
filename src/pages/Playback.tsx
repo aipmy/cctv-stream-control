@@ -32,7 +32,7 @@ function PlaybackContent() {
   const effectiveState = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
   const initialSeekDone = React.useRef(false);
 
-  const loadPlaybackData = async () => {
+  const loadPlaybackSegments = async () => {
     if (!selectedCameraId) return;
     setLoading(true);
     setError(null);
@@ -40,8 +40,6 @@ function PlaybackContent() {
     setCurrentRecordingTime(null);
     setTimelineCenterTs(null);
 
-    // HLS destruction is handled automatically by VideoPlayer's cleanup
-    // so we just fetch data here.
     try {
       let start: number | undefined;
       let end: number | undefined;
@@ -67,7 +65,18 @@ function PlaybackContent() {
         }
       }
 
-      // Fetch events unconditionally for the selected camera and date
+      setLoadPlaybackTrigger((prev) => prev + 1); // trigger VideoPlayer to reinitialize HLS
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("failedLoadRecordings"));
+      toast.error(t("failedFetchPlayback"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadEvents = async () => {
+    if (!selectedCameraId) return;
+    try {
       const allEvents = await eventApi.list();
       const filtered = allEvents.filter((e) => {
         const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
@@ -90,19 +99,18 @@ function PlaybackContent() {
         }
         initialSeekDone.current = true;
       }
-
-      setLoadPlaybackTrigger((prev) => prev + 1); // trigger VideoPlayer to reinitialize HLS
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("failedLoadRecordings"));
-      toast.error(t("failedFetchPlayback"));
-    } finally {
-      setLoading(false);
+      console.error("Failed to load events", err);
     }
   };
 
   React.useEffect(() => {
-    loadPlaybackData();
+    loadPlaybackSegments();
   }, [selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs]);
+
+  React.useEffect(() => {
+    loadEvents();
+  }, [selectedCameraId, selectedDate]);
 
   React.useEffect(() => {
     if (!selectedCameraId) {

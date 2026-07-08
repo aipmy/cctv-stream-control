@@ -10,6 +10,7 @@ import { classifyStreamError } from "../stream/streamError.js";
 import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const streamRoutes = Router();
+const diskUsageCache = new Map(); // cameraId -> { size, ts }
 
 // Validate camera access by user's allowedGroups/sites
 streamRoutes.param("id", async (req, res, next, id) => {
@@ -229,21 +230,28 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const hlsBaseDir = path.join(config.storageDir, "hls", id);
     try {
       if (fs.existsSync(hlsBaseDir)) {
-        const calculateDirSize = async (dirPath) => {
-          let total = 0;
-          const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
-          for (const item of list) {
-            const fullPath = path.join(dirPath, item.name);
-            if (item.isDirectory()) {
-              total += await calculateDirSize(fullPath);
-            } else if (item.isFile()) {
-              const stats = await fs.promises.stat(fullPath);
-              total += stats.size;
+        const cached = diskUsageCache.get(id);
+        const now = Date.now();
+        if (cached && now - cached.ts < 30000) { // Cache for 30s
+          diskUsageBytes = cached.size;
+        } else {
+          const calculateDirSize = async (dirPath) => {
+            let total = 0;
+            const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
+            for (const item of list) {
+              const fullPath = path.join(dirPath, item.name);
+              if (item.isDirectory()) {
+                total += await calculateDirSize(fullPath);
+              } else if (item.isFile()) {
+                const stats = await fs.promises.stat(fullPath);
+                total += stats.size;
+              }
             }
-          }
-          return total;
-        };
-        diskUsageBytes = await calculateDirSize(hlsBaseDir);
+            return total;
+          };
+          diskUsageBytes = await calculateDirSize(hlsBaseDir);
+          diskUsageCache.set(id, { size: diskUsageBytes, ts: now });
+        }
       }
     } catch (err) {
       console.error("Error calculating HLS dir size:", err);
