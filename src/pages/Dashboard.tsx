@@ -160,12 +160,22 @@ export default function Dashboard() {
 
   const getEventLabel = (evt: SmartEvent) => {
     if (evt.type === "sound") return t("sound");
-    if (evt.type === "person" || evt.type === "human") return "Orang Terdeteksi";
-    if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) return "Hewan Terdeteksi";
-    if (evt.type === "pixel") return "Gerakan Umum";
-    if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) return "Kendaraan Terdeteksi";
-    if (evt.type === "motion") return "Gerakan Terdeteksi";
-    return evt.typeDescription || evt.type || "Gerakan Terdeteksi";
+    if (evt.type === "person" || evt.type === "human") {
+      return lang === "id" ? "Manusia Terdeteksi" : "Human Detected";
+    }
+    if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
+      return lang === "id" ? "Hewan Terdeteksi" : "Pet Detected";
+    }
+    if (evt.type === "pixel") {
+      return lang === "id" ? "Gerakan Umum" : "General Motion";
+    }
+    if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
+      return lang === "id" ? "Kendaraan Terdeteksi" : "Vehicle Detected";
+    }
+    if (evt.type === "motion") {
+      return lang === "id" ? "Gerakan Terdeteksi" : "Motion Detected";
+    }
+    return evt.typeDescription || evt.type || (lang === "id" ? "Gerakan Terdeteksi" : "Motion Detected");
   };
 
   const enabled = cameras.filter((c) => c.enabled).length;
@@ -191,7 +201,9 @@ export default function Dashboard() {
         <div className="space-y-5">
           {/* Row 1: CCTV Status */}
           <div className="space-y-2">
-            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">Jaringan CCTV</h4>
+            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">
+              {lang === "id" ? "Jaringan CCTV" : "CCTV Network"}
+            </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <StatCard label={t("totalCameras")} value={cameras.length} icon="camera" />
               <StatCard 
@@ -221,7 +233,9 @@ export default function Dashboard() {
 
           {/* Row 2: Server System Telemetry */}
           <div className="space-y-2">
-            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">Kesehatan Server NVR</h4>
+            <h4 className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest pl-1">
+              {lang === "id" ? "Kesehatan Server NVR" : "NVR Server Health"}
+            </h4>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
               <StatCard 
                 label={t("cpuUsage")} 
@@ -292,7 +306,9 @@ export default function Dashboard() {
         <Card className="p-4 bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 shadow-2xl rounded-xl">
           <div className="flex items-center gap-2 mb-2">
             <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-            <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Grafik Bandwidth</h3>
+            <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">
+              {lang === "id" ? "Grafik Bandwidth" : "Bandwidth Chart"}
+            </h3>
           </div>
           <BandwidthChart />
         </Card>
@@ -304,10 +320,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <h2 className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-1.5">
               <LayoutGrid className="h-4 w-4 text-primary" />
-              {pinnedCameraIds.length > 0 ? "Kamera Pilihan" : "Kamera Aktif"}
+              {pinnedCameraIds.length > 0 
+                ? (lang === "id" ? "Kamera Pilihan" : "Pinned Cameras") 
+                : (lang === "id" ? "Kamera Aktif" : "Active Cameras")}
             </h2>
             <Button variant="link" size="sm" onClick={() => navigate("/live")} className="text-xs text-primary px-0">
-              Lihat Seluruh Kamera &rarr;
+              {lang === "id" ? "Lihat Seluruh Kamera" : "View All Cameras"} &rarr;
             </Button>
           </div>
 
@@ -339,10 +357,10 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <h2 className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-2">
               <Bell className="h-4 w-4 text-primary" />
-              Notifikasi Baru
+              {lang === "id" ? "Notifikasi Baru" : "New Notifications"}
             </h2>
             <Button variant="link" size="sm" onClick={() => navigate("/events")} className="text-xs text-primary px-0">
-              Semua Event &rarr;
+              {lang === "id" ? "Semua Event" : "All Events"} &rarr;
             </Button>
           </div>
 
@@ -356,7 +374,7 @@ export default function Dashboard() {
               ) : events.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-2">
                   <ShieldAlert className="h-8 w-8 text-muted-foreground/40" />
-                  <span className="text-xs">Tidak ada kejadian terekam.</span>
+                  <span className="text-xs">{lang === "id" ? "Tidak ada kejadian terekam." : "No events recorded."}</span>
                 </div>
               ) : (
                 events.map((evt) => {
@@ -406,7 +424,7 @@ export default function Dashboard() {
                         </div>
                         <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{getEventLabel(evt)}</div>
                         <div className="text-[9px] text-muted-foreground/80 mt-1 font-mono">
-                          {new Date(evt.ts).toLocaleTimeString("id-ID", { hour12: false })}
+                          {new Date(evt.ts).toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour12: false })}
                         </div>
                       </div>
                     </div>

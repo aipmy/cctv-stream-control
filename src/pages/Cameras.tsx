@@ -210,7 +210,7 @@ export default function Cameras() {
                         await probeCamera(c.id, false); // or update active status
                         toast.success(lang === "id" ? "Status kamera diperbarui" : "Camera status updated");
                       } catch {
-                        toast.error("Gagal memperbarui status");
+                        toast.error(lang === "id" ? "Gagal memperbarui status" : "Failed to update status");
                       }
                     }}
                   />
