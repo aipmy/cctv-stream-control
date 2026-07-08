@@ -90,6 +90,8 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
           "-tune", "zerolatency",
           "-profile:v", "baseline",
           "-pix_fmt", "yuv420p",
+        ] : (options.videoEncoder || "").includes("v4l2m2m") ? [
+          "-pix_fmt", "yuv420p",
         ] : [
           "-profile:v", isSubStream ? "main" : "high",
           "-pix_fmt", "yuv420p",
