@@ -63,7 +63,7 @@ export const getClassificationLabel = (classification?: string, fallback?: strin
 export function EventList() {
   const { t, lang } = useTranslation();
   const {
-    selectedCameraId, selectedDate, setSelectedDate, playbackInfo,
+    selectedCameraId, setSelectedCameraId, selectedDate, setSelectedDate, playbackInfo,
     events, searchKeyword, minScore, filterStartTime, filterEndTime,
     setActivePosterUrl, setActiveSnapshot, setJumpToTimeTrigger
   } = usePlayback();
@@ -123,6 +123,78 @@ export function EventList() {
     const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
     setJumpToTimeTrigger(eventTime);
   };
+
+  if (!selectedCameraId) {
+    return (
+      <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card h-full">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 sticky top-0 bg-card z-10 shadow-sm">
+          <h3 className="font-semibold text-sm text-foreground">
+            {lang === "id" ? "Kejadian Terbaru (Semua Kamera)" : "Recent Events (All Cameras)"}
+          </h3>
+          <span className="text-[10px] text-muted-foreground bg-muted dark:bg-slate-900 border border-border/40 px-1.5 py-0.5 rounded font-mono">
+            {filteredEvents.length} {lang === "id" ? "Event" : "Events"}
+          </span>
+        </div>
+
+        <div className="p-5 flex-1 overflow-y-auto space-y-4 max-h-[calc(100vh-160px)] scrollbar-thin">
+          {filteredEvents.length === 0 ? (
+            <div className="text-xs text-muted-foreground text-center py-12">
+              {lang === "id" ? "Tidak ada event terbaru" : "No recent events"}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-2 xl:grid-cols-2 gap-3">
+              {filteredEvents.slice(0, 50).map((evt) => {
+                const badge = getClassificationBadge(evt.type, t);
+                const eventDate = new Date(evt.ts);
+                const timeStr = eventDate.toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+                const dateStr = eventDate.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "short", day: "numeric" });
+                
+                return (
+                  <div
+                    key={evt.id}
+                    className="group relative z-0 aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full"
+                    onClick={() => {
+                      const localDate = new Date(evt.ts).toLocaleDateString("sv-SE");
+                      setSelectedDate(localDate);
+                      setActivePosterUrl(eventApi.snapshotUrl(evt.id));
+                      setSelectedCameraId(evt.cameraId);
+                      
+                      const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
+                      setJumpToTimeTrigger(eventTime);
+                    }}
+                  >
+                    <img
+                      src={eventApi.snapshotUrl(evt.id)}
+                      alt={evt.type}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
+                    <div className="absolute top-1.5 left-1.5 text-[8px] bg-black/75 px-1 py-0.5 rounded border border-white/5 font-semibold text-white/90 truncate max-w-[85%]">
+                      {evt.cameraName}
+                    </div>
+
+                    <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded text-[8px] font-mono font-bold bg-black/75 text-white/90 border border-white/5 leading-none">
+                      {dateStr} {timeStr}
+                    </span>
+                    
+                    <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
+                      <span className={cn("px-1 py-0.5 rounded text-[8px] border font-semibold flex items-center gap-0.5", badge.bgColor)}>
+                        {badge.icon}
+                        <span>{badge.label}</span>
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   if (!selectedCameraId || !playbackInfo) return null;
 
