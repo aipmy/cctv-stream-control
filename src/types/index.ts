@@ -109,6 +109,7 @@ export interface SmartEvent {
   typeDescription?: string;
   classification?: "human" | "pet" | "pixel";
   score?: number;
+  isOngoing?: boolean;
 }
 
 
