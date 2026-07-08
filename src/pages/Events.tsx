@@ -100,7 +100,7 @@ export default function Events() {
       })
       .catch((err) => {
         console.error("Failed to load events", err);
-        toast.error("Failed to load events");
+        toast.error(lang === "id" ? "Gagal memuat daftar event" : "Failed to load events");
       })
       .finally(() => {
         setLoading(false);
@@ -121,7 +121,7 @@ export default function Events() {
   // Trigger mock event
   const triggerSimulation = async (type: "motion" | "sound") => {
     if (!selectedCameraId) {
-      toast.error("Please select a camera to simulate.");
+      toast.error(lang === "id" ? "Silakan pilih kamera terlebih dahulu" : "Please select a camera to simulate.");
       return;
     }
     setSimulating(true);
@@ -130,7 +130,7 @@ export default function Events() {
       toast.success(t("eventTriggered"));
       setEvents((prev) => [result, ...prev]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to simulate event");
+      toast.error(err instanceof Error ? err.message : (lang === "id" ? "Gagal mensimulasikan event" : "Failed to simulate event"));
     } finally {
       setSimulating(false);
     }
@@ -141,9 +141,9 @@ export default function Events() {
     try {
       await eventApi.remove(id);
       setEvents((prev) => prev.filter((e) => e.id !== id));
-      toast.success("Event deleted");
+      toast.success(lang === "id" ? "Event berhasil dihapus" : "Event deleted");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete event");
+      toast.error(err instanceof Error ? err.message : (lang === "id" ? "Gagal menghapus event" : "Failed to delete event"));
     }
   };
 
@@ -153,9 +153,9 @@ export default function Events() {
       await eventApi.clear();
       setEvents([]);
       setShowClearConfirm(false);
-      toast.success("All events cleared");
+      toast.success(lang === "id" ? "Semua event berhasil dibersihkan" : "All events cleared");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to clear events");
+      toast.error(err instanceof Error ? err.message : (lang === "id" ? "Gagal membersihkan event" : "Failed to clear events"));
     }
   };
 
@@ -251,8 +251,8 @@ export default function Events() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {paginatedEvents.map((evt) => {
               const dateObj = new Date(evt.ts);
-              const dateStr = dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-              const timeStr = dateObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+              const dateStr = dateObj.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
+              const timeStr = dateObj.toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
               return (
                 <Card 
                   key={evt.id} 
@@ -287,15 +287,15 @@ export default function Events() {
                           Icon = Volume2;
                           colorClass = "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
                         } else if (evt.type === "person" || evt.type === "human") {
-                          label = lang === "id" ? "Manusia" : "Human";
+                          label = t("human");
                           Icon = User;
                           colorClass = "bg-rose-500/10 border-rose-500/20 text-rose-400";
                         } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
-                          label = lang === "id" ? "Hewan" : "Pet";
+                          label = t("pet");
                           Icon = PawPrint;
                           colorClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
                         } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
-                          label = lang === "id" ? "Kendaraan" : "Vehicle";
+                          label = t("vehicle");
                           Icon = Car;
                           colorClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
                         }
@@ -367,7 +367,7 @@ export default function Events() {
                         {dateStr} • {timeStr}
                         {evt.isOngoing && (
                           <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 animate-pulse border border-amber-500/30">
-                            ONGOING
+                            {t("ongoing")}
                           </span>
                         )}
                       </p>
@@ -382,11 +382,23 @@ export default function Events() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-5 border-t border-border/40 mt-8 bg-muted/10 p-4 rounded-xl">
               <span className="text-xs text-muted-foreground">
-                Menampilkan <span className="font-semibold text-foreground">{startIndex + 1}</span> -{" "}
-                <span className="font-semibold text-foreground">
-                  {Math.min(startIndex + itemsPerPage, filteredEvents.length)}
-                </span>{" "}
-                dari <span className="font-semibold text-foreground">{filteredEvents.length}</span> event
+                {lang === "id" ? (
+                  <>
+                    Menampilkan <span className="font-semibold text-foreground">{startIndex + 1}</span> -{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(startIndex + itemsPerPage, filteredEvents.length)}
+                    </span>{" "}
+                    dari <span className="font-semibold text-foreground">{filteredEvents.length}</span> event
+                  </>
+                ) : (
+                  <>
+                    Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> -{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(startIndex + itemsPerPage, filteredEvents.length)}
+                    </span>{" "}
+                    of <span className="font-semibold text-foreground">{filteredEvents.length}</span> events
+                  </>
+                )}
               </span>
 
               <div className="flex items-center gap-1">
