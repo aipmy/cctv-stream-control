@@ -5,7 +5,7 @@ import os from "node:os";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "../core/config.js";
-import { streamSystemMetrics } from "../stream/streamManager.js";
+import { streamSystemMetrics, getOngoingEventIds } from "../stream/streamManager.js";
 
 const execAsync = promisify(exec);
 import {
@@ -72,7 +72,15 @@ eventRoutes.get("/", requirePermission("canViewEvents"), async (req, res, next) 
         events = events.filter((evt) => req.auth.allowedGroups.includes(evt.site));
       }
     }
-    res.json(events);
+    
+    // Add isOngoing flag
+    const ongoingIds = new Set(getOngoingEventIds());
+    const eventsWithStatus = events.map(evt => ({
+      ...evt,
+      isOngoing: ongoingIds.has(evt.id)
+    }));
+
+    res.json(eventsWithStatus);
   } catch (err) {
     next(err);
   }

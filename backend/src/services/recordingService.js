@@ -124,7 +124,7 @@ export async function clearAllEvents() {
 /**
  * Triggers a smart CCTV event (motion or sound detection).
  */
-export async function triggerEvent(cameraId, type, { req = null, predictions = null, pixelBoxes = null } = {}) {
+export async function triggerEvent(cameraId, type, { req = null, predictions = null, pixelBoxes = null, snapshotBuffer = null } = {}) {
   const camera = await getCamera(cameraId, { revealSecret: true });
   if (!camera) {
     throw new Error(`Camera with ID ${cameraId} not found`);
@@ -137,31 +137,7 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
   await fs.mkdir(eventsDir, { recursive: true });
 
   const snapshotFilename = `${eventId}.jpg`;
-  const videoFilename = `${eventId}.mp4`;
   const snapshotFile = path.join(eventsDir, snapshotFilename);
-  const videoFile = path.join(eventsDir, videoFilename);
-
-  // Check HLS playlist to use segment-based pre-recording
-  const hlsSubdir = camera.streamType.replace(/\W+/g, "_").toLowerCase();
-  const recordHlsDir = path.join(config.storageDir, "record_hls", camera.id, hlsSubdir);
-  const recordPlaylistFile = path.join(recordHlsDir, "index.m3u8");
-  
-  const standardHlsDir = path.join(config.storageDir, "hls", camera.id, hlsSubdir);
-  const standardPlaylistFile = path.join(standardHlsDir, "index.m3u8");
-
-  let useSegmentMerger = false;
-  let hlsDir = null;
-  let playlistFile = null;
-
-  if (fsSync.existsSync(recordPlaylistFile)) {
-    useSegmentMerger = true;
-    hlsDir = recordHlsDir;
-    playlistFile = recordPlaylistFile;
-  } else if (fsSync.existsSync(standardPlaylistFile)) {
-    useSegmentMerger = true;
-    hlsDir = standardHlsDir;
-    playlistFile = standardPlaylistFile;
-  }
 
   let score = undefined;
   if (predictions && predictions.length > 0) {
@@ -173,20 +149,99 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
     }
   }
 
-  // Create Event record (optimistically assumed to be created)
+  // Handle Snapshot Generation from buffer (bypassing ffmpeg extraction)
+  if (snapshotBuffer) {
+    try {
+      const decoded = jpeg.decode(snapshotBuffer, { useTArray: true });
+      const width = decoded.width;
+      const height = decoded.height;
+
+      const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
+      let boxesToDraw = [];
+
+      // Determine the classified mode (for boxes and labels)
+      let classifiedMode = "pixel";
+      if (predictions && predictions.length > 0) {
+        const hasHuman = predictions.some((p) => p.class === "person");
+        const hasPet = predictions.some((p) => ["cat", "dog", "bird"].includes(p.class));
+        if (hasHuman && detectionModes.includes("human")) classifiedMode = "human";
+        else if (hasPet && detectionModes.includes("pet")) classifiedMode = "pet";
+      }
+
+      if (classifiedMode !== "pixel" && predictions) {
+        for (const p of predictions) {
+          if (classifiedMode === "human" && p.class !== "person") continue;
+          if (classifiedMode === "pet" && !["cat", "dog", "bird"].includes(p.class)) continue;
+          boxesToDraw.push({
+            x: Math.round(p.bbox[0]),
+            y: Math.round(p.bbox[1]),
+            w: Math.round(p.bbox[2]),
+            h: Math.round(p.bbox[3]),
+            color: classifiedMode === "human" ? [239, 68, 68] : [59, 130, 246]
+          });
+        }
+      } else if (classifiedMode === "pixel" && pixelBoxes && pixelBoxes.length > 0) {
+        const largestBox = pixelBoxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
+        boxesToDraw.push({
+          x: largestBox.x,
+          y: largestBox.y,
+          w: largestBox.w,
+          h: largestBox.h,
+          color: [251, 191, 36]
+        });
+      }
+
+      // Draw boxes
+      for (const box of boxesToDraw) {
+        const thickness = 3;
+        const bx = Math.max(0, box.x);
+        const by = Math.max(0, box.y);
+        const bx2 = Math.min(width - 1, box.x + box.w);
+        const by2 = Math.min(height - 1, box.y + box.h);
+        const [r, g, b] = box.color;
+        for (let t = 0; t < thickness; t++) {
+          for (let x = bx; x <= bx2; x++) {
+            for (const row of [by + t, by2 - t]) {
+              if (row >= 0 && row < height) {
+                const idx = (width * row + x) << 2;
+                decoded.data[idx] = r; decoded.data[idx + 1] = g; decoded.data[idx + 2] = b;
+              }
+            }
+          }
+          for (let y = by; y <= by2; y++) {
+            for (const col of [bx + t, bx2 - t]) {
+              if (col >= 0 && col < width) {
+                const idx = (width * y + col) << 2;
+                decoded.data[idx] = r; decoded.data[idx + 1] = g; decoded.data[idx + 2] = b;
+              }
+            }
+          }
+        }
+      }
+
+      const encoded = jpeg.encode({ data: decoded.data, width, height }, 85);
+      fsSync.writeFileSync(snapshotFile, encoded.data);
+    } catch (err) {
+      console.error(`[Event Recording] Failed to generate snapshot for ${eventId}`, err);
+    }
+  }
+
   const newEvent = {
     id: eventId,
     cameraId: camera.id,
     cameraName: camera.name,
     site: camera.site,
     ts: new Date().toISOString(),
+    endTime: null, // Track ongoing event duration
     type,
     score,
     snapshotPath: `/api/events/snapshot/${eventId}`,
-    videoPath: camera.enableRecording ? `/api/events/video/${eventId}` : "",
+    videoPath: null // Removed mp4 generation
   };
 
-
+  await eventStore.update((events) => {
+    return [newEvent, ...events].slice(0, 1000);
+  });
 
   // Audit log
   if (req) {
@@ -195,40 +250,17 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
       action: "cctv.event_triggered",
       outcome: "success",
       target: { type: "camera", id: camera.id, label: camera.name },
-      details: { eventId, type, useSegmentMerger },
+      details: { eventId, type },
     });
   }
 
-  // Run the recording, snapshot extraction, and notification asynchronously
-  if (useSegmentMerger) {
-    void processSegmentEventRecording({
-      eventId,
-      cameraId: camera.id,
-      hlsDir,
-      playlistFile,
-      snapshotFile,
-      videoFile,
-      enableRecording: camera.enableRecording,
-      enableNotifications: camera.enableNotifications,
-      settings,
+  // Notifications
+  if (camera.enableNotifications && settings.telegramBotToken && settings.telegramChatId) {
+    void sendTelegramAlert(settings.telegramBotToken, settings.telegramChatId, {
       cameraName: camera.name,
       site: camera.site,
       type,
-      predictions,
-      pixelBoxes,
-    });
-  } else {
-    void processFallbackEventRecording({
-      eventId,
-      camera,
-      snapshotFile,
-      videoFile,
-      enableRecording: camera.enableRecording,
-      enableNotifications: camera.enableNotifications,
-      settings,
-      type,
-      predictions,
-      pixelBoxes,
+      snapshotFile: fsSync.existsSync(snapshotFile) ? snapshotFile : null,
     });
   }
 
@@ -236,586 +268,19 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
 }
 
 /**
- * Parses HLS playlist to extract .ts segment files.
+ * Extends the duration of an active event.
  */
-async function getPlaylistSegments(playlistPath) {
-  try {
-    const content = await fs.readFile(playlistPath, "utf8");
-    return content
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith("#"));
-  } catch (err) {
-    return [];
-  }
-}
-
-/**
- * Handles HLS segment copy, pre-recording extraction, and merging.
- */
-/**
- * Handles HLS segment copy, pre-recording extraction, and merging.
- */
-async function processSegmentEventRecording({
-  eventId,
-  cameraId,
-  hlsDir,
-  playlistFile,
-  snapshotFile,
-  videoFile,
-  enableRecording,
-  enableNotifications,
-  settings,
-  cameraName,
-  site,
-  type,
-  predictions,
-  pixelBoxes,
-}) {
-  const triggerUnixTime = Math.floor(Date.now() / 1000);
-  let classifiedMode = "pixel";
-  let ignored = false;
-  const tempWorkspace = path.join(config.storageDir, "temp_recordings", eventId);
-  await fs.mkdir(tempWorkspace, { recursive: true });
-
-  try {
-    // 1. Wait for 20 seconds to allow HLS segments covering the event window to be fully written to disk
-    await new Promise((resolve) => setTimeout(resolve, 20000));
-
-    if (!fsSync.existsSync(hlsDir)) {
-      console.error(`[Event Recording] HLS directory not found for ${cameraId}: ${hlsDir}`);
-      return;
+export async function extendEventDuration(eventId, newEndTimeMs) {
+  let updated = false;
+  await eventStore.update((events) => {
+    const evt = events.find((e) => e.id === eventId);
+    if (evt) {
+      evt.endTime = new Date(newEndTimeMs).toISOString();
+      updated = true;
     }
-
-    // 2. Scan HLS directory for all .ts segment files
-    const files = await fs.readdir(hlsDir);
-    const segments = [];
-    for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const filePath = path.join(hlsDir, file);
-      try {
-        const stats = await fs.stat(filePath);
-        let ts = Math.floor(stats.mtimeMs / 1000); // Fallback: use file modification time
-        const match = file.match(/seg_(\d+)\.ts/);
-        if (match) {
-          ts = parseInt(match[1], 10);
-        }
-        segments.push({
-          file,
-          path: filePath,
-          ts,
-        });
-      } catch { /* ignore */ }
-    }
-
-    if (segments.length === 0) {
-      console.error(`[Event Recording] No segment files found in HLS directory for ${cameraId}`);
-      return;
-    }
-
-    // Sort segments chronologically
-    segments.sort((a, b) => a.ts - b.ts);
-    // 3. Find the segment file that contains the trigger timestamp (the one closest to but not after triggerUnixTime)
-    let triggerSegment = null;
-    let triggerIdx = -1;
-    for (let i = segments.length - 1; i >= 0; i--) {
-      if (segments[i].ts <= triggerUnixTime) {
-        triggerSegment = segments[i];
-        triggerIdx = i;
-        break;
-      }
-    }
-    if (!triggerSegment) {
-      triggerSegment = segments[0];
-      triggerIdx = 0;
-    }
-
-    // 4. Extract snapshot frames using Jimp, relative to the actual trigger offset in the segment
-    const snapSegmentPath1 = triggerSegment.path;
-    const offsetSec1 = Math.max(0, triggerUnixTime - triggerSegment.ts);
-
-    let snapSegmentPath2 = snapSegmentPath1;
-    let offsetSec2 = offsetSec1 + 0.5;
-
-    // Use the next segment for frame2 if it exists, to prevent out-of-bounds errors on short HLS segments
-    if (triggerIdx !== -1 && triggerIdx + 1 < segments.length) {
-      snapSegmentPath2 = segments[triggerIdx + 1].path;
-      offsetSec2 = 0;
-    } else if (offsetSec1 > 0.5) {
-      offsetSec2 = offsetSec1 - 0.5;
-    }
-
-    const frame1File = path.join(tempWorkspace, "frame1.jpg");
-    const frame2File = path.join(tempWorkspace, "frame2.jpg");
-
-    await new Promise((resolve) => {
-      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec1), "-i", snapSegmentPath1, "-vframes", "1", "-vf", "scale=-1:360", "-q:v", "2", frame1File], { stdio: "ignore" });
-      proc.on("close", resolve);
-    });
-
-    await new Promise((resolve) => {
-      const proc = spawn(config.ffmpegBin, ["-y", "-ss", String(offsetSec2), "-i", snapSegmentPath2, "-vframes", "1", "-vf", "scale=-1:360", "-q:v", "2", frame2File], { stdio: "ignore" });
-      proc.on("close", resolve);
-    });
-    let motionOverlayApplied = false;
-    const frame1Exists = fsSync.existsSync(frame1File);
-    const frame2Exists = fsSync.existsSync(frame2File);
-
-    if (frame1Exists) {
-      if (frame2Exists) {
-        try {
-          const buf1 = fsSync.readFileSync(frame1File);
-          const buf2 = fsSync.readFileSync(frame2File);
-          const img1 = jpeg.decode(buf1, { useTArray: true });
-          const img2 = jpeg.decode(buf2, { useTArray: true });
-
-          const width = img1.width;
-          const height = img1.height;
-          const gray1 = rgbaToGray(img1.data, width, height);
-          const gray2 = rgbaToGray(img2.data, width, height);
-
-          const camera = await getCamera(cameraId, { revealSecret: true });
-          const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
-          let boxesToDraw = [];
-
-          if (predictions && predictions.length > 0) {
-            classifiedMode = type;
-            const isMatch = detectionModes.includes(classifiedMode) || (classifiedMode === "person" && detectionModes.includes("human")) || (["cat", "dog", "bird"].includes(classifiedMode) && detectionModes.includes("pet"));
-            if (!isMatch) {
-              console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
-              ignored = true;
-              return;
-            }
-
-            // Scale predictions bbox to snapshot dimensions
-            for (const p of predictions) {
-              const scaleX = width / p.frameWidth;
-              const scaleY = height / p.frameHeight;
-              const [bx, by, bw, bh] = p.bbox;
-              boxesToDraw.push({
-                x: Math.round(bx * scaleX),
-                y: Math.round(by * scaleY),
-                w: Math.round(bw * scaleX),
-                h: Math.round(bh * scaleY),
-                color: p.class === "person" ? [239, 68, 68] : [16, 185, 129] // Match frontend: Red for person, Green for pet/objects
-              });
-            }
-          } else if (pixelBoxes && pixelBoxes.length > 0) {
-            classifiedMode = "pixel";
-            const isMatch = detectionModes.includes(classifiedMode);
-            if (!isMatch) {
-              console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
-              ignored = true;
-              return;
-            }
-            // Scale pixelBoxes to snapshot dimensions
-            for (const b of pixelBoxes) {
-              const scaleX = width / b.frameWidth;
-              const scaleY = height / b.frameHeight;
-              boxesToDraw.push({
-                x: Math.round(b.x * scaleX),
-                y: Math.round(b.y * scaleY),
-                w: Math.round(b.w * scaleX),
-                h: Math.round(b.h * scaleY),
-                color: [251, 191, 36] // Amber for pixel motion
-              });
-            }
-          } else {
-            const motionResult = detectMotion(gray1, gray2, width, height, {
-              sensitivity: camera?.motionSensitivity ?? 50,
-              excludeAreas: camera?.excludeAreas || [],
-            });
-
-            if (motionResult.motion && motionResult.boxes.length > 0) {
-              const largestBox = motionResult.boxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
-              const ratio = largestBox.h / largestBox.w;
-              const coverage = (largestBox.w * largestBox.h) / (width * height);
-              if (coverage > 0.80) {
-                classifiedMode = "pixel";
-              } else if (largestBox.w > 20 && largestBox.h > 20) {
-                classifiedMode = ratio > 0.5 ? "human" : "pixel";
-              } else {
-                classifiedMode = "pixel";
-              }
-
-              const isMatch = detectionModes.includes(classifiedMode);
-              if (!isMatch) {
-                console.log(`[Event Recording] Event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
-                ignored = true;
-                return;
-              }
-              boxesToDraw = motionResult.boxes.map(b => ({ ...b, color: [251, 191, 36] })); // Amber for pixel motion
-            }
-          }
-
-          if (!ignored) {
-            const labelMap = {
-              human: "Gerakan (Manusia)",
-              person: "Gerakan (Manusia)",
-              pet: "Gerakan (Hewan/Lainnya)",
-              pixel: "Gerakan (Perubahan Gambar)",
-            };
-            const typeDesc = labelMap[classifiedMode] || (["cat", "dog", "bird"].includes(classifiedMode) ? "Gerakan (Hewan)" : "Deteksi Gerakan");
-            
-            const eventRecord = {
-              id: eventId,
-              cameraId,
-              cameraName,
-              site,
-              ts: new Date().toISOString(),
-              type,
-              snapshotPath: `/api/events/snapshot/${eventId}`,
-              videoPath: enableRecording ? `/api/events/video/${eventId}` : "",
-              typeDescription: typeDesc,
-              classification: classifiedMode,
-            };
-            await eventStore.update((events) => {
-              return [eventRecord, ...events].slice(0, 1000);
-            });
-
-            // Draw bounding boxes directly on RGBA buffer
-            for (const box of boxesToDraw) {
-              const thickness = 3;
-              const bx = Math.max(0, box.x);
-              const by = Math.max(0, box.y);
-              const bx2 = Math.min(width - 1, box.x + box.w);
-              const by2 = Math.min(height - 1, box.y + box.h);
-              const [r, g, b] = box.color;
-              for (let t = 0; t < thickness; t++) {
-                for (let x = bx; x <= bx2; x++) {
-                  for (const row of [by + t, by2 - t]) {
-                    if (row >= 0 && row < height) {
-                      const idx = (width * row + x) << 2;
-                      img1.data[idx] = r; img1.data[idx + 1] = g; img1.data[idx + 2] = b;
-                    }
-                  }
-                }
-                for (let y = by; y <= by2; y++) {
-                  for (const col of [bx + t, bx2 - t]) {
-                    if (col >= 0 && col < width) {
-                      const idx = (width * y + col) << 2;
-                      img1.data[idx] = r; img1.data[idx + 1] = g; img1.data[idx + 2] = b;
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // Encode back to JPEG and save
-          const encoded = jpeg.encode({ data: img1.data, width, height }, 85);
-          fsSync.writeFileSync(snapshotFile, encoded.data);
-          motionOverlayApplied = true;
-        } catch (err) {
-          console.error(`[Snapshot Overlay] Processing failed for ${eventId}:`, err);
-        }
-      }
-
-      if (!motionOverlayApplied) {
-        await fs.copyFile(frame1File, snapshotFile).catch(() => {});
-      }
-
-      if (!ignored) {
-        const camera = await getCamera(cameraId, { revealSecret: true });
-        const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
-        const isMatch = detectionModes.includes(classifiedMode);
-        if (!isMatch) {
-          console.log(`[Event Recording] Fallback event ${eventId} ignored. Classified '${classifiedMode}' but camera only allows '${detectionModes.join(", ")}'.`);
-          ignored = true;
-        }
-      }
-
-      if (!ignored) {
-        const currentEvents = await eventStore.read();
-        const exists = currentEvents.some((e) => e.id === eventId);
-        if (!exists) {
-          const eventRecord = {
-            id: eventId,
-            cameraId,
-            cameraName,
-            site,
-            ts: new Date().toISOString(),
-            type,
-            snapshotPath: `/api/events/snapshot/${eventId}`,
-            videoPath: enableRecording ? `/api/events/video/${eventId}` : "",
-            typeDescription: "Deteksi Gerakan",
-            classification: "pixel",
-          };
-          await eventStore.update((events) => {
-            return [eventRecord, ...events].slice(0, 1000);
-          });
-        }
-      }
-    }
-
-    // 5. Merge segments for a 30-second window: 10s pre-recording, 20s post-recording
-    if (!ignored && enableRecording) {
-      const startTimeWindow = triggerUnixTime - 15;
-      const endTimeWindow = triggerUnixTime + 15;
-
-      const segmentsToMerge = segments.filter(
-        (s) => s.ts >= startTimeWindow && s.ts <= endTimeWindow
-      );
-
-      if (segmentsToMerge.length > 0) {
-        const concatTxtPath = path.join(tempWorkspace, "concat.txt");
-        const concatContent = segmentsToMerge
-          .map((s) => `file '${s.path}'`)
-          .join("\n");
-        await fs.writeFile(concatTxtPath, concatContent);
-
-        const concatArgs = [
-          "-y",
-          "-f", "concat",
-          "-safe", "0",
-          "-i", concatTxtPath,
-          "-c", "copy",
-          "-movflags", "+faststart",
-          videoFile,
-        ];
-
-        await new Promise((resolve) => {
-          const proc = spawn(config.ffmpegBin, concatArgs, { stdio: "ignore" });
-          proc.on("close", resolve);
-        });
-      } else {
-        console.warn(`[Event Recording] No segments in HLS found within clip time window for ${eventId}`);
-      }
-    }
-
-    // 6. Send Telegram Notification
-    if (!ignored && enableNotifications && settings.telegramBotToken && settings.telegramChatId) {
-      await sendTelegramAlert(settings.telegramBotToken, settings.telegramChatId, {
-        cameraName,
-        site,
-        type: classifiedMode,
-        snapshotFile,
-      });
-    }
-  } catch (err) {
-    console.error(`[Event Recording] Error processing event ${eventId}:`, err);
-  } finally {
-    await fs.rm(tempWorkspace, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
-/**
- * Fallback to direct RTSP/stream recording if HLS stream is not active.
- */
-async function processFallbackEventRecording({
-  eventId,
-  camera,
-  snapshotFile,
-  videoFile,
-  enableRecording,
-  enableNotifications,
-  settings,
-  type,
-  predictions,
-  pixelBoxes,
-}) {
-  try {
-    const sourceUrl = buildSourceUrl(camera);
-    const isRtsp = camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF";
-    const transport = ["tcp", "udp", "auto"].includes(camera.rtspTransport) ? camera.rtspTransport : "tcp";
-
-    // 1. Capture snapshot via FFmpeg
-    const snapArgs = [
-      "-y",
-      ...(isRtsp && transport !== "auto" ? ["-rtsp_transport", transport] : []),
-      "-i", sourceUrl,
-      "-vframes", "1",
-      "-q:v", "2",
-      snapshotFile
-    ];
-
-    const snapProcess = spawn(config.ffmpegBin, snapArgs, { stdio: "ignore" });
-    const snapSuccess = await new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        snapProcess.kill("SIGKILL");
-        resolve(false);
-      }, 10000);
-      snapProcess.on("close", (code) => {
-        clearTimeout(timeout);
-        resolve(code === 0);
-      });
-    });
-
-    if (!snapSuccess) return;
-
-    // Check if the event matches the camera's detection modes
-    const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
-    if (type === "motion" && !detectionModes.includes("pixel")) {
-      console.log(`[Fallback Event] Event ${eventId} ignored. Camera only allows '${detectionModes.join(", ")}' but fallback does not support classification.`);
-      return;
-    }
-
-    // Draw bounding boxes if we have any
-    let boxesToDraw = [];
-    if (predictions && predictions.length > 0) {
-      boxesToDraw = predictions.map(p => ({ ...p, color: p.class === "person" ? [239, 68, 68] : [16, 185, 129] }));
-    } else if (pixelBoxes && pixelBoxes.length > 0) {
-      boxesToDraw = pixelBoxes.map(b => ({ ...b, color: [251, 191, 36] }));
-    }
-
-    if (boxesToDraw.length > 0) {
-      try {
-        const buf = fsSync.readFileSync(snapshotFile);
-        const img = jpeg.decode(buf, { useTArray: true });
-        const width = img.width;
-        const height = img.height;
-
-        for (const box of boxesToDraw) {
-          const scaleX = width / box.frameWidth;
-          const scaleY = height / box.frameHeight;
-          const bx = Math.max(0, Math.round((box.x || box.bbox?.[0]) * scaleX));
-          const by = Math.max(0, Math.round((box.y || box.bbox?.[1]) * scaleY));
-          const bw = Math.max(1, Math.round((box.w || box.bbox?.[2]) * scaleX));
-          const bh = Math.max(1, Math.round((box.h || box.bbox?.[3]) * scaleY));
-          
-          const bx2 = Math.min(width - 1, bx + bw);
-          const by2 = Math.min(height - 1, by + bh);
-          const [r, g, b] = box.color;
-          const thickness = 3;
-
-          for (let t = 0; t < thickness; t++) {
-            for (let x = bx; x <= bx2; x++) {
-              for (const row of [by + t, by2 - t]) {
-                if (row >= 0 && row < height) {
-                  const idx = (width * row + x) << 2;
-                  img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b;
-                }
-              }
-            }
-            for (let y = by; y <= by2; y++) {
-              for (const col of [bx + t, bx2 - t]) {
-                if (col >= 0 && col < width) {
-                  const idx = (width * y + col) << 2;
-                  img.data[idx] = r; img.data[idx + 1] = g; img.data[idx + 2] = b;
-                }
-              }
-            }
-          }
-        }
-        const encoded = jpeg.encode({ data: img.data, width, height }, 85);
-        fsSync.writeFileSync(snapshotFile, encoded.data);
-      } catch (err) {
-        console.error(`[Fallback Event Overlay] Processing failed for ${eventId}:`, err);
-      }
-    }
-
-    // 2. Start Video Recording in background (if enabled)
-    if (enableRecording) {
-      const videoArgs = [
-        "-y",
-        ...(isRtsp && transport !== "auto" ? ["-rtsp_transport", transport] : []),
-        "-i", sourceUrl,
-        "-t", "15",
-        "-c", "copy",
-        videoFile
-      ];
-
-      await new Promise((resolve) => {
-        const videoProcess = spawn(config.ffmpegBin, videoArgs, { stdio: "ignore" });
-        videoProcess.on("close", (code) => {
-          if (code !== 0) {
-            // Fallback to recording without audio copy
-            const noAudioArgs = [
-              "-y",
-              ...(isRtsp && transport !== "auto" ? ["-rtsp_transport", transport] : []),
-              "-i", sourceUrl,
-              "-t", "15",
-              "-c:v", "copy",
-              "-an",
-              videoFile
-            ];
-            const fallbackProc = spawn(config.ffmpegBin, noAudioArgs, { stdio: "ignore" });
-            fallbackProc.on("close", resolve);
-          } else {
-            resolve();
-          }
-        });
-      });
-    }
-
-    // 3. Send Telegram Notification
-    if (enableNotifications && settings.telegramBotToken && settings.telegramChatId) {
-      await sendTelegramAlert(settings.telegramBotToken, settings.telegramChatId, {
-        cameraName: camera.name,
-        site: camera.site,
-        type,
-        snapshotFile,
-      });
-    }
-
-    // 4. Save Event to DB
-    const eventRecord = {
-      id: eventId,
-      cameraId: camera.id,
-      cameraName: camera.name,
-      site: camera.site,
-      ts: new Date().toISOString(),
-      type,
-      snapshotPath: `/api/events/snapshot/${eventId}`,
-      videoPath: enableRecording ? `/api/events/video/${eventId}` : "",
-      typeDescription: type === "motion" ? "Deteksi Gerakan" : "Deteksi Suara",
-      classification: type === "motion" ? "pixel" : undefined,
-    };
-    await eventStore.update((events) => {
-      return [eventRecord, ...events].slice(0, 1000);
-    });
-  } catch (err) {
-    console.error(`[Fallback Recording] Error processing event ${eventId}:`, err);
-  }
-}
-
-/**
- * Sends photo snapshot to Telegram.
- */
-async function sendTelegramAlert(token, chatId, { cameraName, site, type, snapshotFile }) {
-  let emoji = "⚠️🏃";
-  let typeLabel = "Gerakan";
-  if (type === "sound") {
-    emoji = "🔊";
-    typeLabel = "Suara Bising";
-  } else if (type === "person") {
-    emoji = "⚠️🚶‍♂️";
-    typeLabel = "Manusia Terdeteksi";
-  } else if (["cat", "dog", "bird", "horse", "sheep", "cow"].includes(type)) {
-    emoji = "⚠️🐕";
-    typeLabel = "Hewan/Peliharaan Terdeteksi";
-  } else if (["car", "motorcycle", "bus", "truck", "bicycle"].includes(type)) {
-    emoji = "⚠️🚗";
-    typeLabel = "Kendaraan Terdeteksi";
-  } else if (type === "pixel") {
-    emoji = "⚠️📷";
-    typeLabel = "Perubahan Gambar";
-  }
-  
-  const caption = `${emoji} *Smart CCTV Alert*\n\n*Kamera:* ${cameraName}\n*Lokasi:* ${site || "Tidak diketahui"}\n*Tipe:* ${typeLabel}\n*Waktu:* ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`;
-
-  try {
-    const fileData = await fs.readFile(snapshotFile);
-    const blob = new Blob([fileData], { type: "image/jpeg" });
-
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("photo", blob, "snapshot.jpg");
-    formData.append("caption", caption);
-    formData.append("parse_mode", "Markdown");
-
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Telegram API responded with ${res.status}: ${errText}`);
-    }
-  } catch (err) {
-    console.error("Error sending Telegram snapshot photo:", err.message);
-  }
+    return events;
+  });
+  return updated;
 }
 
 /**
@@ -861,7 +326,7 @@ export async function runStorageCleanup() {
         if (!eventsByCamera.has(evt.cameraId)) {
           eventsByCamera.set(evt.cameraId, []);
         }
-        eventsByCamera.get(evt.cameraId).push(tsSec);
+        eventsByCamera.get(evt.cameraId).push(evt);
       }
       const pre = settings.preMotionSeconds || 15;
       const post = settings.postMotionSeconds || 15;
@@ -875,8 +340,11 @@ export async function runStorageCleanup() {
         if (camera.recordingMode !== "event") return true;
         
         const camEvents = eventsByCamera.get(cameraId) || [];
-        for (const evtTs of camEvents) {
-          if (segTsSec >= evtTs - pre && segTsSec <= evtTs + post) return true;
+        for (const evt of camEvents) {
+          const evtTs = Math.floor(new Date(evt.ts).getTime() / 1000);
+          const endTsSec = evt.endTime ? Math.floor(new Date(evt.endTime).getTime() / 1000) : evtTs;
+          if (segTsSec >= evtTs - pre && segTsSec <= endTsSec + post) return true;
+
         }
         return false;
       };

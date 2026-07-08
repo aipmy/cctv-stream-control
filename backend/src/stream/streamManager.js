@@ -17,15 +17,28 @@ import {
   normalizeRtspTransport,
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
-import { triggerEvent, updateLastMotionAt } from "../services/recordingService.js";
+import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
 import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
-const lastTriggered = new Map(); // cameraId -> timestamp
+const activeMotionEvents = new Map(); // cameraId -> { eventId, lastMotionAt }
 
-async function handleMotionDetected(camera, predictions = null, pixelBoxes = null) {
+export function getOngoingEventIds() {
+  const ids = [];
+  for (const active of activeMotionEvents.values()) {
+    if (active.eventId && active.eventId !== "pending") {
+      ids.push(active.eventId);
+    }
+  }
+  return ids;
+}
+
+async function handleMotionDetected(camera, predictions = null, pixelBoxes = null, snapshotBuffer = null) {
   const now = Date.now();
+  if (camera.name === "LivingRoom") {
+    console.log(`[Motion Debug] handleMotionDetected for LivingRoom called! predictions=${predictions ? predictions.length : "null"}, pixelBoxes=${pixelBoxes ? pixelBoxes.length : "null"}`);
+  }
 
   // Always update last motion timestamp (used by smart recording stop)
   updateLastMotionAt(camera.id, now);
@@ -35,52 +48,80 @@ async function handleMotionDetected(camera, predictions = null, pixelBoxes = nul
   let reason = "motion";
 
   if (!predictions) {
-    // Basic pixel motion
     shouldTrigger = modes.includes("pixel");
   } else if (predictions.length === 0) {
-    // AI ran but found nothing, fallback to pixel if enabled
     shouldTrigger = modes.includes("pixel");
   } else {
-    // AI found objects, check if they match requested modes
     for (const p of predictions) {
       if (modes.includes("human") && p.class === "person") {
-        shouldTrigger = true;
-        reason = "person";
-        break;
+        shouldTrigger = true; reason = "person"; break;
       }
       if (modes.includes("pet") && ["cat", "dog", "bird", "horse", "sheep", "cow"].includes(p.class)) {
-        shouldTrigger = true;
-        reason = p.class;
-        break;
+        shouldTrigger = true; reason = p.class; break;
       }
       if (modes.includes("vehicle") && ["car", "motorcycle", "bus", "truck", "bicycle"].includes(p.class)) {
-        shouldTrigger = true;
-        reason = p.class;
-        break;
+        shouldTrigger = true; reason = p.class; break;
       }
     }
-    // If AI found objects but none match modes, DO NOT trigger (unless pixel mode is heavily trusted? No, if AI ran and found no matching objects, we ignore).
-    // Wait, if pixel mode is ON, and AI didn't find person/pet, should we still trigger? Yes, because pixel mode means "ANY motion".
     if (!shouldTrigger && modes.includes("pixel")) {
-      shouldTrigger = true;
-      reason = "motion";
+      shouldTrigger = true; reason = "motion";
     }
   }
 
-  if (!shouldTrigger) return;
+  if (!shouldTrigger) {
+    if (camera.name === "LivingRoom") {
+      console.log(`[Motion Debug] LivingRoom motion ignored. modes: ${JSON.stringify(modes)}, predictions: ${predictions ? predictions.length : "null"}`);
+    }
+    return;
+  }
 
-  // Only trigger a NEW event if enough time has passed since last event
-  const lastTime = lastTriggered.get(camera.id) || 0;
-  if (now - lastTime < 45000) return;
-  lastTriggered.set(camera.id, now);
+  const active = activeMotionEvents.get(camera.id);
+  if (active) {
+    // Extend the existing event!
+    active.lastMotionAt = now;
+    return;
+  }
 
+  // Trigger a NEW event
   console.log(`[Motion Detection] ⚠️ ${reason} detected on camera: ${camera.name} (${camera.id})!`);
+  // Prevent async race condition
+  activeMotionEvents.set(camera.id, { eventId: "pending", lastMotionAt: now });
   try {
-    await triggerEvent(camera.id, reason, { predictions, pixelBoxes });
+    const newEvent = await triggerEvent(camera.id, reason, { predictions, pixelBoxes, snapshotBuffer });
+    const active = activeMotionEvents.get(camera.id);
+    if (active && newEvent) {
+      active.eventId = newEvent.id;
+    }
   } catch (err) {
     console.error(`[Motion Detection] Failed to trigger event for camera ${camera.id}:`, err);
   }
 }
+
+// Background watchdog to update endTimes and cleanup
+setInterval(async () => {
+  const now = Date.now();
+  for (const [cameraId, active] of activeMotionEvents.entries()) {
+    try {
+      if (active.eventId === "pending") continue;
+      // Update the event's end time in the database continuously
+      const eventExists = await extendEventDuration(active.eventId, active.lastMotionAt);
+
+      if (!eventExists) {
+        console.log(`[Motion Detection] ⚠️ Event ${active.eventId} not found in DB. Resetting state for ${cameraId}`);
+        activeMotionEvents.delete(cameraId);
+        continue;
+      }
+
+      // If no motion for 60 seconds, mark as ended locally
+      if (now - active.lastMotionAt > 60000) {
+        console.log(`[Motion Detection] 🛑 Motion ended for camera ${cameraId} (Event: ${active.eventId})`);
+        activeMotionEvents.delete(cameraId);
+      }
+    } catch (e) {
+      console.error(`[Motion Detection Watchdog] Error extending event ${active.eventId}: `, e);
+    }
+  }
+}, 5000);
 
 function getMotionEngine(cameraId) {
   let engine = motionEngines.get(cameraId);
@@ -337,6 +378,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         recordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
         await fs.mkdir(recordDir, { recursive: true });
         await fs.unlink(path.join(recordDir, "index.m3u8")).catch(() => {});
+      } else {
+        const oldRecordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+        await fs.rm(oldRecordDir, { recursive: true, force: true }).catch(() => {});
       }
 
       await fs.mkdir(dir, { recursive: true });
@@ -407,7 +451,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   frameWidth: result.width,
                   frameHeight: result.height
                 }));
-                void handleMotionDetected(camera, null, pixelBoxes); // Pass null so it relies purely on pixel mode
+                void handleMotionDetected(camera, null, pixelBoxes, frame); // Pass null so it relies purely on pixel mode
               }
             }
 
@@ -440,18 +484,31 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                     return false;
                   });
                   
+                  let finalPredictions = filtered;
+                  const now = Date.now();
+                  
+                  if (filtered.length > 0) {
+                    session.lastAiPredictions = filtered;
+                    session.lastAiPredictionTime = now;
+                  } else if (session.lastAiPredictions && now - session.lastAiPredictionTime < 2000) {
+                    // Temporal smoothing: Keep the box for 2 seconds if the AI momentarily drops it
+                    finalPredictions = session.lastAiPredictions;
+                  } else {
+                    session.lastAiPredictions = null;
+                  }
+                  
                   // Emit filtered AI results (>= 10%) to frontend via SSE so they appear in live view
                   motionEmitter.emit(`ai-motion-${id}`, {
                     ts: new Date().toISOString(),
-                    predictions: filtered
+                    predictions: finalPredictions
                   });
 
                   // Filter again strictly for events (must meet camera's AI Sensitivity setting)
-                  const eventFiltered = filtered.filter(p => p.score >= threshold);
+                  const eventFiltered = finalPredictions.filter(p => p.score >= threshold);
 
                   // If AI found matching objects that meet the sensitivity threshold, trigger recording/notification
                   if (eventFiltered.length > 0 && hasSmart) {
-                    void handleMotionDetected(camera, eventFiltered);
+                    void handleMotionDetected(camera, eventFiltered, null, frame);
                   }
                 }).catch(err => {
                   session.aiBusy = false;

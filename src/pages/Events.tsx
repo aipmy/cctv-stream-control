@@ -9,7 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Eye, Trash2, Video, Bell, Volume2, ShieldAlert, Sparkles, User, Footprints, Activity, Loader2, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  Bell, 
+  Trash2, 
+  Video, 
+  Image as ImageIcon, 
+  X, 
+  Calendar, 
+  Loader2, 
+  Eye, 
+  ChevronLeft, 
+  ChevronRight,
+  Activity,
+  User,
+  PawPrint,
+  Car,
+  Volume2
+} from "lucide-react";
 import { toast } from "sonner";
 import type { SmartEvent } from "@/types";
 import { cn } from "@/lib/utils";
@@ -263,33 +279,33 @@ export default function Events() {
                     <div className="absolute top-3 left-3 flex gap-2 items-center z-5">
                       {(() => {
                         let label = t("motion");
-                        let emoji = "🏃";
+                        let Icon = Activity;
                         let colorClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
                         
                         if (evt.type === "sound") {
                           label = t("sound");
-                          emoji = "🔊";
+                          Icon = Volume2;
                           colorClass = "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
                         } else if (evt.type === "person" || evt.type === "human") {
                           label = lang === "id" ? "Manusia" : "Human";
-                          emoji = "🚶";
+                          Icon = User;
                           colorClass = "bg-rose-500/10 border-rose-500/20 text-rose-400";
                         } else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) {
                           label = lang === "id" ? "Hewan" : "Pet";
-                          emoji = "🐕";
+                          Icon = PawPrint;
                           colorClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
                         } else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) {
                           label = lang === "id" ? "Kendaraan" : "Vehicle";
-                          emoji = "🚗";
+                          Icon = Car;
                           colorClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
                         }
                         
                         return (
                           <span className={cn(
-                            "h-7 w-7 rounded-full flex items-center justify-center text-sm backdrop-blur-md shadow-lg border",
+                            "h-7 w-7 rounded-full flex items-center justify-center backdrop-blur-md shadow-lg border",
                             colorClass
                           )} title={label}>
-                            {emoji}
+                            <Icon className="h-4 w-4" />
                           </span>
                         );
                       })()}
@@ -349,6 +365,11 @@ export default function Events() {
                       <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1.5">
                         <Calendar className="h-3 w-3 text-muted-foreground/60" />
                         {dateStr} • {timeStr}
+                        {evt.isOngoing && (
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 animate-pulse border border-amber-500/30">
+                            ONGOING
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
