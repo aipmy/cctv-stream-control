@@ -32,7 +32,6 @@ export default function Settings() {
   const [postMotionSeconds, setPostMotionSeconds] = useState(15);
   const [segmentDuration, setSegmentDuration] = useState(5);
   const [enableAudioRecording, setEnableAudioRecording] = useState(false);
-  const [sourceQualityRecording, setSourceQualityRecording] = useState(false);
   const [customStorageDir, setCustomStorageDir] = useState("");
 
   // Storage states
@@ -74,7 +73,6 @@ export default function Settings() {
         setPostMotionSeconds(data.postMotionSeconds || 15);
         setSegmentDuration(data.segmentDuration || 5);
         setEnableAudioRecording(!!data.enableAudioRecording);
-        setSourceQualityRecording(!!data.sourceQualityRecording);
         setCustomStorageDir(data.customStorageDir || "");
       })
       .catch((err) => {
@@ -100,7 +98,6 @@ export default function Settings() {
         postMotionSeconds,
         segmentDuration,
         enableAudioRecording,
-        sourceQualityRecording,
         customStorageDir,
       });
       toast.success(t("saveSettingsSuccess"));
@@ -397,17 +394,6 @@ export default function Settings() {
                   <Switch
                     checked={enableAudioRecording}
                     onCheckedChange={setEnableAudioRecording}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border rounded-lg p-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">{t("sourceQualityRecording")}</Label>
-                    <p className="text-xs text-muted-foreground">{t("sourceQualityRecordingDesc")}</p>
-                  </div>
-                  <Switch
-                    checked={sourceQualityRecording}
-                    onCheckedChange={setSourceQualityRecording}
                   />
                 </div>
               </div>

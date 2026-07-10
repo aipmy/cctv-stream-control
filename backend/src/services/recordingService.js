@@ -21,7 +21,6 @@ const settingsStore = new JsonStore(path.join(config.dataDir, "settings.json"), 
   postMotionSeconds: 15,
   segmentDuration: 5,
   enableAudioRecording: true,
-  sourceQualityRecording: true,
   customStorageDir: "",
 });
 
@@ -61,7 +60,6 @@ export async function updateSettings(payload) {
       postMotionSeconds: Number(payload.postMotionSeconds ?? settings.postMotionSeconds ?? 15),
       segmentDuration: Number(payload.segmentDuration ?? settings.segmentDuration ?? 5),
       enableAudioRecording: Boolean(payload.enableAudioRecording ?? settings.enableAudioRecording ?? true),
-      sourceQualityRecording: Boolean(payload.sourceQualityRecording ?? settings.sourceQualityRecording ?? true),
       customStorageDir: newDir,
     };
   });

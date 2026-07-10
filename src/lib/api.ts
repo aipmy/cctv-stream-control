@@ -217,7 +217,6 @@ export interface ServerSettings {
   postMotionSeconds?: number;
   segmentDuration?: number;
   enableAudioRecording?: boolean;
-  sourceQualityRecording?: boolean;
   customStorageDir?: string;
 }
 

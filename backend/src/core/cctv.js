@@ -107,7 +107,6 @@ export function normalizeCamera(input, existing = {}) {
     postMotionSeconds: Number(input.postMotionSeconds ?? existing.postMotionSeconds ?? 15),
     segmentDuration: Number(input.segmentDuration ?? existing.segmentDuration ?? 5),
     enableAudioRecording: Boolean(input.enableAudioRecording ?? existing.enableAudioRecording ?? true),
-    sourceQualityRecording: Boolean(input.sourceQualityRecording ?? existing.sourceQualityRecording ?? true),
     motionArea: input.motionArea !== undefined
       ? (input.motionArea && typeof input.motionArea === "object"
         ? {
