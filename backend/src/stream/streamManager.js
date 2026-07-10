@@ -77,15 +77,22 @@ async function handleMotionDetected(camera, predictions = null, pixelBoxes = nul
 
   const active = activeMotionEvents.get(camera.id);
   if (active) {
-    // Extend the existing event!
-    active.lastMotionAt = now;
-    return;
+    // If the event has been ongoing for more than 15 minutes (900000 ms), force close it
+    // to prevent excessively long events. A new event will be created.
+    if (now - active.startedAt > 900000) {
+      console.log(`[Motion Detection] ⏱️ Event ${active.eventId} reached max duration (15m). Closing and starting a new one.`);
+      activeMotionEvents.delete(camera.id);
+    } else {
+      // Extend the existing event
+      active.lastMotionAt = now;
+      return;
+    }
   }
 
   // Trigger a NEW event
   console.log(`[Motion Detection] ⚠️ ${reason} detected on camera: ${camera.name} (${camera.id})!`);
   // Prevent async race condition
-  activeMotionEvents.set(camera.id, { eventId: "pending", lastMotionAt: now });
+  activeMotionEvents.set(camera.id, { eventId: "pending", lastMotionAt: now, startedAt: now });
   try {
     const newEvent = await triggerEvent(camera.id, reason, { predictions, pixelBoxes, snapshotBuffer });
     const active = activeMotionEvents.get(camera.id);
