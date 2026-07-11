@@ -51,8 +51,9 @@ export function VideoPlayer() {
 
     if (playbackWindowMinutes !== "none" && playbackWindowCenterTs !== null) {
       const halfWindow = (parseInt(playbackWindowMinutes, 10) * 60) / 2;
-      start = playbackWindowCenterTs - halfWindow;
-      end = playbackWindowCenterTs + halfWindow;
+      const centerSec = Math.floor(playbackWindowCenterTs / 1000);
+      start = centerSec - halfWindow;
+      end = centerSec + halfWindow;
     }
 
     const playlistSrc = playbackUrl(selectedCameraId, selectedDate, start, end);
