@@ -192,10 +192,16 @@ export function VideoPlayer() {
     const mappings = playbackInfo.segmentMappings || [];
     
     if (mappings.length > 0) {
-      const closest = mappings.reduce((prev: any, curr: any) => {
-        return Math.abs(curr.ts - targetTs) < Math.abs(prev.ts - targetTs) ? curr : prev;
-      });
-      offset = closest.offset + Math.max(0, targetTs - closest.ts);
+      // Find the block that contains the target timestamp
+      let found = mappings.find((m: any) => targetTs >= m.ts && targetTs < m.ts + m.duration);
+      
+      if (!found) {
+        // Fall back: find the last block that starts before the target
+        const before = mappings.filter((m: any) => m.ts <= targetTs);
+        found = before.length > 0 ? before[before.length - 1] : mappings[0];
+      }
+      
+      offset = found.offset + Math.max(0, targetTs - found.ts);
     } else {
       offset = targetTs - playbackInfo.firstSegmentUnixTime;
     }
@@ -210,12 +216,19 @@ export function VideoPlayer() {
     if (!video || !playbackInfo || !playbackInfo.segmentMappings || playbackInfo.segmentMappings.length === 0) return;
 
     const currentTime = video.currentTime;
-    const closest = playbackInfo.segmentMappings.reduce((prev: any, curr: any) => {
-      return Math.abs(curr.offset - currentTime) < Math.abs(prev.offset - currentTime) ? curr : prev;
-    });
+    const mappings = playbackInfo.segmentMappings;
+    
+    // Find the block that contains the current video offset
+    let block = mappings.find((m: any) => currentTime >= m.offset && currentTime < m.offset + m.duration);
+    
+    if (!block) {
+      // Fall back: find the last block whose offset is <= currentTime
+      const before = mappings.filter((m: any) => m.offset <= currentTime);
+      block = before.length > 0 ? before[before.length - 1] : mappings[0];
+    }
 
-    if (closest) {
-      const ts = closest.ts + (currentTime - closest.offset);
+    if (block) {
+      const ts = block.ts + (currentTime - block.offset);
       setCurrentPlaybackTs(Math.floor(ts));
       setCurrentRecordingTime(new Date(ts * 1000).toLocaleTimeString("id-ID", { hour12: false }));
     }
