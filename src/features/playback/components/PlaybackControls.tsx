@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 export function PlaybackControls() {
   const { t } = useTranslation();
-  const theme = useSettings((s) => s.theme);
+  const theme = useSettings((s) => s.settings.theme);
   const { data: cameras = [] } = useCamerasQuery();
 
   const {

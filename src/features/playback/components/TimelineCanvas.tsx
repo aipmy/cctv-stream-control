@@ -346,12 +346,12 @@ export function TimelineCanvas() {
                 className="w-24 px-2.5 py-1.5 rounded-md border border-border/60 bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <Button size="sm" onClick={jumpToPreciseTime} className="h-8">
-                {t("jumpBtn")}
+                {t("jump")}
               </Button>
             </div>
             <div className="text-[10px] text-muted-foreground ml-auto max-w-sm hidden sm:block">
               <Info className="h-3 w-3 inline-block mr-1 -mt-0.5" />
-              {t("timelineHelp")}
+              {t("timelineScrollHelp")}
             </div>
           </div>
 
