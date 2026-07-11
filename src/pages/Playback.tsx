@@ -25,11 +25,10 @@ function PlaybackContent() {
     setPlaybackInfo, setEvents, setActivePosterUrl, setJumpToTimeTrigger,
     activeSnapshot, setActiveSnapshot,
     deleteEventTarget, setDeleteEventTarget,
-    loadPlaybackTrigger, setLoadPlaybackTrigger
+    loadPlaybackTrigger, setLoadPlaybackTrigger,
+    parsedState
   } = usePlayback();
 
-  const location = useLocation();
-  const effectiveState = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
   const initialSeekDone = React.useRef(false);
 
   const loadPlaybackSegments = async () => {
@@ -57,8 +56,8 @@ function PlaybackContent() {
 
       if (info.hasRecording) {
         let startTs = info.firstSegmentUnixTime;
-        if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
-          startTs = effectiveState.timestamp;
+        if (parsedState?.eventSeek && parsedState?.timestamp && !initialSeekDone.current) {
+          startTs = parsedState.timestamp;
         }
         if (startTs) {
           setCurrentPlaybackTs(startTs);
@@ -89,8 +88,8 @@ function PlaybackContent() {
       filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
       setEvents(filtered);
 
-      if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
-        const targetTs = effectiveState.timestamp;
+      if (parsedState?.eventSeek && parsedState?.timestamp && !initialSeekDone.current) {
+        const targetTs = parsedState.timestamp;
         const closestEvent = filtered.find(e => {
           const eUnix = Math.floor(new Date(e.ts).getTime() / 1000);
           return Math.abs(eUnix - targetTs) <= 2;
