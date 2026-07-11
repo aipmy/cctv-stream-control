@@ -170,22 +170,13 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
     const recordHlsDir = path.join(config.storageDir, "record_hls");
     
     async function getDirSize(dirPath) {
-      let size = 0;
       try {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dirPath, entry.name);
-          if (entry.isDirectory()) {
-            size += await getDirSize(fullPath);
-          } else if (entry.isFile()) {
-            const stats = await fs.stat(fullPath);
-            size += stats.size;
-          }
-        }
+        const { stdout } = await execAsync(`du -sk "${dirPath}"`);
+        const kb = parseInt(stdout.split(/\\s+/)[0], 10);
+        return isNaN(kb) ? 0 : kb * 1024;
       } catch (err) {
-        // ignore if directory not found
+        return 0;
       }
-      return size;
     }
 
     const eventsSize = await getDirSize(eventsDir);
