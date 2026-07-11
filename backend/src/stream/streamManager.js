@@ -320,7 +320,7 @@ function normalizeOutput(output = "HLS Stable") {
 }
 
 function streamDir(id, output = "HLS Stable") {
-  return path.join(config.storageDir, "hls", id, output.replace(/\W+/g, "_").toLowerCase());
+  return path.join("/tmp", "cctv_hls", id, output.replace(/\W+/g, "_").toLowerCase());
 }
 
 async function exists(filePath) {
