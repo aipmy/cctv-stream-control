@@ -313,9 +313,10 @@ export async function runStorageCleanup() {
       } catch { /* ignore */ }
     }
 
-    // 2. Scan HLS streams directory for .ts files
-    const hlsBaseDir = path.join(config.storageDir, "hls");
-    if (fsSync.existsSync(hlsBaseDir)) {
+    // 2. Scan HLS and record_hls directories for .ts files
+    const hlsBaseDirs = [path.join(config.storageDir, "hls"), path.join(config.storageDir, "record_hls")];
+    for (const hlsBaseDir of hlsBaseDirs) {
+      if (!fsSync.existsSync(hlsBaseDir)) continue;
       const events = await listEvents();
       const eventsByCamera = new Map();
       for (const evt of events) {
@@ -332,17 +333,17 @@ export async function runStorageCleanup() {
       const cameras = await listCameras({ revealSecret: true });
       const cameraMap = new Map(cameras.map((c) => [c.id, c]));
 
-      const isSegmentActive = (cameraId, segTsSec) => {
+      const isSegmentActive = (cameraId, segTsSec, isSequential) => {
         const camera = cameraMap.get(cameraId);
         if (!camera || !camera.enableRecording) return false;
         if (camera.recordingMode !== "event") return true;
+        if (isSequential) return true; // Keep sequential records if mode is event but we don't know the exact time
         
         const camEvents = eventsByCamera.get(cameraId) || [];
         for (const evt of camEvents) {
           const evtTs = Math.floor(new Date(evt.ts).getTime() / 1000);
           const endTsSec = evt.endTime ? Math.floor(new Date(evt.endTime).getTime() / 1000) : evtTs;
           if (segTsSec >= evtTs - pre && segTsSec <= endTsSec + post) return true;
-
         }
         return false;
       };
@@ -350,8 +351,15 @@ export async function runStorageCleanup() {
       const cameraDirs = await fs.readdir(hlsBaseDir);
       for (const cameraId of cameraDirs) {
         const camDir = path.join(hlsBaseDir, cameraId);
-        const subdirs = ["hls_stable", "hls_low_latency"];
-        for (const subdir of subdirs) {
+        const subdirs = ["hls_stable", "hls_low_latency", "copy", "transcode"];
+        
+        let allDirsToScan = [];
+        try {
+          const innerDirs = await fs.readdir(camDir);
+          allDirsToScan = innerDirs.filter(d => subdirs.includes(d) || !d.includes("."));
+        } catch { continue; }
+
+        for (const subdir of allDirsToScan) {
           const dirPath = path.join(camDir, subdir);
           if (!fsSync.existsSync(dirPath)) continue;
 
@@ -360,22 +368,28 @@ export async function runStorageCleanup() {
             if (!file.endsWith(".ts")) continue;
             const match = file.match(/seg_(\d+)\.ts/);
             if (!match) continue;
-            const timestampSec = parseInt(match[1], 10);
-            const timestamp = timestampSec * 1000; // in ms
+            let timestampSec = parseInt(match[1], 10);
+            let timestamp = timestampSec * 1000;
             const filePath = path.join(dirPath, file);
-
-            const camera = cameraMap.get(cameraId);
-            const recordingEnabled = camera?.enableRecording ?? false;
-            const isEventMode = camera?.recordingMode === "event";
-
-            // Delete segment if recording is disabled, or if event mode is active and segment is outside motion window
-            if (!recordingEnabled || (isEventMode && !isSegmentActive(cameraId, timestampSec))) {
-              await fs.unlink(filePath).catch(() => {});
-              continue;
-            }
 
             try {
               const stats = await fs.stat(filePath);
+              const isSequential = timestampSec < 1000000000; // if it's less than year 2001, it's a sequence number
+              if (isSequential) {
+                timestamp = stats.mtime.getTime();
+                timestampSec = Math.floor(timestamp / 1000);
+              }
+
+              const camera = cameraMap.get(cameraId);
+              const recordingEnabled = camera?.enableRecording ?? false;
+              const isEventMode = camera?.recordingMode === "event";
+
+              // Delete segment if recording is disabled, or if event mode is active and segment is outside motion window
+              if (!recordingEnabled || (isEventMode && !isSegmentActive(cameraId, timestampSec, isSequential))) {
+                await fs.unlink(filePath).catch(() => {});
+                continue;
+              }
+
               if (stats.isFile()) {
                 fileInfos.push({
                   type: "segment",
@@ -432,33 +446,48 @@ export async function deleteRecordingsForDate(cameraId, date) {
   const startUnix = Math.floor(startOfDay.getTime() / 1000);
   const endUnix = Math.floor(endOfDay.getTime() / 1000);
 
-  const hlsBaseDir = path.join(config.storageDir, "hls", cameraId);
-  const subdirs = ["hls_stable", "hls_low_latency"];
+  const hlsBaseDirs = [path.join(config.storageDir, "hls", cameraId), path.join(config.storageDir, "record_hls", cameraId)];
   let deletedCount = 0;
 
-  for (const subdir of subdirs) {
-    const dirPath = path.join(hlsBaseDir, subdir);
-    if (!fsSync.existsSync(dirPath)) continue;
+  for (const baseDir of hlsBaseDirs) {
+    if (!fsSync.existsSync(baseDir)) continue;
+    let allDirsToScan = [];
+    try {
+      allDirsToScan = await fs.readdir(baseDir);
+    } catch { continue; }
 
-    const files = await fs.readdir(dirPath);
-    for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
-      if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
-        await fs.unlink(path.join(dirPath, file)).catch(() => {});
-        deletedCount++;
+    for (const subdir of allDirsToScan) {
+      const dirPath = path.join(baseDir, subdir);
+      if (!fsSync.existsSync(dirPath) || !(await fs.stat(dirPath)).isDirectory()) continue;
+
+      const files = await fs.readdir(dirPath);
+      for (const file of files) {
+        if (!file.endsWith(".ts")) continue;
+        const match = file.match(/seg_(\d+)\.ts/);
+        if (!match) continue;
+        let ts = parseInt(match[1], 10);
+        
+        try {
+          if (ts < 1000000000) {
+            const stats = await fs.stat(path.join(dirPath, file));
+            ts = Math.floor(stats.mtime.getTime() / 1000);
+          }
+        } catch { continue; }
+        
+        if (ts >= startUnix && ts <= endUnix) {
+          await fs.unlink(path.join(dirPath, file)).catch(() => {});
+          deletedCount++;
+        }
       }
-    }
 
-    // Clean up HLS playlist if empty
-    const indexFile = path.join(dirPath, "index.m3u8");
-    if (fsSync.existsSync(indexFile)) {
-      const remaining = await fs.readdir(dirPath);
-      const hasSegments = remaining.some(f => f.endsWith(".ts"));
-      if (!hasSegments) {
-        await fs.unlink(indexFile).catch(() => {});
+      // Clean up HLS playlist if empty
+      const indexFile = path.join(dirPath, "index.m3u8");
+      if (fsSync.existsSync(indexFile)) {
+        const remaining = await fs.readdir(dirPath);
+        const hasSegments = remaining.some(f => f.endsWith(".ts"));
+        if (!hasSegments) {
+          await fs.unlink(indexFile).catch(() => {});
+        }
       }
     }
   }
@@ -466,9 +495,11 @@ export async function deleteRecordingsForDate(cameraId, date) {
 }
 
 export async function deleteAllRecordings(cameraId) {
-  const hlsBaseDir = path.join(config.storageDir, "hls", cameraId);
-  if (fsSync.existsSync(hlsBaseDir)) {
-    await fs.rm(hlsBaseDir, { recursive: true, force: true }).catch(() => {});
+  const hlsBaseDirs = [path.join(config.storageDir, "hls", cameraId), path.join(config.storageDir, "record_hls", cameraId)];
+  for (const baseDir of hlsBaseDirs) {
+    if (fsSync.existsSync(baseDir)) {
+      await fs.rm(baseDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
   return true;
 }
