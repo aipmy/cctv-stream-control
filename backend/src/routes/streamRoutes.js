@@ -264,18 +264,8 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
 
     const output = await getCameraOutput(id);
     
-    // Determine the correct recording directory
-    const recordMode = camera?.recordMode || hlsMode;
-    const needsSeparateRecordOutput = 
-      recordMode !== hlsMode ||
-      (recordMode === "transcode" && camera?.recordResolution && camera.recordResolution !== camera?.streamQuality);
-
-    let dir;
-    if (needsSeparateRecordOutput) {
-      dir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
-    } else {
-      dir = path.dirname(getHlsFilePath(id, output, "index.m3u8"));
-    }
+    // Determine the correct recording directory (unified under record_hls/<id>/)
+    const dir = path.join(config.storageDir, "record_hls", id);
     
     if (!dir || !fs.existsSync(dir)) {
       return res.json({ hasRecording: false, diskUsageBytes });
@@ -438,7 +428,7 @@ streamRoutes.get("/:id/snapshot-at", async (req, res, next) => {
     if (!camera) return res.status(404).send("Camera not found");
 
     const output = await getCameraOutput(id);
-    const dir = path.dirname(getHlsFilePath(id, output, "index.m3u8"));
+    const dir = path.join(config.storageDir, "record_hls", id);
     if (!dir || !fs.existsSync(dir)) {
       return res.status(404).send("No HLS recording found");
     }
@@ -522,7 +512,7 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
     }
 
     const output = await getCameraOutput(id);
-    const dir = path.dirname(getHlsFilePath(id, output, "index.m3u8"));
+    const dir = path.join(config.storageDir, "record_hls", id);
     if (!dir || !fs.existsSync(dir)) {
       return res.status(404).send("Stream directory not found");
     }
