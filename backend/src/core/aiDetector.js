@@ -144,8 +144,8 @@ if (!isMainThread) {
           let scaleX = 1;
           let scaleY = 1;
           
-          if (frameWidth > 640 || frameHeight > 480) {
-            const scale = Math.min(640 / frameWidth, 480 / frameHeight);
+          if (frameWidth > 300 || frameHeight > 300) {
+            const scale = Math.min(300 / frameWidth, 300 / frameHeight);
             const newWidth = Math.round(frameWidth * scale);
             const newHeight = Math.round(frameHeight * scale);
             const resized = tf.image.resizeBilinear(imageTensor, [newHeight, newWidth]);

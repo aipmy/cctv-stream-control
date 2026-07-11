@@ -473,8 +473,12 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
             // 2. Continuous AI Engine (runs independently)
             // session.aiBusy lock prevents worker queue buildup
+            const modes = camera.detectionModes || ["pixel", "human", "pet"];
+            const hasAiModes = modes.some(m => ["human", "pet", "object", "vehicle"].includes(m));
+            const needsAi = (hasSmart && hasAiModes) || hasAiListeners;
+
             const aiIntervalMs = Math.max(200, 1000 / (camera.detectFps || 1));
-            if (!session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
+            if (needsAi && !session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
               session.aiBusy = true;
               
               
