@@ -359,8 +359,8 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
 
     const output = await getCameraOutput(id);
     
-    // Determine the correct recording directory (now always in record_hls)
-    const dir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+    // Determine the correct recording directory (now always in record_hls without output subfolder)
+    const dir = path.join(config.storageDir, "record_hls", id);
     
     if (!dir || !fs.existsSync(dir)) {
       return res.status(404).send("Playback stream directory not found");

@@ -389,11 +389,11 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       const needsSeparateRecordOutput = true;
 
       if (needsSeparateRecordOutput) {
-        recordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+        recordDir = path.join(config.storageDir, "record_hls", id);
         await fs.mkdir(recordDir, { recursive: true });
         await fs.unlink(path.join(recordDir, "index.m3u8")).catch(() => {});
       } else {
-        const oldRecordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+        const oldRecordDir = path.join(config.storageDir, "record_hls", id);
         await fs.rm(oldRecordDir, { recursive: true, force: true }).catch(() => {});
       }
 
