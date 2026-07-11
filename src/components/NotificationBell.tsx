@@ -219,6 +219,7 @@ export function NotificationBell() {
         title: `${evt.cameraName} - ${typeLabel}`,
         message: t("eventDetectedDesc", { type: typeMsg, site: evt.site }),
         eventId: evt.id,
+        cameraId: evt.cameraId,
         site: evt.site,
         time: new Date(evt.ts).getTime(),
         icon: EvtIcon,
@@ -269,8 +270,21 @@ export function NotificationBell() {
                   key={notif.id}
                   onClick={() => {
                     setOpen(false);
-                    if (notif.type === "warning") {
-                      navigate("/events");
+                    if (notif.type === "warning" && notif.cameraId) {
+                      const dateObj = new Date(notif.time);
+                      const year = dateObj.getFullYear();
+                      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                      const day = String(dateObj.getDate()).padStart(2, "0");
+                      const dateStr = `${year}-${month}-${day}`;
+
+                      navigate("/playback", {
+                        state: {
+                          cameraId: notif.cameraId,
+                          date: dateStr,
+                          timestamp: Math.floor(dateObj.getTime() / 1000),
+                          eventSeek: true
+                        }
+                      });
                     } else {
                       navigate(`/cameras?site=${encodeURIComponent(notif.site)}&highlight=${notif.cameraId}`);
                     }

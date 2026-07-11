@@ -387,7 +387,22 @@ export default function Dashboard() {
                     <div 
                       key={evt.id} 
                       className="group flex gap-3 pb-3.5 border-b border-border/30 dark:border-white/5 last:border-0 last:pb-0 items-start cursor-pointer hover:bg-muted/10 p-1 rounded transition-colors"
-                      onClick={() => navigate(`/playback?camera=${evt.cameraId}&ts=${evt.ts}`)}
+                      onClick={() => {
+                        const dateObj = new Date(evt.ts);
+                        const year = dateObj.getFullYear();
+                        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                        const day = String(dateObj.getDate()).padStart(2, "0");
+                        const dateStr = `${year}-${month}-${day}`;
+
+                        navigate("/playback", {
+                          state: {
+                            cameraId: evt.cameraId,
+                            date: dateStr,
+                            timestamp: Math.floor(dateObj.getTime() / 1000),
+                            eventSeek: true
+                          }
+                        });
+                      }}
                     >
                       {/* Event Snapshot Thumbnail */}
                       <div className="w-16 h-10 bg-muted/40 rounded-lg overflow-hidden shrink-0 border relative">
