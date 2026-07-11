@@ -385,11 +385,8 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     let recordDir = null;
 
     if (camera.enableRecording) {
-      const hlsMode = normalizeHlsMode(camera.hlsMode, config);
-      const recordMode = camera.recordMode || hlsMode;
-      const needsSeparateRecordOutput = 
-        recordMode !== hlsMode ||
-        (recordMode === "transcode" && camera.recordResolution && camera.recordResolution !== camera.streamQuality);
+      // Always separate live stream (goes to /tmp) from recording (goes to HDD)
+      const needsSeparateRecordOutput = true;
 
       if (needsSeparateRecordOutput) {
         recordDir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());

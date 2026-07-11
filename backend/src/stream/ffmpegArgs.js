@@ -161,7 +161,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-hls_flags", streamFlags.join("+"),
     "-hls_allow_cache", "0",
     "-hls_segment_type", "mpegts",
-    ...(camera.enableRecording ? ["-strftime", "1", "-hls_segment_filename", path.join(dir, "seg_%s.ts")] : ["-hls_segment_filename", path.join(dir, (streamMode === "transcode" ? "seg_%06d.ts" : "%d.ts"))]),
+    "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
     path.join(dir, "index.m3u8")
   );
 
