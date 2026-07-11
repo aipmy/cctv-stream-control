@@ -83,47 +83,20 @@ interface PlaybackState {
   setJumpToTimeTrigger: (ts: number | null) => void;
   loadPlaybackTrigger: number;
   setLoadPlaybackTrigger: React.Dispatch<React.SetStateAction<number>>;
-
-  parsedState: { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 }
 
 const PlaybackContext = createContext<PlaybackState | undefined>(undefined);
 
 export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  
-  const parsedState = useMemo(() => {
-    const state: { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } = {};
-    if (location.state) {
-      Object.assign(state, location.state);
-    }
-    const searchParams = new URLSearchParams(location.search);
-    const queryCameraId = searchParams.get("camera") || searchParams.get("cameraId");
-    const queryTs = searchParams.get("ts") || searchParams.get("timestamp");
-    if (queryCameraId) {
-      state.cameraId = queryCameraId;
-    }
-    if (queryTs) {
-      const isUnix = /^\d+$/.test(queryTs);
-      const dateObj = isUnix ? new Date(parseInt(queryTs, 10) * 1000) : new Date(queryTs);
-      if (!isNaN(dateObj.getTime())) {
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-        const day = String(dateObj.getDate()).padStart(2, "0");
-        state.date = `${year}-${month}-${day}`;
-        state.timestamp = Math.floor(dateObj.getTime() / 1000);
-        state.eventSeek = true;
-      }
-    }
-    return Object.keys(state).length > 0 ? state : null;
-  }, [location.state, location.search]);
+  const effectiveState = location.state as { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 
-  const [selectedCameraId, setSelectedCameraId] = useState(() => parsedState?.cameraId || "");
+  const [selectedCameraId, setSelectedCameraId] = useState(() => effectiveState?.cameraId || "");
   const [cameraSearchQuery, setCameraSearchQuery] = useState("");
   const [isCameraPopoverOpen, setIsCameraPopoverOpen] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState(() => {
-    if (parsedState?.date) return parsedState.date;
+    if (effectiveState?.date) return effectiveState.date;
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -153,8 +126,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [activePosterUrl, setActivePosterUrl] = useState<string | null>(null);
   const [activeSnapshot, setActiveSnapshot] = useState<string | null>(null);
 
-  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>(() => parsedState?.eventSeek ? "15" : "none");
-  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(() => parsedState?.eventSeek ? parsedState.timestamp || null : null);
+  const [playbackWindowMinutes, setPlaybackWindowMinutes] = useState<string>(() => effectiveState?.eventSeek ? "15" : "none");
+  const [playbackWindowCenterTs, setPlaybackWindowCenterTs] = useState<number | null>(() => effectiveState?.eventSeek ? effectiveState.timestamp || null : null);
 
   const [searchKeyword, setSearchKeyword] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -173,19 +146,19 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [loadPlaybackTrigger, setLoadPlaybackTrigger] = useState(0);
 
   useEffect(() => {
-    if (parsedState) {
-      if (parsedState.cameraId && parsedState.cameraId !== selectedCameraId) {
-        setSelectedCameraId(parsedState.cameraId);
+    if (effectiveState) {
+      if (effectiveState.cameraId && effectiveState.cameraId !== selectedCameraId) {
+        setSelectedCameraId(effectiveState.cameraId);
       }
-      if (parsedState.date && parsedState.date !== selectedDate) {
-        setSelectedDate(parsedState.date);
+      if (effectiveState.date && effectiveState.date !== selectedDate) {
+        setSelectedDate(effectiveState.date);
       }
-      if (parsedState.eventSeek) {
+      if (effectiveState.eventSeek) {
         setPlaybackWindowMinutes("15");
-        setPlaybackWindowCenterTs(parsedState.timestamp || null);
+        setPlaybackWindowCenterTs(effectiveState.timestamp || null);
       }
     }
-  }, [parsedState]);
+  }, [effectiveState]);
 
   const value = {
     selectedCameraId, setSelectedCameraId,
@@ -221,8 +194,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     isCameraPopoverOpen, setIsCameraPopoverOpen,
     playerHeight, setPlayerHeight,
     jumpToTimeTrigger, setJumpToTimeTrigger,
-    loadPlaybackTrigger, setLoadPlaybackTrigger,
-    parsedState
+    loadPlaybackTrigger, setLoadPlaybackTrigger
   };
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;

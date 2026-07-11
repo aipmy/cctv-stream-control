@@ -10,6 +10,8 @@ import { useLocation } from "react-router-dom";
 
 export function VideoPlayer() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const effectiveState = location.state as { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 
   const {
     selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
@@ -22,8 +24,7 @@ export function VideoPlayer() {
     setCurrentPlaybackTs, setCurrentRecordingTime,
     setTimelineCenterTs,
     jumpToTimeTrigger, setJumpToTimeTrigger,
-    loadPlaybackTrigger,
-    parsedState
+    loadPlaybackTrigger
   } = usePlayback();
 
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -34,10 +35,10 @@ export function VideoPlayer() {
 
   // Synchronize URL query changes to reset seek ref
   useEffect(() => {
-    if (parsedState && parsedState.eventSeek) {
+    if (effectiveState && effectiveState.eventSeek) {
       initialSeekDone.current = false;
     }
-  }, [parsedState, selectedCameraId]);
+  }, [effectiveState, selectedCameraId]);
 
   // Handle HLS initialization
   useEffect(() => {
@@ -65,12 +66,8 @@ export function VideoPlayer() {
         video.onloadedmetadata = () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (jumpToTimeTrigger !== null) {
-              seekToTimestamp(jumpToTimeTrigger);
-              setTimelineCenterTs(jumpToTimeTrigger);
-              setJumpToTimeTrigger(null);
-            } else if (parsedState?.eventSeek && parsedState?.timestamp && !initialSeekDone.current) {
-              seekToTimestamp(parsedState.timestamp);
+            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+              seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
             video.play().catch(() => {});
@@ -121,12 +118,8 @@ export function VideoPlayer() {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (jumpToTimeTrigger !== null) {
-              seekToTimestamp(jumpToTimeTrigger);
-              setTimelineCenterTs(jumpToTimeTrigger);
-              setJumpToTimeTrigger(null);
-            } else if (parsedState?.eventSeek && parsedState?.timestamp && !initialSeekDone.current) {
-              seekToTimestamp(parsedState.timestamp);
+            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+              seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
             video.play().catch(() => {});
@@ -182,16 +175,14 @@ export function VideoPlayer() {
     return () => video.removeEventListener("ratechange", handleRateChange);
   }, [playbackSpeed, playbackInfo]);
 
-  // Handle manual jump triggers from context (only if player is already initialized)
+  // Handle manual jump triggers from context
   useEffect(() => {
     if (jumpToTimeTrigger !== null) {
-      if (videoRef.current && playbackInfo && playbackInfo.firstSegmentUnixTime) {
-        seekToTimestamp(jumpToTimeTrigger);
-        setTimelineCenterTs(jumpToTimeTrigger);
-        setJumpToTimeTrigger(null); // consume trigger
-      }
+      seekToTimestamp(jumpToTimeTrigger);
+      setTimelineCenterTs(jumpToTimeTrigger);
+      setJumpToTimeTrigger(null); // consume trigger
     }
-  }, [jumpToTimeTrigger, playbackInfo]);
+  }, [jumpToTimeTrigger]);
 
   const seekToTimestamp = (targetTs: number) => {
     const video = videoRef.current;
