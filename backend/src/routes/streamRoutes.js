@@ -227,7 +227,7 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     if (!date) return res.status(400).send("Date is required");
 
     let diskUsageBytes = 0;
-    const hlsBaseDir = path.join(config.storageDir, "hls", id);
+    const hlsBaseDir = path.join(config.storageDir, "record_hls", id);
     try {
       if (fs.existsSync(hlsBaseDir)) {
         const cached = diskUsageCache.get(id);
@@ -358,21 +358,9 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const targetDuration = Math.max(segDur, 6);
 
     const output = await getCameraOutput(id);
-    const camera = await getCamera(id);
     
-    // Determine the correct recording directory
-    const hlsMode = camera?.hlsMode || "copy";
-    const recordMode = camera?.recordMode || hlsMode;
-    const needsSeparateRecordOutput = 
-      recordMode !== hlsMode ||
-      (recordMode === "transcode" && camera?.recordResolution && camera.recordResolution !== camera?.streamQuality);
-
-    let dir;
-    if (needsSeparateRecordOutput) {
-      dir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
-    } else {
-      dir = path.dirname(getHlsFilePath(id, output, "index.m3u8"));
-    }
+    // Determine the correct recording directory (now always in record_hls)
+    const dir = path.join(config.storageDir, "record_hls", id, output.replace(/\W+/g, "_").toLowerCase());
     
     if (!dir || !fs.existsSync(dir)) {
       return res.status(404).send("Playback stream directory not found");
