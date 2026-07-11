@@ -180,9 +180,7 @@ if (!isMainThread) {
             frameHeight
           }));
 
-          if (formatted.length > 0) {
-            console.log(`[AI Worker] Detection took ${duration}ms. Found: ${formatted.map(p => `${p.class} (${Math.round(p.score * 100)}%)`).join(', ')}`);
-          }
+          console.log(`[AI Worker] Detection took ${duration}ms. Found ${formatted.length} objects: ${formatted.map(p => `${p.class} (${Math.round(p.score * 100)}%)`).join(', ')}`);
 
           parentPort.postMessage({ type: 'result', id: msg.id, predictions: formatted });
         } catch (err) {
