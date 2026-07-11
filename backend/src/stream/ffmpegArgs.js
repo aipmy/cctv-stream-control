@@ -41,7 +41,7 @@ function isAudioEnabled(camera, audioFallback) {
 // Audio args untuk record output (tanpa filter_complex — pakai direct map)
 function audioArgsRecord(camera, audioFallback) {
   if (!isAudioEnabled(camera, audioFallback)) return ["-an"];
-  return ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2"];
+  return ["-map", "[arecout]", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2"];
 }
 
 export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, audioFallback = false }) {
@@ -119,7 +119,14 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
 
   // Audio filter masuk ke dalam filter_complex untuk menghindari konflik -af vs -filter_complex
   // (FFmpeg 7+ tidak mengizinkan -af bersamaan dengan -filter_complex)
-  const audioFilterChain = audioEnabled ? ";[0:a]volume=3.0,aresample=async=1[aout]" : "";
+  let audioFilterChain = "";
+  if (audioEnabled) {
+    if (recordDir) {
+      audioFilterChain = ";[0:a]asplit=2[ain1][ain2];[ain1]volume=3.0,aresample=async=1,asetpts=N/SR/TB[aout];[ain2]aresample=async=1,asetpts=N/SR/TB[arecout]";
+    } else {
+      audioFilterChain = ";[0:a]volume=3.0,aresample=async=1,asetpts=N/SR/TB[aout]";
+    }
+  }
 
   let filterComplex = "";
   if (streamMode === "transcode" && recordDir && recordMode === "transcode") {
