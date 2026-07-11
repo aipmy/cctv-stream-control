@@ -167,6 +167,7 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
     const settings = await getSettings();
     const eventsDir = path.join(config.storageDir, "events");
     const hlsDir = path.join(config.storageDir, "hls");
+    const recordHlsDir = path.join(config.storageDir, "record_hls");
     
     async function getDirSize(dirPath) {
       let size = 0;
@@ -189,7 +190,8 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
 
     const eventsSize = await getDirSize(eventsDir);
     const hlsSize = await getDirSize(hlsDir);
-    const usedBytes = eventsSize + hlsSize;
+    const recordHlsSize = await getDirSize(recordHlsDir);
+    const usedBytes = eventsSize + hlsSize + recordHlsSize;
     const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
 
     let diskTotal = 0;
