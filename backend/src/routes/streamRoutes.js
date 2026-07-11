@@ -595,8 +595,16 @@ streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
     recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
-    const filePath = getHlsFilePath(req.params.id, output, req.params.file);
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).send("Segment not found");
+    let filePath = getHlsFilePath(req.params.id, output, req.params.file);
+    if (!filePath || !fs.existsSync(filePath)) {
+      // Fallback to record_hls directory for playback segments
+      const recordFilePath = path.join(config.storageDir, "record_hls", req.params.id, req.params.file);
+      if (fs.existsSync(recordFilePath) && !req.params.file.includes("..")) {
+        filePath = recordFilePath;
+      } else {
+        return res.status(404).send("Segment not found");
+      }
+    }
     try {
       const st = fs.statSync(filePath);
       if (st.isFile()) {
