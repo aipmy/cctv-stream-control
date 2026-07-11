@@ -289,6 +289,16 @@ function scheduleHlsIdleCleanup() {
         if (closedAt && now - closedAt > config.streamErrorRetentionMs) hlsSessions.delete(id);
         continue;
       }
+      
+      // Watchdog: Detect frozen stream (no frames for 45s)
+      if (session.lastFrameAt && now - session.lastFrameAt > 45000) {
+        logLifecycle(session, `watchdog timeout: no frames received for 45s, stream appears stuck. Killing ffmpeg.`);
+        session.status = "error";
+        session.rawError = "Stream frozen (Watchdog timeout: no frames received)";
+        session.child.kill("SIGKILL");
+        continue;
+      }
+
       if (session.keepAlive) {
         session.lastRequestAt = now;
         continue;
@@ -419,6 +429,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       lastRequestAt: Date.now(),
       keepAlive: Boolean(camera.enableRecording || camera.enableNotifications),
       lastFrame: null,
+      lastFrameAt: Date.now(),
     };
     hlsSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
@@ -430,6 +441,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       recordCameraTraffic(id, "pull", chunk.length);
       parse(chunk, (frame) => {
         session.lastFrame = frame;
+        session.lastFrameAt = Date.now();
         
         // Feed frame to pixel-diff motion engine (non-blocking)
         const hasSmart = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
