@@ -322,13 +322,20 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   };
 
   const handleSelectDiscoveredCamera = (cam: OnvifCamera) => {
-    setFormKey("ip", cam.ip);
+    let newPort: number | undefined;
     if (cam.xaddrs?.[0]) {
       try {
         const url = new URL(cam.xaddrs[0]);
-        if (url.port) setFormKey("onvifPort", parseInt(url.port));
+        if (url.port) newPort = parseInt(url.port);
       } catch (e) {}
     }
+    
+    setForm((f) => ({
+      ...f,
+      ip: cam.ip,
+      ...(newPort ? { onvifPort: newPort } : {})
+    }));
+    
     setShowScanResults(false);
     toast.success(`Auto-filled IP for ${cam.name}`);
   };
@@ -360,14 +367,17 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     if (profile.rtspUrl) {
       try {
         const url = new URL(profile.rtspUrl);
-        setFormKey("sourcePath", url.pathname + url.search);
-        
         const port = url.port ? parseInt(url.port) : (url.protocol.startsWith("rtsp") ? 554 : null);
-        if (port) setFormKey("rtspPort", port);
+        
+        setForm((f) => ({
+          ...f,
+          sourcePath: url.pathname + url.search,
+          ...(port ? { rtspPort: port } : {})
+        }));
         
         toast.success(`Applied stream profile: ${profile.name}`);
       } catch (e) {
-        setFormKey("sourcePath", profile.rtspUrl);
+        setForm((f) => ({ ...f, sourcePath: profile.rtspUrl }));
       }
     }
     setShowProfileResults(false);
