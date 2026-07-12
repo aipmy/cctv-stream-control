@@ -165,6 +165,30 @@ export const statsApi = {
     api<TrafficHistoryResponse>(`/api/stats/traffic/history?range=${encodeURIComponent(range)}`),
 };
 
+export interface OnvifCamera {
+  urn: string;
+  name: string;
+  hardware: string;
+  location: string;
+  xaddrs: string[];
+  ip: string;
+}
+
+export interface OnvifStream {
+  name: string;
+  resolution: string;
+  rtspUrl: string;
+}
+
+export const onvifApi = {
+  discover: () => api<{ cameras: OnvifCamera[] }>("/api/onvif/discover"),
+  getProfiles: (xaddr: string, user: string, pass: string) => 
+    api<{ streams: OnvifStream[]; info: any }>("/api/onvif/profiles", {
+      method: "POST",
+      json: { xaddr, user, pass }
+    })
+};
+
 export const systemApi = {
   status: () => api<Record<string, unknown>>("/api/system/status"),
   getDisks: () => api<DiskInfo[]>("/api/system/disks"),

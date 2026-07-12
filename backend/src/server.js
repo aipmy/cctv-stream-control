@@ -15,6 +15,7 @@ import { statRoutes } from "./routes/statRoutes.js";
 import { systemRoutes } from "./routes/systemRoutes.js";
 import { auditRoutes } from "./routes/auditRoutes.js";
 import { eventRoutes } from "./routes/eventRoutes.js";
+import { onvifRoutes } from "./routes/onvifRoutes.js";
 import { runStorageCleanup } from "./services/recordingService.js";
 import { startMotionDetectionWorker, stopMotionDetectionWorker } from "./services/motionDetectionService.js";
 import { requireAuth } from "./middleware/authMiddleware.js";
@@ -82,6 +83,7 @@ app.use("/api/stats", statRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/onvif", onvifRoutes);
 
 if (fs.existsSync(config.frontendDist)) {
   app.use(express.static(config.frontendDist));

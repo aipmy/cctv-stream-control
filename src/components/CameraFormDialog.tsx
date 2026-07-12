@@ -9,8 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import type { Camera, CameraInput, Brand, StreamType, SourceType, RtspTransport, HlsMode, MotionArea } from "@/types";
 import { SOURCE_SUPPORTS_PTZ } from "@/types";
-import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity, Check, ChevronsUpDown } from "lucide-react";
-import { cameraApi, type PtzResult } from "@/lib/api";
+import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Wand2, Activity, Check, ChevronsUpDown, Search, RefreshCw } from "lucide-react";
+import { cameraApi, onvifApi, type PtzResult, type OnvifCamera } from "@/lib/api";
 import { useAuth } from "@/features/auth/store";
 import { useCamerasQuery, useCameraActions } from "@/features/cameras/queries";
 import { buildSourceUrl, buildOnvifUrl, buildRestreamUrl, DEFAULT_PORTS, defaultPath } from "@/lib/cctv";
@@ -171,6 +171,11 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   } | null>(null);
   const [isNewSite, setIsNewSite] = useState(false);
   const [siteOpen, setSiteOpen] = useState(false);
+  
+  // ONVIF Scanner state
+  const [isScanning, setIsScanning] = useState(false);
+  const [discoveredCameras, setDiscoveredCameras] = useState<OnvifCamera[]>([]);
+  const [showScanResults, setShowScanResults] = useState(false);
 
   // Smart Detection preview filter toggles (now synced with form.detectionModes)
   const [sdShowPerson, setSdShowPerson] = useState(camera?.detectionModes?.includes("human") ?? true);
@@ -290,6 +295,37 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         toast.success(t("presetApplied", { name: t(p.nameKey) }));
       }
     }
+  };
+
+  const handleScanNetwork = async () => {
+    setIsScanning(true);
+    setDiscoveredCameras([]);
+    try {
+      const res = await onvifApi.discover();
+      setDiscoveredCameras(res.cameras || []);
+      if (res.cameras?.length > 0) {
+        setShowScanResults(true);
+        toast.success(`Found ${res.cameras.length} ONVIF cameras`);
+      } else {
+        toast.error("No ONVIF cameras found on the local network");
+      }
+    } catch (err) {
+      toast.error(`Scan failed: ${(err as Error).message}`);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleSelectDiscoveredCamera = (cam: OnvifCamera) => {
+    setFormKey("ip", cam.ip);
+    if (cam.xaddrs?.[0]) {
+      try {
+        const url = new URL(cam.xaddrs[0]);
+        if (url.port) setFormKey("onvifPort", parseInt(url.port));
+      } catch (e) {}
+    }
+    setShowScanResults(false);
+    toast.success(`Auto-filled IP for ${cam.name}`);
   };
 
   useEffect(() => {
@@ -474,7 +510,49 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             </Select>
           </Field>
           <Field label={t("ipHost")} error={errors.ip}>
-            <Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.10" />
+            <div className="flex gap-2">
+              <Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.10" />
+              <Popover open={showScanResults} onOpenChange={setShowScanResults}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    disabled={isScanning} 
+                    onClick={handleScanNetwork}
+                    className="w-[140px] px-2 bg-indigo-50/50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+                  >
+                    {isScanning ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                    {isScanning ? "Scanning..." : "Scan LAN"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="end">
+                  <Command>
+                    <CommandInput placeholder="Search discovered cameras..." />
+                    <CommandList>
+                      <CommandEmpty>No cameras found.</CommandEmpty>
+                      <CommandGroup heading="Discovered Devices">
+                        {discoveredCameras.map((cam, i) => (
+                          <CommandItem 
+                            key={i} 
+                            onSelect={() => handleSelectDiscoveredCamera(cam)}
+                            className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 font-medium text-sm">
+                              <Radio className="w-4 h-4 text-emerald-500" />
+                              {cam.ip}
+                            </div>
+                            <div className="text-xs text-muted-foreground w-full flex justify-between">
+                              <span>{cam.name}</span>
+                              <span className="opacity-50">{cam.hardware}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </Field>
           <Field label={t("siteGroup")} error={errors.site}>
             {user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0 ? (
