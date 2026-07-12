@@ -576,6 +576,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                         {discoveredCameras.map((cam, i) => (
                           <CommandItem 
                             key={i} 
+                            value={cam.ip}
                             onSelect={() => handleSelectDiscoveredCamera(cam)}
                             className="flex flex-col items-start gap-1 p-3 cursor-pointer"
                           >
@@ -766,8 +767,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                         {onvifProfiles.map((p, i) => (
                           <CommandItem 
                             key={i} 
+                            value={p.name}
                             onSelect={() => handleSelectOnvifProfile(p)}
-                            className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                            className="flex flex-col items-start gap-1 p-3 cursor-pointer z-50 pointer-events-auto"
                           >
                             <div className="flex items-center justify-between w-full font-medium text-sm">
                               <span>{p.name}</span>
