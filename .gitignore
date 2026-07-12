@@ -36,4 +36,5 @@ package-lock.json
 test-leak.js
 backend/custom_storage_test_dir/
 
-
+# deploy scripts (contains private ips/passwords)
+deploy-*.sh
