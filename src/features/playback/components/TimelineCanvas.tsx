@@ -9,7 +9,7 @@ import { Info, PlayCircle } from "lucide-react";
 export function TimelineCanvas() {
   const { t } = useTranslation();
   const {
-    selectedDate, playbackInfo, events,
+    selectedCameraIds, selectedDate, playbackInfoMap, eventsMap,
     timelineZoom, setTimelineZoom,
     timelineCenterTs, setTimelineCenterTs,
     currentPlaybackTs, setCurrentPlaybackTs,
@@ -32,7 +32,7 @@ export function TimelineCanvas() {
   // Draw timeline canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !playbackInfo) return;
+    if (!canvas || selectedCameraIds.length === 0) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -75,17 +75,59 @@ export function TimelineCanvas() {
     }
 
     const timeSpan = zoomEnd - zoomStart;
+    
+    const numCameras = Math.max(1, selectedCameraIds.length);
+    const rowHeight = (height - 16) / numCameras;
 
-    // Draw segment blocks
-    const mappings = playbackInfo.segmentMappings || [];
-    ctx.fillStyle = "rgba(16, 185, 129, 0.4)";
-    for (const seg of mappings) {
-      if (seg.ts + seg.duration >= zoomStart && seg.ts <= zoomEnd) {
-        const x = ((seg.ts - zoomStart) / timeSpan) * width;
-        const w = (seg.duration / timeSpan) * width;
-        ctx.fillRect(x, 0, Math.max(1, w), height - 16);
+    // Draw segment blocks and events for each camera
+    selectedCameraIds.forEach((camId, index) => {
+      const pInfo = playbackInfoMap[camId];
+      const yOffset = index * rowHeight;
+      
+      if (pInfo) {
+        const mappings = pInfo.segmentMappings || [];
+        ctx.fillStyle = "rgba(16, 185, 129, 0.4)";
+        for (const seg of mappings) {
+          if (seg.ts + seg.duration >= zoomStart && seg.ts <= zoomEnd) {
+            const x = ((seg.ts - zoomStart) / timeSpan) * width;
+            const w = (seg.duration / timeSpan) * width;
+            ctx.fillRect(x, yOffset, Math.max(1, w), rowHeight - 2);
+          }
+        }
       }
-    }
+
+      // Draw Event Ticks
+      const camEvents = eventsMap[camId] || [];
+      for (const evt of camEvents) {
+        const evtUnix = Math.floor(new Date(evt.ts).getTime() / 1000);
+        if (evtUnix >= zoomStart && evtUnix <= zoomEnd) {
+          const x = ((evtUnix - zoomStart) / timeSpan) * width;
+          let color = "#64748b";
+          if (evt.type === "person" || evt.type === "human") color = "#f43f5e";
+          else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) color = "#10b981";
+          else if (evt.type === "sound") color = "#06b6d4";
+          else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) color = "#3b82f6";
+          else if (evt.type === "motion" || evt.type === "pixel") color = "#f59e0b";
+          
+          ctx.beginPath();
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(x - 2, yOffset + 2, 4, rowHeight - 6, 2);
+          } else {
+            ctx.rect(x - 2, yOffset + 2, 4, rowHeight - 6);
+          }
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+      
+      if (index < numCameras - 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        ctx.moveTo(0, yOffset + rowHeight);
+        ctx.lineTo(width, yOffset + rowHeight);
+        ctx.stroke();
+      }
+    });
 
     // Draw ticks
     ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
@@ -118,32 +160,6 @@ export function TimelineCanvas() {
       ctx.fillText(label, x, height - 3);
     }
 
-    // Draw Event Ticks
-    for (const evt of events) {
-      const evtUnix = Math.floor(new Date(evt.ts).getTime() / 1000);
-      if (evtUnix >= zoomStart && evtUnix <= zoomEnd) {
-        const x = ((evtUnix - zoomStart) / timeSpan) * width;
-        let color = "#64748b";
-        if (evt.type === "person" || evt.type === "human") color = "#f43f5e";
-        else if (["cat", "dog", "bird", "horse", "sheep", "cow", "pet"].includes(evt.type)) color = "#10b981";
-        else if (evt.type === "sound") color = "#06b6d4";
-        else if (["car", "motorcycle", "bus", "truck", "bicycle", "vehicle"].includes(evt.type)) color = "#3b82f6";
-        else if (evt.type === "motion" || evt.type === "pixel") color = "#f59e0b";
-        
-        ctx.beginPath();
-        if (typeof ctx.roundRect === "function") {
-          ctx.roundRect(x - 3, 2, 6, height - 20, 3);
-        } else {
-          ctx.rect(x - 3, 2, 6, height - 20);
-        }
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-      }
-    }
-
     // Draw Playhead
     if (currentPlaybackTs && currentPlaybackTs >= zoomStart && currentPlaybackTs <= zoomEnd) {
       const x = ((currentPlaybackTs - zoomStart) / timeSpan) * width;
@@ -161,7 +177,7 @@ export function TimelineCanvas() {
       ctx.lineTo(x, 6);
       ctx.fill();
     }
-  }, [playbackInfo, events, selectedDate, timelineZoom, currentPlaybackTs, timelineCenterTs]);
+  }, [playbackInfoMap, eventsMap, selectedDate, timelineZoom, currentPlaybackTs, timelineCenterTs, selectedCameraIds]);
 
   const getUnixFromX = (x: number) => {
     const canvas = canvasRef.current;
@@ -189,7 +205,7 @@ export function TimelineCanvas() {
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas || !playbackInfo) return;
+    if (!canvas || selectedCameraIds.length === 0) return;
     canvas.setPointerCapture(e.pointerId);
 
     const rect = canvas.getBoundingClientRect();
@@ -214,7 +230,7 @@ export function TimelineCanvas() {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas || !playbackInfo) return;
+    if (!canvas || selectedCameraIds.length === 0) return;
 
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -283,7 +299,7 @@ export function TimelineCanvas() {
   };
 
   const jumpToPreciseTime = () => {
-    if (!playbackInfo) return;
+    if (Object.keys(playbackInfoMap).length === 0) return;
     const parts = preciseTimeInput.split(":");
     if (parts.length < 2) return;
     const hours = parts[0];
@@ -302,7 +318,7 @@ export function TimelineCanvas() {
 
   return (
     <>
-      {playbackInfo?.hasRecording && (
+      {Object.keys(playbackInfoMap).length > 0 && (
         <Card className="p-4 border border-border/40 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">

@@ -3,14 +3,14 @@ import type { SmartEvent } from "@/types";
 import { useLocation } from "react-router-dom";
 
 interface PlaybackState {
-  selectedCameraId: string;
-  setSelectedCameraId: (id: string) => void;
+  selectedCameraIds: string[];
+  setSelectedCameraIds: React.Dispatch<React.SetStateAction<string[]>>;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
-  playbackInfo: any;
-  setPlaybackInfo: (info: any) => void;
-  events: SmartEvent[];
-  setEvents: React.Dispatch<React.SetStateAction<SmartEvent[]>>;
+  playbackInfoMap: Record<string, any>;
+  setPlaybackInfoMap: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  eventsMap: Record<string, SmartEvent[]>;
+  setEventsMap: React.Dispatch<React.SetStateAction<Record<string, SmartEvent[]>>>;
   loading: boolean;
   setLoading: (loading: boolean) => void;
   error: string | null;
@@ -91,7 +91,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const effectiveState = location.state as { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 
-  const [selectedCameraId, setSelectedCameraId] = useState(() => effectiveState?.cameraId || "");
+  const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>(() => {
+    return effectiveState?.cameraId ? [effectiveState.cameraId] : [];
+  });
   const [cameraSearchQuery, setCameraSearchQuery] = useState("");
   const [isCameraPopoverOpen, setIsCameraPopoverOpen] = useState(false);
   
@@ -104,8 +106,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     return `${year}-${month}-${day}`;
   });
 
-  const [playbackInfo, setPlaybackInfo] = useState<any>(null);
-  const [events, setEvents] = useState<SmartEvent[]>([]);
+  const [playbackInfoMap, setPlaybackInfoMap] = useState<Record<string, any>>({});
+  const [eventsMap, setEventsMap] = useState<Record<string, SmartEvent[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,8 +149,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (effectiveState) {
-      if (effectiveState.cameraId && effectiveState.cameraId !== selectedCameraId) {
-        setSelectedCameraId(effectiveState.cameraId);
+      if (effectiveState.cameraId && !selectedCameraIds.includes(effectiveState.cameraId)) {
+        setSelectedCameraIds([effectiveState.cameraId]);
       }
       if (effectiveState.date && effectiveState.date !== selectedDate) {
         setSelectedDate(effectiveState.date);
@@ -161,10 +163,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   }, [effectiveState]);
 
   const value = {
-    selectedCameraId, setSelectedCameraId,
+    selectedCameraIds, setSelectedCameraIds,
     selectedDate, setSelectedDate,
-    playbackInfo, setPlaybackInfo,
-    events, setEvents,
+    playbackInfoMap, setPlaybackInfoMap,
+    eventsMap, setEventsMap,
     loading, setLoading,
     error, setError,
     isPlaying, setIsPlaying,

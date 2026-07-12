@@ -19,13 +19,13 @@ export function PlaybackControls() {
   const { data: cameras = [] } = useCamerasQuery();
 
   const {
-    selectedCameraId, setSelectedCameraId,
+    selectedCameraIds, setSelectedCameraIds,
     selectedDate, setSelectedDate,
     cameraSearchQuery, setCameraSearchQuery,
     isCameraPopoverOpen, setIsCameraPopoverOpen,
     playbackWindowMinutes, setPlaybackWindowMinutes,
     currentPlaybackTs, setPlaybackWindowCenterTs,
-    setActivePosterUrl, playbackInfo
+    setActivePosterUrl, playbackInfoMap
   } = usePlayback();
 
   const filteredCameras = useMemo(() => {
@@ -63,7 +63,11 @@ export function PlaybackControls() {
                 className="w-full justify-between font-normal text-left h-10 bg-background border-border text-sm"
               >
                 <span className="truncate">
-                  {cameras.find((c) => c.id === selectedCameraId)?.name || t("selectCamera")}
+                  {selectedCameraIds.length === 0 
+                    ? t("selectCamera") 
+                    : selectedCameraIds.length === 1 
+                      ? cameras.find((c) => c.id === selectedCameraIds[0])?.name || t("selectCamera")
+                      : `${selectedCameraIds.length} Cameras Selected`}
                 </span>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
@@ -89,19 +93,29 @@ export function PlaybackControls() {
                       <button
                         key={c.id}
                         onClick={() => {
-                          setSelectedCameraId(c.id);
+                          if (selectedCameraIds.includes(c.id)) {
+                            setSelectedCameraIds(prev => prev.filter(id => id !== c.id));
+                          } else {
+                            if (selectedCameraIds.length >= 4) return;
+                            setSelectedCameraIds(prev => [...prev, c.id]);
+                          }
                           setActivePosterUrl(null);
-                          setIsCameraPopoverOpen(false);
                         }}
                         className={cn(
-                          "w-full text-left p-2 rounded-md transition-colors text-xs flex flex-col gap-0.5 hover:bg-accent/50",
-                          selectedCameraId === c.id && "bg-primary/10 text-primary font-medium border border-primary/20"
+                          "w-full text-left p-2 rounded-md transition-colors text-xs flex items-center justify-between gap-2 hover:bg-accent/50",
+                          selectedCameraIds.includes(c.id) && "bg-primary/10 text-primary font-medium border border-primary/20",
+                          !selectedCameraIds.includes(c.id) && selectedCameraIds.length >= 4 && "opacity-50 cursor-not-allowed"
                         )}
                       >
+                        <div className="flex flex-col gap-0.5 overflow-hidden">
                         <span className="font-semibold truncate">{c.name}</span>
                         <span className="text-[10px] text-muted-foreground truncate">
                           {c.site} · {c.ip} · {c.brand}
                         </span>
+                        </div>
+                        {selectedCameraIds.includes(c.id) && (
+                          <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                        )}
                       </button>
                     ))
                   )}
@@ -161,7 +175,9 @@ export function PlaybackControls() {
         <div className="h-10 flex items-center justify-between px-3 bg-muted/20 border border-border/40 rounded-md">
           <span className="text-xs text-muted-foreground font-medium">{t("diskUsage")}</span>
           <span className="font-semibold text-foreground text-xs font-mono bg-slate-900 border border-border/45 px-1.5 py-0.5 rounded">
-            {selectedCameraId && playbackInfo ? formatBytes(playbackInfo.diskUsageBytes) : "-- B"}
+            {selectedCameraIds.length > 0 && Object.keys(playbackInfoMap).length > 0
+              ? formatBytes(Object.values(playbackInfoMap).reduce((sum: number, info: any) => sum + (info?.diskUsageBytes || 0), 0)) 
+              : "-- B"}
           </span>
         </div>
       </div>

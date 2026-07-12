@@ -8,14 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PlayCircle, Loader2, AlertTriangle, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Maximize } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-export function VideoPlayer() {
+export function VideoPlayer({ cameraId }: { cameraId: string }) {
   const { t } = useTranslation();
   const location = useLocation();
   const effectiveState = location.state as { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 
   const {
-    selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
-    playbackInfo, loading, error, setError,
+    selectedCameraIds, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
+    playbackInfoMap, loading, error, setError,
     isPlaying, setIsPlaying,
     isMuted, setIsMuted,
     volume, setVolume,
@@ -26,6 +26,8 @@ export function VideoPlayer() {
     jumpToTimeTrigger, setJumpToTimeTrigger,
     loadPlaybackTrigger
   } = usePlayback();
+  
+  const playbackInfo = playbackInfoMap[cameraId];
 
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -38,7 +40,7 @@ export function VideoPlayer() {
     if (effectiveState && effectiveState.eventSeek) {
       initialSeekDone.current = false;
     }
-  }, [effectiveState, selectedCameraId]);
+  }, [effectiveState, cameraId]);
 
   // Handle HLS initialization
   useEffect(() => {
@@ -55,7 +57,7 @@ export function VideoPlayer() {
       end = playbackWindowCenterTs + halfWindow;
     }
 
-    const playlistSrc = playbackUrl(selectedCameraId, selectedDate, start, end);
+    const playlistSrc = playbackUrl(cameraId, selectedDate, start, end);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const useNative = isSafari && video.canPlayType("application/vnd.apple.mpegurl");
 

@@ -20,9 +20,9 @@ function PlaybackContent() {
   const { t, lang } = useTranslation();
   
   const {
-    selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
+    selectedCameraIds, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
     setLoading, setError, setCurrentPlaybackTs, setCurrentRecordingTime, setTimelineCenterTs,
-    setPlaybackInfo, setEvents, setActivePosterUrl, setJumpToTimeTrigger,
+    setPlaybackInfoMap, setEventsMap, setActivePosterUrl, setJumpToTimeTrigger,
     activeSnapshot, setActiveSnapshot,
     deleteEventTarget, setDeleteEventTarget,
     loadPlaybackTrigger, setLoadPlaybackTrigger
@@ -33,7 +33,10 @@ function PlaybackContent() {
   const initialSeekDone = React.useRef(false);
 
   const loadPlaybackSegments = async () => {
-    if (!selectedCameraId) return;
+    if (!selectedCameraIds || selectedCameraIds.length === 0) {
+      setPlaybackInfoMap({});
+      return;
+    }
     setLoading(true);
     setError(null);
     setActivePosterUrl(null);
@@ -51,19 +54,30 @@ function PlaybackContent() {
         end = playbackWindowCenterTs + halfWindow;
       }
 
-      // Fetch playback segments metadata
-      const info = await streamApi.playbackInfo(selectedCameraId, selectedDate, start, end);
-      setPlaybackInfo(info);
+      const newMap: Record<string, any> = {};
+      let firstValidTs: number | null = null;
 
-      if (info.hasRecording) {
-        let startTs = info.firstSegmentUnixTime;
-        if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
-          startTs = effectiveState.timestamp;
+      await Promise.all(selectedCameraIds.map(async (camId) => {
+        try {
+          const info = await streamApi.playbackInfo(camId, selectedDate, start, end);
+          newMap[camId] = info;
+          if (info.hasRecording && firstValidTs === null) {
+            firstValidTs = info.firstSegmentUnixTime;
+          }
+        } catch (e) {
+          console.error(`Failed to load segments for ${camId}`, e);
         }
-        if (startTs) {
-          setCurrentPlaybackTs(startTs);
-          setCurrentRecordingTime(new Date(startTs * 1000).toLocaleTimeString("id-ID", { hour12: false }));
-        }
+      }));
+
+      setPlaybackInfoMap(newMap);
+
+      let startTs = firstValidTs;
+      if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+        startTs = effectiveState.timestamp;
+      }
+      if (startTs) {
+        setCurrentPlaybackTs(startTs);
+        setCurrentRecordingTime(new Date(startTs * 1000).toLocaleTimeString("id-ID", { hour12: false }));
       }
 
       setLoadPlaybackTrigger((prev) => prev + 1); // trigger VideoPlayer to reinitialize HLS
@@ -76,22 +90,34 @@ function PlaybackContent() {
   };
 
   const loadEvents = async () => {
-    if (!selectedCameraId) return;
+    if (!selectedCameraIds || selectedCameraIds.length === 0) {
+      setEventsMap({});
+      return;
+    }
     try {
       const allEvents = await eventApi.list();
-      const filtered = allEvents.filter((e) => {
-        const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
-        return (
-          e.cameraId === selectedCameraId &&
-          eventLocalDate === selectedDate
-        );
+      const newMap: Record<string, any[]> = {};
+      
+      let allFiltered: any[] = [];
+      
+      selectedCameraIds.forEach(camId => {
+        const filtered = allEvents.filter((e) => {
+          const eventLocalDate = new Date(e.ts).toLocaleDateString("sv-SE");
+          return (
+            e.cameraId === camId &&
+            eventLocalDate === selectedDate
+          );
+        });
+        filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+        newMap[camId] = filtered;
+        allFiltered = [...allFiltered, ...filtered];
       });
-      filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-      setEvents(filtered);
+      
+      setEventsMap(newMap);
 
       if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
         const targetTs = effectiveState.timestamp;
-        const closestEvent = filtered.find(e => {
+        const closestEvent = allFiltered.find(e => {
           const eUnix = Math.floor(new Date(e.ts).getTime() / 1000);
           return Math.abs(eUnix - targetTs) <= 2;
         });
@@ -107,20 +133,20 @@ function PlaybackContent() {
 
   React.useEffect(() => {
     loadPlaybackSegments();
-  }, [selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs]);
+  }, [selectedCameraIds, selectedDate, playbackWindowMinutes, playbackWindowCenterTs]);
 
   React.useEffect(() => {
     loadEvents();
-  }, [selectedCameraId, selectedDate]);
+  }, [selectedCameraIds, selectedDate]);
 
   React.useEffect(() => {
-    if (!selectedCameraId) {
+    if (!selectedCameraIds || selectedCameraIds.length === 0) {
       setLoading(true);
       eventApi.list()
         .then((allEvents) => {
           const filtered = allEvents.filter((e) => e.type !== "sound");
           filtered.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-          setEvents(filtered);
+          setEventsMap({ "global": filtered }); // Fallback to global
         })
         .catch((err) => {
           console.error("Failed to load global events", err);
@@ -129,14 +155,24 @@ function PlaybackContent() {
           setLoading(false);
         });
     }
-  }, [selectedCameraId]);
+  }, [selectedCameraIds]);
 
   const confirmDeleteEvent = async () => {
     if (!deleteEventTarget) return;
     try {
       await eventApi.remove(deleteEventTarget.id);
       toast.success(t("deleteEventSuccess"));
-      setEvents((prev) => prev.filter((e) => e.id !== deleteEventTarget.id));
+      
+      setEventsMap((prev) => {
+        const newMap = { ...prev };
+        if (newMap[deleteEventTarget.cameraId]) {
+          newMap[deleteEventTarget.cameraId] = newMap[deleteEventTarget.cameraId].filter(e => e.id !== deleteEventTarget.id);
+        }
+        if (newMap["global"]) {
+          newMap["global"] = newMap["global"].filter(e => e.id !== deleteEventTarget.id);
+        }
+        return newMap;
+      });
       setDeleteEventTarget(null);
     } catch (err) {
       toast.error(t("failedDeleteEvent"));
@@ -160,7 +196,23 @@ function PlaybackContent() {
       <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 items-start h-[calc(100vh-64px)] lg:h-auto overflow-hidden lg:overflow-visible">
         {/* Left Column */}
         <div className="w-full lg:col-span-2 flex flex-col h-full min-h-0 lg:block lg:space-y-6 lg:pr-1 lg:pb-4">
-          <VideoPlayer />
+          {selectedCameraIds.length === 0 ? (
+            <div className="w-full aspect-video bg-black/90 flex flex-col items-center justify-center text-muted-foreground border border-border/40 rounded-xl">
+              <span className="mb-2">Camera</span>
+              <span>{t("selectCameraPrompt") || "Select cameras to view playback"}</span>
+            </div>
+          ) : (
+            <div className={cn(
+              "grid gap-2 w-full",
+              selectedCameraIds.length === 1 ? "grid-cols-1" :
+              selectedCameraIds.length === 2 ? "grid-cols-1 md:grid-cols-2" :
+              "grid-cols-2"
+            )}>
+              {selectedCameraIds.map(camId => (
+                <VideoPlayer key={camId} cameraId={camId} />
+              ))}
+            </div>
+          )}
 
           {/* Desktop Timeline and Downloader */}
           <div className="hidden lg:block space-y-6 mt-4 lg:mt-0">
