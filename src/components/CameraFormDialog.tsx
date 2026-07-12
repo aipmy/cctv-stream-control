@@ -361,7 +361,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       try {
         const url = new URL(profile.rtspUrl);
         setFormKey("sourcePath", url.pathname + url.search);
-        if (url.port) setFormKey("rtspPort", parseInt(url.port));
+        
+        const port = url.port ? parseInt(url.port) : (url.protocol.startsWith("rtsp") ? 554 : null);
+        if (port) setFormKey("rtspPort", port);
+        
         toast.success(`Applied stream profile: ${profile.name}`);
       } catch (e) {
         setFormKey("sourcePath", profile.rtspUrl);
@@ -578,7 +581,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                             key={i} 
                             value={cam.ip}
                             onSelect={() => handleSelectDiscoveredCamera(cam)}
-                            className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                            onMouseDown={(e) => { e.preventDefault(); handleSelectDiscoveredCamera(cam); }}
+                            className="flex flex-col items-start gap-1 p-3 cursor-pointer z-50 pointer-events-auto"
                           >
                             <div className="flex items-center gap-2 font-medium text-sm">
                               <Radio className="w-4 h-4 text-emerald-500" />
@@ -769,7 +773,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                             key={i} 
                             value={p.name}
                             onSelect={() => handleSelectOnvifProfile(p)}
-                            className="flex flex-col items-start gap-1 p-3 cursor-pointer z-50 pointer-events-auto"
+                            onMouseDown={(e) => { e.preventDefault(); handleSelectOnvifProfile(p); }}
+                            className="flex flex-col items-start gap-1 p-3 cursor-pointer z-50 pointer-events-auto hover:bg-accent"
                           >
                             <div className="flex items-center justify-between w-full font-medium text-sm">
                               <span>{p.name}</span>
