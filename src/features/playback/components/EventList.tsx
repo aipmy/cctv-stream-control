@@ -69,6 +69,7 @@ export function EventList() {
   } = usePlayback();
 
   const events = useMemo(() => {
+    if (selectedCameraIds.length === 0) return eventsMap["global"] || [];
     let allEvents: SmartEvent[] = [];
     selectedCameraIds.forEach(id => {
        if (eventsMap[id]) allEvents = allEvents.concat(eventsMap[id]);
