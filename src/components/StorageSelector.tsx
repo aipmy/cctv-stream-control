@@ -119,7 +119,12 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
                     <HardDrive className="h-6 w-6" />
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <div className="font-semibold text-sm truncate dark:text-gray-200">{disk.mountPoint === '/' ? 'System Disk (Root)' : disk.mountPoint}</div>
+                    <div className="flex justify-between items-center">
+                      <div className="font-semibold text-sm truncate dark:text-gray-200">{disk.mountPoint === '/' ? 'System Disk (Root)' : disk.mountPoint}</div>
+                      <div className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isSelected ? 'bg-primary/20 text-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                        {disk.usePercentage}
+                      </div>
+                    </div>
                     <div className="text-xs text-muted-foreground mt-1 mb-2 flex justify-between">
                       <span>{disk.filesystem}</span>
                       <span>{disk.avail} free of {disk.size}</span>
