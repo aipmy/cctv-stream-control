@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/features/auth/store";
 import { PlaybackProvider, usePlayback } from "@/features/playback/context/PlaybackContext";
+import { cn } from "@/lib/utils";
 
 // Components
 import { PlaybackControls } from "@/features/playback/components/PlaybackControls";
@@ -199,7 +200,7 @@ function PlaybackContent() {
           {selectedCameraIds.length === 0 ? (
             <div className="w-full aspect-video bg-black/90 flex flex-col items-center justify-center text-muted-foreground border border-border/40 rounded-xl">
               <span className="mb-2">Camera</span>
-              <span>{t("selectCameraPrompt") || "Select cameras to view playback"}</span>
+              <span>{(t as any)("selectCameraPrompt") || "Select cameras to view playback"}</span>
             </div>
           ) : (
             <div className={cn(

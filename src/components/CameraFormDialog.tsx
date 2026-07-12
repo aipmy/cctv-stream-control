@@ -61,6 +61,7 @@ const empty = {
   recordResolution: "Auto" as Camera["recordResolution"],
   aiSensitivity: 50,
   detectFps: 6,
+  hardwareInfo: undefined as Camera["hardwareInfo"] | undefined,
 };
 
 const sourceHelpKeys: Record<SourceType, TranslationKey> = {
