@@ -1,6 +1,6 @@
 import { Router } from "express";
 import onvif from "node-onvif";
-import { requireRole } from "../middleware/auth.js";
+import { requireRole } from "../middleware/authMiddleware.js";
 
 export const onvifRoutes = Router();
 
