@@ -71,7 +71,15 @@ systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
           usePercentage: parts[4],
           mountPoint: parts.slice(5).join(" "),
         };
-      }).filter(d => d.filesystem.startsWith("/dev/") || d.filesystem === "tmpfs" || d.filesystem === "c:/"); // Filter to likely real disks
+      }).filter(d => {
+        const fs = d.filesystem;
+        const mp = d.mountPoint;
+        // Keep real disks, ignore virtual mounts like snap, boot, docker overlaps
+        if (fs === "tmpfs" || fs === "devtmpfs" || fs === "overlay" || fs.startsWith("shm")) return false;
+        if (mp.startsWith("/run") || mp.startsWith("/sys") || mp.startsWith("/dev") || mp.startsWith("/var/lib/docker") || mp.startsWith("/snap")) return false;
+        if (!fs.startsWith("/dev/") && fs !== "c:/") return false;
+        return true;
+      });
       res.json(disks);
     });
   } catch (err) {

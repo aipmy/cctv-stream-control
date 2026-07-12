@@ -111,22 +111,22 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
             return (
               <Card 
                 key={disk.mountPoint}
-                className={`p-4 cursor-pointer transition-colors ${isSelected ? 'border-primary ring-1 ring-primary' : 'hover:border-gray-400'}`}
+                className={`p-4 cursor-pointer transition-all ${isSelected ? 'border-primary ring-2 ring-primary/20 dark:bg-primary/5' : 'hover:border-gray-400 dark:hover:border-gray-500 dark:border-gray-800'} dark:bg-gray-900`}
                 onClick={() => handleDiskSelect(disk)}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-100 rounded-md">
-                    <HardDrive className="h-6 w-6 text-gray-700" />
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-lg ${isSelected ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                    <HardDrive className="h-6 w-6" />
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <div className="font-medium text-sm truncate">{disk.mountPoint === '/' ? 'System Disk (Root)' : disk.mountPoint}</div>
-                    <div className="text-xs text-gray-500 mt-1 flex justify-between">
+                    <div className="font-semibold text-sm truncate dark:text-gray-200">{disk.mountPoint === '/' ? 'System Disk (Root)' : disk.mountPoint}</div>
+                    <div className="text-xs text-muted-foreground mt-1 mb-2 flex justify-between">
                       <span>{disk.filesystem}</span>
                       <span>{disk.avail} free of {disk.size}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
                       <div 
-                        className="bg-primary h-1.5 rounded-full" 
+                        className={`h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-500'}`}
                         style={{ width: disk.usePercentage }}
                       ></div>
                     </div>
@@ -139,12 +139,19 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
       </div>
 
       {activeDisk && (
-        <div className="p-4 border rounded-md bg-gray-50/50 space-y-4">
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1">
-              <Label>Storage Path</Label>
-              <div className="text-sm border px-3 py-2 rounded-md bg-white text-gray-600 truncate" title={customStorageDir || "/"}>
-                {customStorageDir || "/"}
+        <div className="p-5 border rounded-lg bg-gray-50/50 dark:bg-gray-900/50 space-y-6">
+          <div className="flex items-end gap-3">
+            <div className="flex-1 space-y-2">
+              <Label className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">Storage Path</Label>
+              <div className="text-sm border px-3 py-2.5 rounded-md bg-background text-foreground truncate shadow-sm flex items-center h-10" title={customStorageDir || "Default"}>
+                {customStorageDir ? (
+                  customStorageDir
+                ) : (
+                  <span className="text-muted-foreground italic flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    Default (backend/storage/)
+                  </span>
+                )}
               </div>
             </div>
             <Button variant="outline" onClick={() => setIsFolderBrowserOpen(true)} type="button">
@@ -153,10 +160,12 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
             </Button>
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="flex justify-between items-center">
-              <Label>Recording Quota</Label>
-              <span className="text-sm font-medium">{currentPercentage}% ({maxStorageGb} GB)</span>
+              <Label className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">Recording Quota</Label>
+              <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
+                {currentPercentage}% ({maxStorageGb} GB)
+              </div>
             </div>
             <Slider 
               min={1} 
@@ -164,9 +173,10 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
               step={1} 
               value={[currentPercentage]} 
               onValueChange={handlePercentageChange} 
+              className="py-2"
             />
-            <p className="text-xs text-gray-500">
-              Set how much of {activeDisk.mountPoint} ({activeDiskTotalGb.toFixed(0)}GB total) can be used for CCTV recordings before old videos are overwritten.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Set how much of <span className="font-semibold">{activeDisk.mountPoint}</span> ({activeDiskTotalGb.toFixed(0)}GB total) can be used for CCTV recordings before old videos are overwritten.
             </p>
           </div>
         </div>
