@@ -54,20 +54,30 @@ systemRoutes.get("/status", async (_req, res, next) => {
 
 systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
   try {
-    const child = spawn("df", ["-hP"], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("df", ["-Pk"], { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     child.stdout.on("data", (c) => { out += c.toString(); });
     child.on("close", (code) => {
       if (code !== 0) return res.status(500).json({ error: "Failed to read disks" });
+      
+      const formatSize = (kb) => {
+        if (!kb || isNaN(kb)) return "0 B";
+        const bytes = parseInt(kb) * 1024;
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+
       const lines = out.trim().split("\n").slice(1); // skip header
       const disks = lines.map(line => {
         const parts = line.trim().split(/\s+/);
-        // Filesystem, Size, Used, Avail, Use%, Mounted on
+        // Filesystem, 1024-blocks, Used, Available, Capacity, Mounted on
         return {
           filesystem: parts[0],
-          size: parts[1],
-          used: parts[2],
-          avail: parts[3],
+          size: formatSize(parts[1]),
+          used: formatSize(parts[2]),
+          avail: formatSize(parts[3]),
           usePercentage: parts[4],
           mountPoint: parts.slice(5).join(" "),
         };
@@ -77,6 +87,7 @@ systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
         // Keep real disks, ignore virtual mounts like snap, boot, docker overlaps
         if (fs === "tmpfs" || fs === "devtmpfs" || fs === "overlay" || fs.startsWith("shm")) return false;
         if (mp.startsWith("/run") || mp.startsWith("/sys") || mp.startsWith("/dev") || mp.startsWith("/var/lib/docker") || mp.startsWith("/snap")) return false;
+        if (mp.startsWith("/System/") || mp === "/private/var/vm") return false; // Hide macOS specific system partitions
         if (!fs.startsWith("/dev/") && fs !== "c:/") return false;
         return true;
       });
