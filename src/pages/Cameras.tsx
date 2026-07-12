@@ -173,8 +173,18 @@ export default function Cameras() {
                       <Cctv className="h-4 w-4" />
                     </span>
                     <div>
-                      <div className="font-semibold text-foreground leading-none">{c.name}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono mt-1">{c.brand}</div>
+                      <div className="font-semibold text-foreground leading-none flex items-center gap-2">
+                        {c.name}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground font-mono mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-medium text-foreground/80">{c.brand}</span>
+                        {c.hardwareInfo && (
+                          <>
+                            <span className="opacity-50">•</span>
+                            <span className="bg-muted px-1.5 py-0.5 rounded text-[9px] font-medium border text-muted-foreground/90">{c.hardwareInfo.model}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TableCell>
@@ -323,7 +333,12 @@ export default function Cameras() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-sm text-foreground leading-tight">{c.name}</h3>
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mt-1 block">{c.site} • {c.brand}</span>
+                  <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mt-1 flex flex-wrap items-center gap-1.5">
+                    <span>{c.site} • {c.brand}</span>
+                    {c.hardwareInfo && (
+                      <span className="bg-muted px-1.5 py-0.5 rounded border border-border text-[9px] font-medium lowercase tracking-normal text-muted-foreground/90">{c.hardwareInfo.model}</span>
+                    )}
+                  </div>
                 </div>
                 <Badge variant={c.enabled ? "default" : "outline"} className="text-[10px] px-2 py-0 shrink-0">
                   {c.enabled ? t("active") : t("inactive")}

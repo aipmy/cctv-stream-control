@@ -64,6 +64,11 @@ export interface Camera {
   enableSoundDetection?: boolean;
   detectFps?: number;
   aiSensitivity?: number;
+  hardwareInfo?: {
+    manufacturer: string;
+    model: string;
+    firmware: string;
+  };
 }
 
 export interface MotionArea {

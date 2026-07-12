@@ -349,6 +349,18 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     try {
       const xaddr = `http://${form.ip}:${form.onvifPort}/onvif/device_service`;
       const res = await onvifApi.getProfiles(xaddr, form.username, form.password);
+      
+      if (res.info && res.info.Manufacturer) {
+        setForm(f => ({
+          ...f,
+          hardwareInfo: {
+            manufacturer: res.info.Manufacturer || "",
+            model: res.info.Model || "",
+            firmware: res.info.FirmwareVersion || ""
+          }
+        }));
+      }
+
       if (res.streams && res.streams.length > 0) {
         setOnvifProfiles(res.streams);
         setShowProfileResults(true);
@@ -610,6 +622,15 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                 </PopoverContent>
               </Popover>
             </div>
+            {form.hardwareInfo && (
+              <div className="flex gap-2 text-[11px] text-muted-foreground mt-1.5 px-1 font-medium bg-muted/30 py-1 rounded w-fit border">
+                <span>{form.hardwareInfo.manufacturer}</span>
+                <span>•</span>
+                <span>{form.hardwareInfo.model}</span>
+                <span>•</span>
+                <span>FW: {form.hardwareInfo.firmware}</span>
+              </div>
+            )}
           </Field>
           <Field label={t("siteGroup")} error={errors.site}>
             {user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0 ? (
