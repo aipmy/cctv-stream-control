@@ -291,9 +291,42 @@ export async function runStorageCleanup() {
     const maxSizeBytes = settings.maxStorageGb * 1024 * 1024 * 1024;
     const now = Date.now();
 
+    // ── 0. Clean /tmp/cctv_hls stale live-view segments (older than 2 min) ──
+    const tmpHlsDir = "/tmp/cctv_hls";
+    let tmpCleaned = 0;
+    if (fsSync.existsSync(tmpHlsDir)) {
+      try {
+        const tmpCamDirs = await fs.readdir(tmpHlsDir);
+        for (const camDir of tmpCamDirs) {
+          const camPath = path.join(tmpHlsDir, camDir);
+          const subDirs = await fs.readdir(camPath).catch(() => []);
+          const dirsToScan = [camPath, ...subDirs.map(d => path.join(camPath, d))];
+          for (const dirPath of dirsToScan) {
+            try {
+              const files = await fs.readdir(dirPath);
+              for (const file of files) {
+                if (!file.endsWith(".ts")) continue;
+                const filePath = path.join(dirPath, file);
+                try {
+                  const st = await fs.stat(filePath);
+                  if (now - st.mtime.getTime() > 2 * 60 * 1000) {
+                    await fs.unlink(filePath).catch(() => {});
+                    tmpCleaned++;
+                  }
+                } catch { /* ignore */ }
+              }
+            } catch { /* not a dir, skip */ }
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    if (tmpCleaned > 0) {
+      console.log(`[Storage Cleanup] Cleaned ${tmpCleaned} stale /tmp/cctv_hls segments.`);
+    }
+
     const fileInfos = [];
 
-    // 1. Scan events directory
+    // ── 1. Scan events directory ──
     const eventsDir = path.join(config.storageDir, "events");
     await fs.mkdir(eventsDir, { recursive: true });
     const eventFiles = await fs.readdir(eventsDir);
@@ -313,40 +346,43 @@ export async function runStorageCleanup() {
       } catch { /* ignore */ }
     }
 
-    // 2. Scan HLS and record_hls directories for .ts files
+    // ── 2. Scan HLS and record_hls directories for .ts files ──
     const hlsBaseDirs = [path.join(config.storageDir, "hls"), path.join(config.storageDir, "record_hls")];
+    let zeroByteCleaned = 0;
+
+    // Pre-load events and cameras once (not per hlsBaseDir)
+    const events = await listEvents();
+    const eventsByCamera = new Map();
+    for (const evt of events) {
+      if (evt.type !== "motion") continue;
+      if (!eventsByCamera.has(evt.cameraId)) {
+        eventsByCamera.set(evt.cameraId, []);
+      }
+      eventsByCamera.get(evt.cameraId).push(evt);
+    }
+    const pre = settings.preMotionSeconds || 15;
+    const post = settings.postMotionSeconds || 15;
+    
+    const cameras = await listCameras({ revealSecret: true });
+    const cameraMap = new Map(cameras.map((c) => [c.id, c]));
+
+    const isSegmentActive = (cameraId, segTsSec, isSequential) => {
+      const camera = cameraMap.get(cameraId);
+      if (!camera || !camera.enableRecording) return false;
+      if (camera.recordingMode !== "event") return true;
+      if (isSequential) return true;
+      
+      const camEvents = eventsByCamera.get(cameraId) || [];
+      for (const evt of camEvents) {
+        const evtTs = Math.floor(new Date(evt.ts).getTime() / 1000);
+        const endTsSec = evt.endTime ? Math.floor(new Date(evt.endTime).getTime() / 1000) : evtTs;
+        if (segTsSec >= evtTs - pre && segTsSec <= endTsSec + post) return true;
+      }
+      return false;
+    };
+
     for (const hlsBaseDir of hlsBaseDirs) {
       if (!fsSync.existsSync(hlsBaseDir)) continue;
-      const events = await listEvents();
-      const eventsByCamera = new Map();
-      for (const evt of events) {
-        if (evt.type !== "motion") continue;
-        const tsSec = Math.floor(new Date(evt.ts).getTime() / 1000);
-        if (!eventsByCamera.has(evt.cameraId)) {
-          eventsByCamera.set(evt.cameraId, []);
-        }
-        eventsByCamera.get(evt.cameraId).push(evt);
-      }
-      const pre = settings.preMotionSeconds || 15;
-      const post = settings.postMotionSeconds || 15;
-      
-      const cameras = await listCameras({ revealSecret: true });
-      const cameraMap = new Map(cameras.map((c) => [c.id, c]));
-
-      const isSegmentActive = (cameraId, segTsSec, isSequential) => {
-        const camera = cameraMap.get(cameraId);
-        if (!camera || !camera.enableRecording) return false;
-        if (camera.recordingMode !== "event") return true;
-        if (isSequential) return true; // Keep sequential records if mode is event but we don't know the exact time
-        
-        const camEvents = eventsByCamera.get(cameraId) || [];
-        for (const evt of camEvents) {
-          const evtTs = Math.floor(new Date(evt.ts).getTime() / 1000);
-          const endTsSec = evt.endTime ? Math.floor(new Date(evt.endTime).getTime() / 1000) : evtTs;
-          if (segTsSec >= evtTs - pre && segTsSec <= endTsSec + post) return true;
-        }
-        return false;
-      };
 
       const cameraDirs = await fs.readdir(hlsBaseDir);
       for (const cameraId of cameraDirs) {
@@ -359,8 +395,11 @@ export async function runStorageCleanup() {
           allDirsToScan = innerDirs.filter(d => subdirs.includes(d) || !d.includes("."));
         } catch { continue; }
 
+        // Also scan camDir itself (record_hls segments are directly in camDir)
+        allDirsToScan.push(".");
+
         for (const subdir of allDirsToScan) {
-          const dirPath = path.join(camDir, subdir);
+          const dirPath = subdir === "." ? camDir : path.join(camDir, subdir);
           if (!fsSync.existsSync(dirPath)) continue;
 
           const files = await fs.readdir(dirPath);
@@ -374,7 +413,15 @@ export async function runStorageCleanup() {
 
             try {
               const stats = await fs.stat(filePath);
-              const isSequential = timestampSec < 1000000000; // if it's less than year 2001, it's a sequence number
+
+              // Clean up 0-byte files immediately (result of ENOSPC writes)
+              if (stats.size === 0) {
+                await fs.unlink(filePath).catch(() => {});
+                zeroByteCleaned++;
+                continue;
+              }
+
+              const isSequential = timestampSec < 1000000000;
               if (isSequential) {
                 timestamp = stats.mtime.getTime();
                 timestampSec = Math.floor(timestamp / 1000);
@@ -405,11 +452,18 @@ export async function runStorageCleanup() {
       }
     }
 
+    if (zeroByteCleaned > 0) {
+      console.log(`[Storage Cleanup] Removed ${zeroByteCleaned} empty (0-byte) segment files.`);
+    }
+
+    // ── 3. Enforce retention & quota ──
     // Sort oldest first
     fileInfos.sort((a, b) => a.time - b.time);
 
     let totalSize = fileInfos.reduce((sum, f) => sum + f.size, 0);
     const deletedEventIds = new Set();
+    let deletedSegments = 0;
+    let freedBytes = 0;
 
     for (const fileInfo of fileInfos) {
       const isExpired = (now - fileInfo.time) > retentionMs;
@@ -418,6 +472,7 @@ export async function runStorageCleanup() {
       if (isExpired || isOverQuota) {
         await fs.unlink(fileInfo.path).catch(() => {});
         totalSize -= fileInfo.size;
+        freedBytes += fileInfo.size;
 
         if (fileInfo.type === "event") {
           // Extract event ID from filename to purge from DB
@@ -425,6 +480,8 @@ export async function runStorageCleanup() {
           if (match) {
             deletedEventIds.add(match[1]);
           }
+        } else {
+          deletedSegments++;
         }
       }
     }
@@ -433,7 +490,13 @@ export async function runStorageCleanup() {
       await eventStore.update((events) => {
         return events.filter((e) => !deletedEventIds.has(e.id));
       });
-      console.log(`[Storage Cleanup] Cleaned up ${deletedEventIds.size} event records.`);
+    }
+
+    if (deletedSegments > 0 || deletedEventIds.size > 0) {
+      const freedMb = (freedBytes / (1024 * 1024)).toFixed(1);
+      const remainMb = (totalSize / (1024 * 1024)).toFixed(1);
+      const limitMb = (maxSizeBytes / (1024 * 1024)).toFixed(0);
+      console.log(`[Storage Cleanup] Deleted ${deletedSegments} segments + ${deletedEventIds.size} events. Freed ${freedMb}MB. Remaining: ${remainMb}MB / ${limitMb}MB limit.`);
     }
   } catch (err) {
     console.error("[Storage Cleanup] Error running auto-rotation clean:", err);
