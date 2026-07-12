@@ -161,7 +161,7 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
         hlsRef.current = null;
       }
     };
-  }, [playbackInfo, selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs, loadPlaybackTrigger]);
+  }, [playbackInfo, cameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs, loadPlaybackTrigger]);
 
   // Synchronize playback speed
   useEffect(() => {
@@ -300,7 +300,7 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
             </div>
           )}
 
-          {!selectedCameraId ? (
+          {!cameraId ? (
             <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground flex-1">
               <PlayCircle className="h-12 w-12 text-primary/45 mb-3 animate-pulse" />
               <h3 className="font-semibold text-sm text-white/85">{t("pleaseSelectCamera")}</h3>

@@ -63,10 +63,18 @@ export const getClassificationLabel = (classification?: string, fallback?: strin
 export function EventList() {
   const { t, lang } = useTranslation();
   const {
-    selectedCameraId, setSelectedCameraId, selectedDate, setSelectedDate, playbackInfo,
-    events, searchKeyword, minScore, filterStartTime, filterEndTime,
+    selectedCameraIds, selectedDate, setSelectedDate, playbackInfoMap,
+    eventsMap, searchKeyword, minScore, filterStartTime, filterEndTime,
     setActivePosterUrl, setActiveSnapshot, setJumpToTimeTrigger
   } = usePlayback();
+
+  const events = useMemo(() => {
+    let allEvents: SmartEvent[] = [];
+    selectedCameraIds.forEach(id => {
+       if (eventsMap[id]) allEvents = allEvents.concat(eventsMap[id]);
+    });
+    return allEvents;
+  }, [eventsMap, selectedCameraIds]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((evt) => {
@@ -124,7 +132,7 @@ export function EventList() {
     setJumpToTimeTrigger(eventTime);
   };
 
-  if (!selectedCameraId) {
+  if (selectedCameraIds.length === 0) {
     return (
       <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card h-full">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/10 sticky top-0 bg-card z-10 shadow-sm">
@@ -196,7 +204,7 @@ export function EventList() {
     );
   }
 
-  if (!selectedCameraId || !playbackInfo) return null;
+  if (selectedCameraIds.length === 0 || Object.keys(playbackInfoMap).length === 0) return null;
 
   return (
     <Card className="border border-border/40 flex flex-col min-h-[300px] bg-card">

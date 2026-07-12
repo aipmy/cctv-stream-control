@@ -15,13 +15,16 @@ export function DownloadClipForm() {
   const { data: cameras = [] } = useCamerasQuery();
 
   const {
-    selectedCameraId, selectedDate, playbackInfo,
+    selectedCameraIds, selectedDate, playbackInfoMap,
     downloadStart, setDownloadStart,
     downloadEnd, setDownloadEnd,
     previewStartTs, setPreviewStartTs,
     previewEndTs, setPreviewEndTs,
     isPreviewDownloadOpen, setIsPreviewDownloadOpen
   } = usePlayback();
+
+  const selectedCameraId = selectedCameraIds.length === 1 ? selectedCameraIds[0] : null;
+  const playbackInfo = selectedCameraId ? playbackInfoMap[selectedCameraId] : null;
 
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const previewHlsRef = useRef<any | null>(null);
