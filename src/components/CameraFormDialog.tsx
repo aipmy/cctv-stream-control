@@ -177,8 +177,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const [sdShowPet, setSdShowPet] = useState(camera?.detectionModes?.includes("pet") ?? true);
   const [sdShowObject, setSdShowObject] = useState(camera?.detectionModes?.includes("object") ?? true);
   const [sdShowMotion, setSdShowMotion] = useState(camera?.detectionModes?.includes("pixel") ?? true);
-  const [sdAiSensitivity, setSdAiSensitivity] = useState(50);
-  const [sdMotionSensitivity, setSdMotionSensitivity] = useState(10);
+  const [sdAiSensitivity, setSdAiSensitivity] = useState(camera?.aiSensitivity ?? 50);
+  const [sdMotionSensitivity, setSdMotionSensitivity] = useState(camera?.motionSensitivity ?? 50);
 
   const runAutoDetect = async () => {
     if (!form.ip.trim()) {
