@@ -188,31 +188,31 @@ export function StorageSelector({ maxStorageGb, customStorageDir, onChange }: St
             <DialogTitle>Browse Folder</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm border px-3 py-2 rounded-md bg-gray-50 truncate flex items-center gap-1">
-              <HardDrive className="h-4 w-4 text-gray-500" />
+            <div className="text-sm border dark:border-gray-700 px-3 py-2 rounded-md bg-gray-50 dark:bg-gray-800/50 truncate flex items-center gap-2 text-gray-700 dark:text-gray-300">
+              <HardDrive className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               {currentPath}
             </div>
             
-            <div className="border rounded-md h-[300px] overflow-y-auto">
+            <div className="border dark:border-gray-700 rounded-md h-[300px] overflow-y-auto bg-white dark:bg-[#151515]">
               {foldersLoading ? (
-                <div className="p-4 text-sm text-gray-500 text-center">Loading...</div>
+                <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">Loading...</div>
               ) : (
                 <ul className="py-2">
                   {folders.map((f, i) => (
                     <li key={i}>
                       <button 
                         type="button"
-                        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-sm text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm text-left text-gray-700 dark:text-gray-300 transition-colors"
                         onClick={() => loadFolders(f.path)}
                       >
-                        <Folder className="h-4 w-4 text-blue-500" />
+                        <Folder className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                         <span className="flex-1 truncate">{f.name}</span>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                       </button>
                     </li>
                   ))}
                   {folders.length === 0 && (
-                    <li className="px-4 py-2 text-sm text-gray-500">No subfolders</li>
+                    <li className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No subfolders</li>
                   )}
                 </ul>
               )}
