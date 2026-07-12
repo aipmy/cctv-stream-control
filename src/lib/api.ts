@@ -167,6 +167,8 @@ export const statsApi = {
 
 export const systemApi = {
   status: () => api<Record<string, unknown>>("/api/system/status"),
+  getDisks: () => api<DiskInfo[]>("/api/system/disks"),
+  getFolders: (path: string = "/") => api<FolderInfo[]>(`/api/system/folders?path=${encodeURIComponent(path)}`),
 };
 
 export interface AuditQuery {
@@ -318,3 +320,18 @@ export const eventApi = {
   runStorageCleanup: () => api<{ ok: boolean }>("/api/events/cleanup", { method: "POST" }),
   deleteSnapshot: (id: string) => api<{ ok: boolean }>(`/api/events/${encodeURIComponent(id)}/snapshot`, { method: "DELETE" }),
 };
+
+export interface DiskInfo {
+  filesystem: string;
+  size: string;
+  used: string;
+  avail: string;
+  usePercentage: string;
+  mountPoint: string;
+}
+
+export interface FolderInfo {
+  name: string;
+  path: string;
+}
+

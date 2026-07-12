@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSettings } from "@/features/settings/store";
+import { StorageSelector } from "@/components/StorageSelector";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -322,19 +323,6 @@ export default function Settings() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="maxStorageGb">{t("maxStorageGb")}</Label>
-                  <Input
-                    id="maxStorageGb"
-                    type="number"
-                    min={1}
-                    value={maxStorageGb}
-                    onChange={(e) => setMaxStorageGb(Number(e.target.value))}
-                  />
-                </div>
-
-
-
-                <div className="space-y-2">
                   <Label htmlFor="segmentDuration">{t("segmentDurationLabel")}</Label>
                   <Input
                     id="segmentDuration"
@@ -370,18 +358,15 @@ export default function Settings() {
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="customStorageDir">{t("customStoragePath")}</Label>
-                  <Input
-                    id="customStorageDir"
-                    type="text"
-                    value={customStorageDir}
-                    onChange={(e) => setCustomStorageDir(e.target.value)}
-                    placeholder={t("customStoragePathPlaceholder")}
+                <div className="md:col-span-2 pt-4 border-t border-gray-100">
+                  <StorageSelector 
+                    maxStorageGb={maxStorageGb}
+                    customStorageDir={customStorageDir}
+                    onChange={(updates) => {
+                      if (updates.maxStorageGb !== undefined) setMaxStorageGb(updates.maxStorageGb);
+                      if (updates.customStorageDir !== undefined) setCustomStorageDir(updates.customStorageDir);
+                    }}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    {t("customStoragePathHelp")}
-                  </p>
                 </div>
               </div>
 
