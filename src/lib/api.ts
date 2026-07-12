@@ -169,6 +169,14 @@ export const systemApi = {
   status: () => api<Record<string, unknown>>("/api/system/status"),
   getDisks: () => api<DiskInfo[]>("/api/system/disks"),
   getFolders: (path: string = "/") => api<FolderInfo[]>(`/api/system/folders?path=${encodeURIComponent(path)}`),
+  createFolder: (targetPath: string, folderName: string) => api<{ ok: boolean; path: string }>("/api/system/folders", {
+    method: "POST",
+    body: JSON.stringify({ targetPath, folderName }),
+  }),
+  formatDisk: (mountPoint: string) => api<{ ok: boolean }>("/api/system/disks/format", {
+    method: "POST",
+    body: JSON.stringify({ mountPoint }),
+  }),
 };
 
 export interface AuditQuery {
@@ -320,7 +328,6 @@ export const eventApi = {
   runStorageCleanup: () => api<{ ok: boolean }>("/api/events/cleanup", { method: "POST" }),
   deleteSnapshot: (id: string) => api<{ ok: boolean }>(`/api/events/${encodeURIComponent(id)}/snapshot`, { method: "DELETE" }),
 };
-
 export interface DiskInfo {
   filesystem: string;
   size: string;
@@ -328,10 +335,11 @@ export interface DiskInfo {
   avail: string;
   usePercentage: string;
   mountPoint: string;
+  formatType?: string;
+  isReadOnly?: boolean;
 }
 
 export interface FolderInfo {
   name: string;
   path: string;
 }
-

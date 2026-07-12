@@ -54,11 +54,36 @@ systemRoutes.get("/status", async (_req, res, next) => {
 
 systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
   try {
-    const child = spawn("df", ["-Pk"], { stdio: ["ignore", "pipe", "pipe"] });
-    let out = "";
-    child.stdout.on("data", (c) => { out += c.toString(); });
-    child.on("close", (code) => {
-      if (code !== 0) return res.status(500).json({ error: "Failed to read disks" });
+    const mountChild = spawn("mount", [], { stdio: ["ignore", "pipe", "pipe"] });
+    let mountOut = "";
+    mountChild.stdout.on("data", (c) => { mountOut += c.toString(); });
+    mountChild.on("close", () => {
+      const mountMap = {};
+      const mountLines = mountOut.trim().split("\n");
+      for (const line of mountLines) {
+        // Mac: /dev/disk on / (apfs, sealed, local, read-only)
+        // Linux: /dev/root on / type ext4 (rw,relatime)
+        const matchLinux = line.match(/^(.+) on (.+) type ([^\s]+) \((.+)\)/);
+        const matchMac = line.match(/^(.+) on (.+) \(([^,]+)(.*?)\)/);
+        
+        if (matchLinux) {
+          mountMap[matchLinux[2]] = { 
+            type: matchLinux[3].toUpperCase(), 
+            isReadOnly: matchLinux[4].includes("ro,") || matchLinux[4].startsWith("ro")
+          };
+        } else if (matchMac) {
+          mountMap[matchMac[2]] = { 
+            type: matchMac[3].toUpperCase(), 
+            isReadOnly: matchMac[4].includes("read-only")
+          };
+        }
+      }
+
+      const child = spawn("df", ["-Pk"], { stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      child.stdout.on("data", (c) => { out += c.toString(); });
+      child.on("close", (code) => {
+        if (code !== 0) return res.status(500).json({ error: "Failed to read disks" });
       
       const formatSize = (kb) => {
         if (!kb || isNaN(kb)) return "0 B";
@@ -72,14 +97,17 @@ systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
       const lines = out.trim().split("\n").slice(1); // skip header
       const disks = lines.map(line => {
         const parts = line.trim().split(/\s+/);
-        // Filesystem, 1024-blocks, Used, Available, Capacity, Mounted on
+        const mountPoint = parts.slice(5).join(" ");
+        const mountInfo = mountMap[mountPoint] || { type: "UNKNOWN", isReadOnly: false };
         return {
           filesystem: parts[0],
           size: formatSize(parts[1]),
           used: formatSize(parts[2]),
           avail: formatSize(parts[3]),
           usePercentage: parts[4],
-          mountPoint: parts.slice(5).join(" "),
+          mountPoint: mountPoint,
+          formatType: mountInfo.type,
+          isReadOnly: mountInfo.isReadOnly,
         };
       }).filter(d => {
         const fs = d.filesystem;
@@ -92,6 +120,7 @@ systemRoutes.get("/disks", requireRole("admin"), async (_req, res, next) => {
         return true;
       });
       res.json(disks);
+    });
     });
   } catch (err) {
     next(err);
