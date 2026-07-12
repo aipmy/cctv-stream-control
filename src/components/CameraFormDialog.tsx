@@ -177,6 +177,11 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const [discoveredCameras, setDiscoveredCameras] = useState<OnvifCamera[]>([]);
   const [showScanResults, setShowScanResults] = useState(false);
 
+  // ONVIF Direct Fetch state
+  const [isFetchingOnvif, setIsFetchingOnvif] = useState(false);
+  const [showProfileResults, setShowProfileResults] = useState(false);
+  const [onvifProfiles, setOnvifProfiles] = useState<any[]>([]);
+
   // Smart Detection preview filter toggles (now synced with form.detectionModes)
   const [sdShowPerson, setSdShowPerson] = useState(camera?.detectionModes?.includes("human") ?? true);
   const [sdShowPet, setSdShowPet] = useState(camera?.detectionModes?.includes("pet") ?? true);
@@ -326,6 +331,43 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     }
     setShowScanResults(false);
     toast.success(`Auto-filled IP for ${cam.name}`);
+  };
+
+  const handleFetchOnvif = async () => {
+    if (!form.ip) {
+      return toast.error("Please enter the Camera IP first.");
+    }
+    setIsFetchingOnvif(true);
+    setOnvifProfiles([]);
+    try {
+      const xaddr = `http://${form.ip}:${form.onvifPort}/onvif/device_service`;
+      const res = await onvifApi.getProfiles(xaddr, form.username, form.password);
+      if (res.streams && res.streams.length > 0) {
+        setOnvifProfiles(res.streams);
+        setShowProfileResults(true);
+        toast.success(`Found ${res.streams.length} ONVIF streams`);
+      } else {
+        toast.error("No streams found on this camera.");
+      }
+    } catch (err) {
+      toast.error(`Fetch failed: ${(err as Error).message}`);
+    } finally {
+      setIsFetchingOnvif(false);
+    }
+  };
+
+  const handleSelectOnvifProfile = (profile: any) => {
+    if (profile.rtspUrl) {
+      try {
+        const url = new URL(profile.rtspUrl);
+        setFormKey("sourcePath", url.pathname + url.search);
+        if (url.port) setFormKey("rtspPort", parseInt(url.port));
+        toast.success(`Applied stream profile: ${profile.name}`);
+      } catch (e) {
+        setFormKey("sourcePath", profile.rtspUrl);
+      }
+    }
+    setShowProfileResults(false);
   };
 
   useEffect(() => {
@@ -690,15 +732,58 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
           )}
 
           <Field label={t("streamPath")} className="md:col-span-2" error={errors.sourcePath}>
-            <Input
-              value={form.sourcePath}
-              onChange={(e) => setForm({ ...form, sourcePath: e.target.value })}
-              placeholder={defaultPath(form.sourceType)}
-              className="font-mono text-xs"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {t("streamPathHelp")}
-            </p>
+            <div className="flex gap-2 items-start">
+              <div className="flex-1 space-y-1">
+                <Input
+                  value={form.sourcePath}
+                  onChange={(e) => setForm({ ...form, sourcePath: e.target.value })}
+                  placeholder={defaultPath(form.sourceType)}
+                  className="font-mono text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {t("streamPathHelp")}
+                </p>
+              </div>
+              <Popover open={showProfileResults} onOpenChange={setShowProfileResults}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    disabled={isFetchingOnvif || !form.ip || form.sourceType !== "RTSP+ONVIF"} 
+                    onClick={handleFetchOnvif}
+                    className="w-[140px] px-2 bg-purple-50/50 hover:bg-purple-100 dark:bg-purple-950/20 dark:hover:bg-purple-900/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800"
+                  >
+                    {isFetchingOnvif ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
+                    {isFetchingOnvif ? "Fetching..." : "Fetch ONVIF"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="end">
+                  <Command>
+                    <CommandInput placeholder="Search streams..." />
+                    <CommandList>
+                      <CommandEmpty>No streams found.</CommandEmpty>
+                      <CommandGroup heading="ONVIF Stream Profiles">
+                        {onvifProfiles.map((p, i) => (
+                          <CommandItem 
+                            key={i} 
+                            onSelect={() => handleSelectOnvifProfile(p)}
+                            className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between w-full font-medium text-sm">
+                              <span>{p.name}</span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{p.resolution}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground w-full break-all">
+                              {p.rtspUrl}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </Field>
 
           <Field label={t("username")}>
