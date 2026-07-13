@@ -271,8 +271,9 @@ export function SmartDetectionEditor({
             ctx.stroke();
           }
         }
+        }
       }
-
+      
       // 3. Draw in-progress rectangle (dashed Orange/Yellow)
       if (mode === "rect" && isDrawingRect) {
         ctx.strokeStyle = "rgba(251, 191, 36, 0.9)";
