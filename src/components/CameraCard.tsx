@@ -34,6 +34,7 @@ import { cameraApi } from "@/lib/api";
 import { formatByteRateFromBytes, formatByteRateFromKbps } from "@/lib/bandwidth";
 import { toast } from "sonner";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { CameraInfoDialog } from "@/components/CameraInfoDialog";
 
 interface Props {
   camera: Camera;
@@ -253,6 +254,9 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
           <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {(camera.sourceType === "RTSP+ONVIF" || camera.sourceType === "ONVIF") && canSeeIp && (
+            <CameraInfoDialog cameraId={camera.id} cameraName={camera.name} />
+          )}
           {hideManagementActions && (
             <Button
               size="icon"

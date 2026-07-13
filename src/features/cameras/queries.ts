@@ -6,6 +6,7 @@ import { cameraApi, statsApi } from "@/lib/api";
 export const cameraKeys = {
   all: ["cameras"] as const,
   stats: ["camera-stats"] as const,
+  hardwareInfo: (id: string) => ["camera-hardware-info", id] as const,
 };
 
 function sortCameras(cameras: Camera[]) {
@@ -20,6 +21,16 @@ export function useCamerasQuery(enabled = true) {
     queryFn: cameraApi.list,
     enabled,
     select: sortCameras,
+  });
+}
+
+export function useCameraHardwareInfoQuery(id: string, enabled = false) {
+  return useQuery({
+    queryKey: cameraKeys.hardwareInfo(id),
+    queryFn: () => cameraApi.hardwareInfo(id),
+    enabled,
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+    retry: false, // do not retry onvif connection failures heavily
   });
 }
 

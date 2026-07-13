@@ -1,4 +1,5 @@
 import { Router } from "express";
+import onvif from "node-onvif";
 import { createCamera, deleteCamera, getCamera, listCameras, probeAll, probeCamera, probeTransientCamera, replaceCameras, updateCamera } from "../services/cameraService.js";
 import { stopCameraStreams } from "../stream/streamManager.js";
 import { clearPtzCache, sendPtzCommand, testPtzConnection } from "../services/ptzService.js";
@@ -215,6 +216,36 @@ cameraRoutes.post("/:id/ptz/test", requirePermission("canControlPTZ"), async (re
     if (!camera) return res.status(404).json({ error: "Camera not found" });
     res.json(await testPtzConnection(camera));
   } catch (err) { next(err); }
+});
+
+cameraRoutes.get("/:id/hardware-info", requirePermission("canViewCamera"), async (req, res, next) => {
+  try {
+    const camera = await getCamera(req.params.id, { revealSecret: true });
+    if (!camera) return res.status(404).json({ error: "Camera not found" });
+    if (!camera.ip) return res.status(400).json({ error: "Camera IP is not configured" });
+
+    const port = Number(camera.onvifPort || 80);
+    const xaddr = `http://${camera.ip}:${port}/onvif/device_service`;
+
+    const device = new onvif.OnvifDevice({
+      xaddr,
+      user: camera.username || "",
+      pass: camera.password || ""
+    });
+
+    await device.init();
+    const info = device.getInformation();
+    
+    if (!info) {
+      return res.status(404).json({ error: "No hardware information available" });
+    }
+
+    res.json(info);
+  } catch (err) {
+    const errMsg = err?.message || "Unknown error";
+    // Send 400 for typical ONVIF connection failures to prevent 500 clutter
+    res.status(400).json({ error: `Gagal mengambil info ONVIF: ${errMsg}` });
+  }
 });
 
 cameraRoutes.post("/:id/probe", requirePermission("canEditCamera"), async (req, res, next) => {

@@ -88,6 +88,7 @@ export const cameraApi = {
   probe: (id: string, deep = false) => api<{ camera: Camera; probe: unknown }>(`/api/cameras/${encodeURIComponent(id)}/probe?deep=${deep ? "1" : "0"}`, { method: "POST" }),
   probeAll: (deep = false) => api<Array<{ camera: Camera; probe: unknown }>>(`/api/cameras/probe-all?deep=${deep ? "1" : "0"}`, { method: "POST" }),
   probeTest: (payload: Partial<CameraInput>) => api<{ camera: Camera; probe: { ok: boolean; info?: { streams?: Array<{ codec_type: string; codec_name?: string; [key: string]: unknown }>; [key: string]: unknown }; error?: string } }>("/api/cameras/probe-test", { method: "POST", json: payload }),
+  hardwareInfo: (id: string) => api<{ Manufacturer?: string; Model?: string; FirmwareVersion?: string; SerialNumber?: string; HardwareId?: string; }>(`/api/cameras/${encodeURIComponent(id)}/hardware-info`),
   exportAll: () => api<{ exportedAt: string; cameras: Camera[] }>("/api/cameras/bulk/export"),
   importAll: (cameras: CameraInput[], mode: "replace" | "append" = "replace") => api<Camera[]>("/api/cameras/bulk/import", { method: "POST", json: { cameras, mode } }),
 };
