@@ -63,7 +63,7 @@ export const getClassificationLabel = (classification?: string, fallback?: strin
 export function EventList() {
   const { t, lang } = useTranslation();
   const {
-    selectedCameraIds, selectedDate, setSelectedDate, playbackInfoMap,
+    selectedCameraIds, setSelectedCameraIds, selectedDate, setSelectedDate, playbackInfoMap,
     eventsMap, searchKeyword, minScore, filterStartTime, filterEndTime,
     setActivePosterUrl, setActiveSnapshot, setJumpToTimeTrigger
   } = usePlayback();
@@ -166,7 +166,7 @@ export function EventList() {
                       const localDate = new Date(evt.ts).toLocaleDateString("sv-SE");
                       setSelectedDate(localDate);
                       setActivePosterUrl(eventApi.snapshotUrl(evt.id));
-                      setSelectedCameraId(evt.cameraId);
+                      setSelectedCameraIds([evt.cameraId]);
                       
                       const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
                       setJumpToTimeTrigger(eventTime);

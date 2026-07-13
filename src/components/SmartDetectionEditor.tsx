@@ -43,8 +43,7 @@ export function SmartDetectionEditor({
   onEnableSoundDetectionChange?: (v: boolean) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<any>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [connected, setConnected] = useState(false);
   const [activity, setActivity] = useState(0);
   const [mode, setMode] = useState<"none" | "exclude_poly" | "exclude_rect" | "intrusion_poly" | "tripwire">("none");
@@ -78,84 +77,18 @@ export function SmartDetectionEditor({
   useEffect(() => { aiSensitivityRef.current = aiSensitivity; }, [aiSensitivity]);
 
   // Build MJPEG src URL
-  const hlsSrc = useMemo(() => {
+  const mjpegSrc = useMemo(() => {
     const token = localStorage.getItem("cctv-lite-token") || "";
     const base = (typeof window !== "undefined" && ["5173", "5174", "8080"].includes(window.location.port))
       ? `${window.location.protocol}//${window.location.hostname}:4200`
       : "";
-    return `${base}/api/streams/${cameraId}/index.m3u8?token=${encodeURIComponent(token)}&output=HLS%20Low%20Latency`;
+    return `${base}/api/streams/${cameraId}/video.mjpg?token=${encodeURIComponent(token)}&t=${Date.now()}`;
   }, [cameraId]);
 
-
-  // HLS Lifecycle
+  // Reset image loaded status on stream URL change
   useEffect(() => {
     setImgLoaded(false);
-    if (!hlsSrc || !videoRef.current) return;
-    
-    let disposed = false;
-    
-    const initHls = async () => {
-      try {
-        const mod = await import("hls.js");
-        const HlsLib = mod.default;
-        
-        if (disposed) return;
-        
-        if (!HlsLib.isSupported()) {
-          console.error("HLS not supported in this browser");
-          return;
-        }
-        
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-        }
-        
-        const hls = new HlsLib({
-          maxBufferLength: 5,
-          maxMaxBufferLength: 10,
-          lowLatencyMode: true,
-          backBufferLength: 5,
-        });
-        
-        hlsRef.current = hls;
-        
-        hls.loadSource(hlsSrc);
-        hls.attachMedia(videoRef.current!);
-        
-        hls.on(HlsLib.Events.MANIFEST_PARSED, () => {
-          if (!disposed && videoRef.current) {
-            videoRef.current.play().catch(console.error);
-          }
-        });
-        
-        hls.on(HlsLib.Events.ERROR, (_evt: any, data: any) => {
-          if (data.fatal) {
-            if (data.type === HlsLib.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad();
-            } else if (data.type === HlsLib.ErrorTypes.MEDIA_ERROR) {
-              hls.recoverMediaError();
-            } else {
-              hls.destroy();
-            }
-          }
-        });
-        
-      } catch (err) {
-        console.error("Failed to load hls.js", err);
-      }
-    };
-    
-    initHls();
-    
-    return () => {
-      disposed = true;
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [hlsSrc]);
-
+  }, [mjpegSrc]);
 
   // SSE for motion events
   useEffect(() => {
@@ -214,35 +147,18 @@ export function SmartDetectionEditor({
     const draw = () => {
       const canvas = canvasRef.current;
       const img = imgRef.current;
-      const video = videoRef.current;
-      if (!canvas || !video) {
+      if (!canvas || !img) {
         raf = requestAnimationFrame(draw);
         return;
       }
 
-      const rect = video.getBoundingClientRect();
+      const rect = img.getBoundingClientRect();
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
 
-      if (w === 0 || h === 0 || video.videoWidth === 0) {
+      if (w === 0 || h === 0) {
         raf = requestAnimationFrame(draw);
         return;
-      }
-
-      // Aspect ratio letterbox calculation
-      let drawW = w;
-      let drawH = h;
-      let offsetX = 0;
-      let offsetY = 0;
-      
-      const videoRatio = video.videoWidth / video.videoHeight;
-      const containerRatio = w / h;
-      if (videoRatio > containerRatio) {
-        drawH = w / videoRatio;
-        offsetY = (h - drawH) / 2;
-      } else {
-        drawW = h * videoRatio;
-        offsetX = (w - drawW) / 2;
       }
 
       if (canvas.width !== w || canvas.height !== h) {
@@ -285,9 +201,9 @@ export function SmartDetectionEditor({
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = zone.type === "line" ? 3 : 1.5;
           ctx.beginPath();
-          ctx.moveTo((zone.points[0].x * drawW + offsetX), (zone.points[0].y * drawH + offsetY));
+          ctx.moveTo(zone.points[0].x * w, zone.points[0].y * h);
           for (let i = 1; i < zone.points.length; i++) {
-            ctx.lineTo((zone.points[i].x * drawW + offsetX), (zone.points[i].y * drawH + offsetY));
+            ctx.lineTo(zone.points[i].x * w, zone.points[i].y * h);
           }
           if (zone.type === "polygon" && zone.points.length >= 3) {
             ctx.closePath();
@@ -297,15 +213,15 @@ export function SmartDetectionEditor({
 
           ctx.fillStyle = labelColor;
           ctx.font = "bold 9px monospace";
-          ctx.fillText(labelText, (zone.points[0].x * drawW + offsetX) + 5, (zone.points[0].y * drawH + offsetY) + 12);
+          ctx.fillText(labelText, zone.points[0].x * w + 5, zone.points[0].y * h + 12);
         } else if (zone.type === "rect" && zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
           ctx.fillStyle = fillColor;
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = 1.5;
-          const zx = (zone.x * drawW + offsetX);
-          const zy = (zone.y * drawH + offsetY);
-          const zw = (zone.w * drawW);
-          const zh = (zone.h * drawH);
+          const zx = zone.x * w;
+          const zy = zone.y * h;
+          const zw = zone.w * w;
+          const zh = zone.h * h;
           ctx.fillRect(zx, zy, zw, zh);
           ctx.strokeRect(zx, zy, zw, zh);
 
@@ -323,9 +239,9 @@ export function SmartDetectionEditor({
           ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo((previewPoints[0].x * drawW + offsetX), (previewPoints[0].y * drawH + offsetY));
+          ctx.moveTo(previewPoints[0].x * w, previewPoints[0].y * h);
           for (let i = 1; i < previewPoints.length; i++) {
-            ctx.lineTo((previewPoints[i].x * drawW + offsetX), (previewPoints[i].y * drawH + offsetY));
+            ctx.lineTo(previewPoints[i].x * w, previewPoints[i].y * h);
           }
           
           if (mode.includes("poly") && previewPoints.length >= 3) {
@@ -338,7 +254,7 @@ export function SmartDetectionEditor({
         ctx.fillStyle = "#fcd34d";
         for (const p of previewPoints) {
           ctx.beginPath();
-          ctx.arc((p.x * drawW + offsetX), (p.y * drawH + offsetY), 4, 0, Math.PI * 2);
+          ctx.arc(p.x * w, p.y * h, 4, 0, Math.PI * 2);
           ctx.fill();
         }
 
@@ -364,10 +280,10 @@ export function SmartDetectionEditor({
         ctx.fillStyle = "rgba(251, 191, 36, 0.15)";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
-        const rx = (Math.min(rectStart.x, rectCurrent.x) * drawW + offsetX);
-        const ry = (Math.min(rectStart.y, rectCurrent.y) * drawH + offsetY);
-        const rw = (Math.abs(rectStart.x - rectCurrent.x) * drawW);
-        const rh = (Math.abs(rectStart.y - rectCurrent.y) * drawH);
+        const rx = Math.min(rectStart.x, rectCurrent.x) * w;
+        const ry = Math.min(rectStart.y, rectCurrent.y) * h;
+        const rw = Math.abs(rectStart.x - rectCurrent.x) * w;
+        const rh = Math.abs(rectStart.y - rectCurrent.y) * h;
         ctx.fillRect(rx, ry, rw, rh);
         ctx.strokeRect(rx, ry, rw, rh);
         ctx.setLineDash([]);
@@ -377,16 +293,16 @@ export function SmartDetectionEditor({
       if (showPixelMotionRef.current && boxesRef.current.length > 0) {
         const fw = frameDims.current.width || 640;
         const fh = frameDims.current.height || 480;
-        const sx = drawW / fw;
-        const sy = drawH / fh;
+        const sx = w / fw;
+        const sy = h / fh;
 
         ctx.strokeStyle = "rgba(16, 185, 129, 0.95)";
         ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
         ctx.lineWidth = 3;
         ctx.font = "bold 12px sans-serif";
         for (const box of boxesRef.current) {
-          const bx = (box.x * sx + offsetX);
-          const by = (box.y * sy + offsetY);
+          const bx = box.x * sx;
+          const by = box.y * sy;
           const bw = box.w * sx;
           const bh = box.h * sy;
           ctx.strokeRect(bx, by, bw, bh);
@@ -433,12 +349,12 @@ export function SmartDetectionEditor({
 
           filteredCount++;
 
-          const sx = drawW / box.frameWidth;
-          const sy = drawH / box.frameHeight;
-          const bx = (box.bbox[0] * sx + offsetX);
-          const by = (box.bbox[1] * sy + offsetY);
-          const bw = (box.bbox[2] * sx);
-          const bh = (box.bbox[3] * sy);
+          const sx = w / box.frameWidth;
+          const sy = h / box.frameHeight;
+          const bx = box.bbox[0] * sx;
+          const by = box.bbox[1] * sy;
+          const bw = box.bbox[2] * sx;
+          const bh = box.bbox[3] * sy;
 
           const borderColor = isPerson ? "#ef4444" : isPet ? "#10b981" : "#3b82f6";
           const fillColor = isPerson ? "rgba(239, 68, 68, 0.15)" : isPet ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)";
@@ -823,20 +739,19 @@ export function SmartDetectionEditor({
 
       {/* ══════ Editor & Live Preview Stage ══════ */}
       <div className="relative w-full aspect-video border bg-slate-950 rounded-lg overflow-hidden border-slate-800 select-none">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
+        <img
+          ref={imgRef}
+          src={mjpegSrc}
+          alt="Live MJPEG"
           className="w-full h-full object-contain block"
           crossOrigin="anonymous"
-          onPlaying={() => setImgLoaded(true)}
+          onLoad={() => setImgLoaded(true)}
         />
         
         {!imgLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-slate-400 gap-2 z-0">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-primary" />
-            <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Stream HLS...</span>
+            <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Stream MJPEG...</span>
           </div>
         )}
 
