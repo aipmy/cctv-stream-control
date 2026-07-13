@@ -432,6 +432,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       lastFrame: null,
       lastFrameAt: Date.now(),
       objectTracker: new ObjectTracker(),
+      aiSleepMode: false,
+      lastAiWakeTime: Date.now(),
+      lastMotionTime: 0,
     };
     hlsSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
@@ -464,6 +467,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                 excludeAreas: camera.excludeAreas || [],
               });
               pixelMotionDetected = Boolean(result && result.motion);
+              if (pixelMotionDetected) {
+                session.lastMotionTime = nowMs;
+              }
               
               // If basic motion detected something, trigger fallback (especially for 'pixel' mode)
               if (pixelMotionDetected && hasSmart) {
@@ -476,11 +482,23 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               }
             }
 
-            // 2. Continuous AI Engine (runs independently)
-            // session.aiBusy lock prevents worker queue buildup
+            // 2. Hybrid Wake-Up AI Engine
             const modes = camera.detectionModes || ["pixel", "human", "pet"];
             const hasAiModes = modes.some(m => ["human", "pet", "object", "vehicle"].includes(m));
-            const needsAi = (hasSmart && hasAiModes) || hasAiListeners;
+            
+            // Check if we should keep AI awake
+            const trackerHasObjects = session.objectTracker && session.objectTracker.trackedObjects && session.objectTracker.trackedObjects.length > 0;
+            const recentMotion = session.lastMotionTime && (nowMs - session.lastMotionTime < 1000); // within 1 second
+            
+            if (recentMotion || trackerHasObjects) {
+              session.aiSleepMode = false;
+              session.lastAiWakeTime = nowMs;
+            } else if (!session.aiSleepMode && (nowMs - session.lastAiWakeTime > 5000)) {
+              session.aiSleepMode = true;
+              session.lastAiPredictions = null; // Clear predictions to reset UI boxes
+            }
+
+            const needsAi = !session.aiSleepMode && ((hasSmart && hasAiModes) || hasAiListeners);
 
             const aiIntervalMs = Math.max(200, 1000 / (camera.detectFps || 1));
             if (needsAi && !session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
