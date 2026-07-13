@@ -20,7 +20,7 @@ import { classifyStreamError } from "./streamError.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration, getSettings } from "../services/recordingService.js";
 
 import { ObjectTracker } from "../core/objectTracker.js";
-import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
+import { CameraMotionEngine, motionEmitter, isIgnoredPoint } from "../core/motionEngine.js";
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
@@ -502,6 +502,15 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   const VEHICLE_CLASSES = ["car", "motorcycle", "bus", "truck", "bicycle"];
                   
                   const filtered = (predictions || []).filter(p => {
+                    // Check exclude areas first
+                    const w = p.frameWidth || 640;
+                    const h = p.frameHeight || 480;
+                    const centerX = (p.bbox[0] + (p.bbox[2] / 2)) / w;
+                    const centerY = (p.bbox[1] + (p.bbox[3] / 2)) / h;
+                    if (isIgnoredPoint(centerX, centerY, camera.excludeAreas || [])) {
+                      return false;
+                    }
+
                     if (modes.includes("human") && PERSON_CLASSES.includes(p.class)) return true;
                     if (modes.includes("pet") && PET_CLASSES.includes(p.class)) return true;
                     if (modes.includes("object") && !PERSON_CLASSES.includes(p.class) && !PET_CLASSES.includes(p.class)) return true;
