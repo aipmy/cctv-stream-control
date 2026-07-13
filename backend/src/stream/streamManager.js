@@ -18,7 +18,7 @@ import {
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
-import { getMotionEngine, handleMotionDetected } from "./motionHandler.js";
+
 import { ObjectTracker } from "../core/objectTracker.js";
 import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
 
