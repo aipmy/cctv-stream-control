@@ -64,6 +64,24 @@ export function SmartDetectionEditor({
   const frameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(Date.now());
 
+  // ──── Smooth Interpolation System ────
+  // Each tracked object has current/target positions + opacity for smooth rendering
+  interface TrackedBox {
+    id: string;          // Stable ID for tracking
+    cls: string;         // Detection class
+    score: number;       // Confidence score
+    // Current interpolated position (what we draw)
+    cx: number; cy: number; cw: number; ch: number;
+    // Target position (from latest AI frame)
+    tx: number; ty: number; tw: number; th: number;
+    frameWidth: number; frameHeight: number;
+    opacity: number;     // 0..1, for fade in/out
+    lastSeen: number;    // timestamp of last AI update
+    isNew: boolean;      // true on first frame (for fade-in)
+  }
+  const trackedBoxesRef = useRef<TrackedBox[]>([]);
+  const aiUpdateTsRef = useRef(0);
+
   // Refs for filter state (avoid re-creating draw loop on every toggle)
   const showPersonRef = useRef(showPerson);
   const showPetRef = useRef(showPet);
@@ -116,14 +134,54 @@ export function SmartDetectionEditor({
 
         if (data.type === "ai-motion") {
           if (data.predictions) {
-            if (data.predictions.length > 0) {
-              aiBoxesRef.current = data.predictions;
-              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 400);
-            } else {
-              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 150);
+            aiBoxesRef.current = data.predictions;
+            aiUpdateTsRef.current = Date.now();
+            // Match incoming detections to existing tracked boxes (by class + IoU)
+            const now = Date.now();
+            const incoming = data.predictions as Array<{ class: string; score: number; bbox: number[]; frameWidth: number; frameHeight: number }>;
+            const tracked = trackedBoxesRef.current;
+            const matched = new Set<number>(); // indices of tracked that got matched
+
+            for (const det of incoming) {
+              const [dx, dy, dw, dh] = det.bbox;
+              let bestIdx = -1;
+              let bestIoU = 0.15; // minimum IoU to match
+              for (let i = 0; i < tracked.length; i++) {
+                if (matched.has(i)) continue;
+                if (tracked[i].cls !== det.class) continue;
+                // Compute IoU between target box and new detection
+                const t = tracked[i];
+                const x1 = Math.max(dx, t.tx); const y1 = Math.max(dy, t.ty);
+                const x2 = Math.min(dx + dw, t.tx + t.tw); const y2 = Math.min(dy + dh, t.ty + t.th);
+                const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+                const union = dw * dh + t.tw * t.th - inter;
+                const iou = union > 0 ? inter / union : 0;
+                if (iou > bestIoU) { bestIoU = iou; bestIdx = i; }
+              }
+              if (bestIdx >= 0) {
+                // Update existing tracked box target
+                matched.add(bestIdx);
+                tracked[bestIdx].tx = dx; tracked[bestIdx].ty = dy;
+                tracked[bestIdx].tw = dw; tracked[bestIdx].th = dh;
+                tracked[bestIdx].score = det.score;
+                tracked[bestIdx].frameWidth = det.frameWidth;
+                tracked[bestIdx].frameHeight = det.frameHeight;
+                tracked[bestIdx].lastSeen = now;
+                tracked[bestIdx].isNew = false;
+              } else {
+                // New object — add with fade-in
+                tracked.push({
+                  id: `${det.class}_${now}_${Math.random().toString(36).slice(2, 6)}`,
+                  cls: det.class, score: det.score,
+                  cx: dx, cy: dy, cw: dw, ch: dh,
+                  tx: dx, ty: dy, tw: dw, th: dh,
+                  frameWidth: det.frameWidth, frameHeight: det.frameHeight,
+                  opacity: 0, lastSeen: now, isNew: true,
+                });
+              }
             }
+            // Mark unmatched tracked boxes as "lost" (they'll fade out in draw loop)
+            trackedBoxesRef.current = tracked;
           }
           return;
         }
@@ -320,78 +378,121 @@ export function SmartDetectionEditor({
         }
       }
 
-      // ──── 5. AI bounding boxes (Person=Red, Pet/Object=Green) ────
+      // ──── 5. AI bounding boxes — Smooth Interpolation ────
       const aiThreshold = (aiSensitivityRef.current || 50) / 100;
       let filteredCount = 0;
+      const now = Date.now();
+      const LERP_SPEED = 0.15; // Smoothing factor (0=frozen, 1=instant)
+      const FADE_IN_SPEED = 0.12;
+      const FADE_OUT_SPEED = 0.04;
+      const LOST_TIMEOUT_MS = 1500; // Keep box visible 1.5s after last detection
 
-      if (aiBoxesRef.current.length > 0) {
-        ctx.lineWidth = 3;
-        ctx.font = "bold 14px sans-serif";
+      const tracked = trackedBoxesRef.current;
 
-        for (const box of aiBoxesRef.current) {
-          if (box.score < aiThreshold) continue;
+      // Update interpolation + opacity for each tracked box
+      for (let i = tracked.length - 1; i >= 0; i--) {
+        const t = tracked[i];
+        const age = now - t.lastSeen;
+        const isLost = age > LOST_TIMEOUT_MS;
 
-          let isPerson = false;
-          let isPet = false;
-          let isObj = false;
-
-          const personClasses = ["person"];
-          const petClasses = ["cat", "dog", "bird", "horse", "sheep", "cow"];
-          
-          if (personClasses.includes(box.class)) isPerson = true;
-          else if (petClasses.includes(box.class)) isPet = true;
-          else isObj = true;
-
-          // Filter by checkbox
-          if (isPerson && !showPersonRef.current) continue;
-          if (isPet && !showPetRef.current) continue;
-          if (isObj && !showObjectRef.current) continue;
-
-          filteredCount++;
-
-          const sx = w / box.frameWidth;
-          const sy = h / box.frameHeight;
-          const bx = box.bbox[0] * sx;
-          const by = box.bbox[1] * sy;
-          const bw = box.bbox[2] * sx;
-          const bh = box.bbox[3] * sy;
-
-          const borderColor = isPerson ? "#ef4444" : isPet ? "#10b981" : "#3b82f6";
-          const fillColor = isPerson ? "rgba(239, 68, 68, 0.15)" : isPet ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)";
-          const labelBg = isPerson ? "#ef4444" : isPet ? "#10b981" : "#3b82f6";
-
-          ctx.strokeStyle = borderColor;
-          ctx.fillStyle = fillColor;
-          ctx.strokeRect(bx, by, bw, bh);
-          ctx.fillRect(bx, by, bw, bh);
-
-          // Label box
-          const labelText = `${box.class} (${Math.round(box.score * 100)}%)`;
-          const textMetrics = ctx.measureText(labelText);
-          const labelW = textMetrics.width + 16;
-          const labelH = 22;
-          const labelY = Math.max(0, by - labelH - 2);
-
-          ctx.fillStyle = labelBg;
-          // Rounded label background
-          const radius = 4;
-          ctx.beginPath();
-          ctx.moveTo(bx - 1.5 + radius, labelY);
-          ctx.lineTo(bx - 1.5 + labelW - radius, labelY);
-          ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY, bx - 1.5 + labelW, labelY + radius);
-          ctx.lineTo(bx - 1.5 + labelW, labelY + labelH - radius);
-          ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY + labelH, bx - 1.5 + labelW - radius, labelY + labelH);
-          ctx.lineTo(bx - 1.5 + radius, labelY + labelH);
-          ctx.quadraticCurveTo(bx - 1.5, labelY + labelH, bx - 1.5, labelY + labelH - radius);
-          ctx.lineTo(bx - 1.5, labelY + radius);
-          ctx.quadraticCurveTo(bx - 1.5, labelY, bx - 1.5 + radius, labelY);
-          ctx.closePath();
-          ctx.fill();
-
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 14px sans-serif";
-          ctx.fillText(labelText, bx + 5, labelY + 16);
+        // Remove fully faded boxes
+        if (isLost && t.opacity <= 0.01) {
+          tracked.splice(i, 1);
+          continue;
         }
+
+        // Interpolate position toward target
+        t.cx += (t.tx - t.cx) * LERP_SPEED;
+        t.cy += (t.ty - t.cy) * LERP_SPEED;
+        t.cw += (t.tw - t.cw) * LERP_SPEED;
+        t.ch += (t.th - t.ch) * LERP_SPEED;
+
+        // Fade in/out
+        if (age < LOST_TIMEOUT_MS) {
+          t.opacity = Math.min(1, t.opacity + FADE_IN_SPEED);
+        } else {
+          t.opacity = Math.max(0, t.opacity - FADE_OUT_SPEED);
+        }
+      }
+
+      // Draw tracked boxes
+      ctx.font = "bold 14px sans-serif";
+
+      for (const t of tracked) {
+        if (t.score < aiThreshold) continue;
+        if (t.opacity <= 0.01) continue;
+
+        let isPerson = false;
+        let isPet = false;
+        let isObj = false;
+
+        const personClasses = ["person"];
+        const petClasses = ["cat", "dog", "bird", "horse", "sheep", "cow"];
+
+        if (personClasses.includes(t.cls)) isPerson = true;
+        else if (petClasses.includes(t.cls)) isPet = true;
+        else isObj = true;
+
+        // Filter by checkbox
+        if (isPerson && !showPersonRef.current) continue;
+        if (isPet && !showPetRef.current) continue;
+        if (isObj && !showObjectRef.current) continue;
+
+        filteredCount++;
+
+        const sx = w / t.frameWidth;
+        const sy = h / t.frameHeight;
+        const bx = t.cx * sx;
+        const by = t.cy * sy;
+        const bw = t.cw * sx;
+        const bh = t.ch * sy;
+        const alpha = t.opacity;
+
+        const borderColor = isPerson
+          ? `rgba(239, 68, 68, ${alpha})`
+          : isPet ? `rgba(16, 185, 129, ${alpha})`
+          : `rgba(59, 130, 246, ${alpha})`;
+        const fillColor = isPerson
+          ? `rgba(239, 68, 68, ${0.15 * alpha})`
+          : isPet ? `rgba(16, 185, 129, ${0.15 * alpha})`
+          : `rgba(59, 130, 246, ${0.15 * alpha})`;
+        const labelBg = isPerson
+          ? `rgba(239, 68, 68, ${alpha})`
+          : isPet ? `rgba(16, 185, 129, ${alpha})`
+          : `rgba(59, 130, 246, ${alpha})`;
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = borderColor;
+        ctx.fillStyle = fillColor;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillRect(bx, by, bw, bh);
+
+        // Label box
+        const labelText = `${t.cls} (${Math.round(t.score * 100)}%)`;
+        const textMetrics = ctx.measureText(labelText);
+        const labelW = textMetrics.width + 16;
+        const labelH = 22;
+        const labelY = Math.max(0, by - labelH - 2);
+
+        ctx.fillStyle = labelBg;
+        // Rounded label background
+        const radius = 4;
+        ctx.beginPath();
+        ctx.moveTo(bx - 1.5 + radius, labelY);
+        ctx.lineTo(bx - 1.5 + labelW - radius, labelY);
+        ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY, bx - 1.5 + labelW, labelY + radius);
+        ctx.lineTo(bx - 1.5 + labelW, labelY + labelH - radius);
+        ctx.quadraticCurveTo(bx - 1.5 + labelW, labelY + labelH, bx - 1.5 + labelW - radius, labelY + labelH);
+        ctx.lineTo(bx - 1.5 + radius, labelY + labelH);
+        ctx.quadraticCurveTo(bx - 1.5, labelY + labelH, bx - 1.5, labelY + labelH - radius);
+        ctx.lineTo(bx - 1.5, labelY + radius);
+        ctx.quadraticCurveTo(bx - 1.5, labelY, bx - 1.5 + radius, labelY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.font = "bold 14px sans-serif";
+        ctx.fillText(labelText, bx + 5, labelY + 16);
       }
 
       // Update detection count for status bar
