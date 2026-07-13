@@ -53,6 +53,7 @@ const empty = {
   motionSensitivity: 50,
   motionArea: null as MotionArea | null,
   excludeAreas: [] as MotionArea[],
+  smartZones: [] as MotionArea[],
   detectionModes: ["pixel", "human", "pet"] as string[],
   detectResolution: "480p" as Camera["detectResolution"],
   enableSoundDetection: false,
@@ -424,6 +425,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         motionSensitivity: camera.motionSensitivity ?? 50,
         motionArea: camera.motionArea || null,
         excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
+        smartZones: Array.isArray(camera.smartZones) ? camera.smartZones : (Array.isArray(camera.excludeAreas) ? camera.excludeAreas : []),
         detectionModes: Array.isArray(camera.detectionModes) ? camera.detectionModes : ["pixel", "human", "pet"],
         detectResolution: camera.detectResolution ?? "480p",
         enableSoundDetection: camera.enableSoundDetection ?? false,
@@ -505,6 +507,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       motionSensitivity: form.motionSensitivity,
       motionArea: form.motionArea,
       excludeAreas: form.excludeAreas,
+      smartZones: form.smartZones,
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
       aiSensitivity: form.aiSensitivity,
@@ -1189,8 +1192,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                   <SmartDetectionEditor
                     cameraId={camera?.id || ""}
                     cameraEnabled={Boolean(camera?.enabled)}
-                    value={form.excludeAreas || []}
-                    onChange={(areas) => setForm({ ...form, excludeAreas: areas })}
+                    value={form.smartZones || []}
+                    onChange={(areas) => setForm({ ...form, smartZones: areas })}
                     showPixelMotion={sdShowMotion}
                     showPerson={sdShowPerson}
                     showPet={sdShowPet}

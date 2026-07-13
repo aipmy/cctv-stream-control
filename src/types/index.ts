@@ -56,6 +56,7 @@ export interface Camera {
   motionSensitivity?: number;
   motionArea?: MotionArea | null;
   excludeAreas?: MotionArea[] | null;
+  smartZones?: MotionArea[] | null;
   detectionModes?: string[] | null;
   detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   recordingMode?: string;
@@ -72,7 +73,8 @@ export interface Camera {
 }
 
 export interface MotionArea {
-  type?: "rect" | "polygon";
+  type?: "rect" | "polygon" | "line";
+  zoneType?: "exclude" | "intrusion" | "tripwire";
   points?: { x: number; y: number }[];
   x?: number;
   y?: number;
@@ -93,6 +95,7 @@ export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassw
   motionSensitivity?: number;
   motionArea?: MotionArea | null;
   excludeAreas?: MotionArea[] | null;
+  smartZones?: MotionArea[] | null;
   detectionModes?: string[] | null;
   detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   recordMode?: "copy" | "transcode" | "";

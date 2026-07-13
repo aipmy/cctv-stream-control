@@ -18,6 +18,8 @@ import {
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
+import { getMotionEngine, handleMotionDetected } from "./motionHandler.js";
+import { ObjectTracker } from "../core/objectTracker.js";
 import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
@@ -427,6 +429,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       keepAlive: Boolean(camera.enableRecording || camera.enableNotifications),
       lastFrame: null,
       lastFrameAt: Date.now(),
+      objectTracker: new ObjectTracker(),
     };
     hlsSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
@@ -526,8 +529,33 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   // Filter again strictly for events (must meet camera's AI Sensitivity setting)
                   const eventFiltered = finalPredictions.filter(p => p.score >= threshold);
 
-                  // If AI found matching objects that meet the sensitivity threshold, trigger recording/notification
-                  if (eventFiltered.length > 0 && hasSmart) {
+                  // Update Object Tracker with raw predictions
+                  session.objectTracker.update(finalPredictions);
+
+                  const smartZones = camera.smartZones || [];
+                  const activeSmartZones = smartZones.filter(z => 
+                    z.enabled !== false && (z.zoneType === "tripwire" || z.zoneType === "intrusion")
+                  );
+
+                  let triggerRecording = false;
+
+                  if (activeSmartZones.length > 0) {
+                    // Smart Zones enabled: Only trigger if an object crosses a line or enters a zone
+                    const frameWidth = finalPredictions[0]?.frameWidth || 640;
+                    const frameHeight = finalPredictions[0]?.frameHeight || 480;
+                    const triggeredEvents = session.objectTracker.checkZones(activeSmartZones, frameWidth, frameHeight);
+                    if (triggeredEvents.length > 0) {
+                      triggerRecording = true;
+                    }
+                  } else {
+                    // Default behavior: any object meeting threshold triggers it
+                    if (eventFiltered.length > 0) {
+                      triggerRecording = true;
+                    }
+                  }
+
+                  // If AI found matching objects that meet criteria, trigger recording/notification
+                  if (triggerRecording && hasSmart) {
                     void handleMotionDetected(camera, eventFiltered, null, frame);
                   }
                 }).catch(err => {

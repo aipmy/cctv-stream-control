@@ -128,6 +128,7 @@ export function normalizeCamera(input, existing = {}) {
           if (area.type === "polygon") {
             return {
               type: "polygon",
+              zoneType: area.zoneType || "exclude",
               points: Array.isArray(area.points)
                 ? area.points.map((p) => ({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) }))
                 : [],
@@ -135,8 +136,20 @@ export function normalizeCamera(input, existing = {}) {
               name: String(area.name || "Polygon"),
             };
           }
+          if (area.type === "line") {
+            return {
+              type: "line",
+              zoneType: area.zoneType || "tripwire",
+              points: Array.isArray(area.points)
+                ? area.points.map((p) => ({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) }))
+                : [],
+              enabled: area.enabled !== false,
+              name: String(area.name || "Line"),
+            };
+          }
           return {
             type: "rect",
+            zoneType: area.zoneType || "exclude",
             x: Number(area.x ?? 0),
             y: Number(area.y ?? 0),
             w: Number(area.w ?? 1),
@@ -147,6 +160,33 @@ export function normalizeCamera(input, existing = {}) {
         })
       : Array.isArray(existing.excludeAreas)
         ? existing.excludeAreas
+        : [],
+    smartZones: Array.isArray(input.smartZones)
+      ? input.smartZones.map((area) => {
+          if (area.type === "polygon" || area.type === "line") {
+            return {
+              type: area.type,
+              zoneType: area.zoneType || "exclude",
+              points: Array.isArray(area.points)
+                ? area.points.map((p) => ({ x: Number(p.x ?? 0), y: Number(p.y ?? 0) }))
+                : [],
+              enabled: area.enabled !== false,
+              name: String(area.name || area.type),
+            };
+          }
+          return {
+            type: "rect",
+            zoneType: area.zoneType || "exclude",
+            x: Number(area.x ?? 0),
+            y: Number(area.y ?? 0),
+            w: Number(area.w ?? 1),
+            h: Number(area.h ?? 1),
+            enabled: area.enabled !== false,
+            name: String(area.name || "Kotak"),
+          };
+        })
+      : Array.isArray(existing.smartZones)
+        ? existing.smartZones
         : [],
     detectionModes: Array.isArray(input.detectionModes)
       ? input.detectionModes.map(String)

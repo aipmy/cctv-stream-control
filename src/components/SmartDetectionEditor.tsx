@@ -46,7 +46,7 @@ export function SmartDetectionEditor({
   const imgRef = useRef<HTMLImageElement>(null);
   const [connected, setConnected] = useState(false);
   const [activity, setActivity] = useState(0);
-  const [mode, setMode] = useState<"none" | "polygon" | "rect">("none");
+  const [mode, setMode] = useState<"none" | "exclude_poly" | "exclude_rect" | "intrusion_poly" | "tripwire">("none");
   const [isDrawingRect, setIsDrawingRect] = useState(false);
   const [rectStart, setRectStart] = useState({ x: 0, y: 0 });
   const [rectCurrent, setRectCurrent] = useState({ x: 0, y: 0 });
@@ -174,29 +174,49 @@ export function SmartDetectionEditor({
 
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Draw existing exclusion zones (Red dashed)
+      // 1. Draw existing zones
       const activeAreas = value || [];
       activeAreas.forEach((zone, idx) => {
         if (zone.enabled === false) return;
-        if (zone.type === "polygon" && zone.points && zone.points.length > 2) {
-          ctx.fillStyle = "rgba(239, 68, 68, 0.22)";
-          ctx.strokeStyle = "rgba(239, 68, 68, 0.95)";
-          ctx.lineWidth = 1.5;
+        
+        let strokeColor = "rgba(239, 68, 68, 0.95)"; // Exclude (Red)
+        let fillColor = "rgba(239, 68, 68, 0.22)";
+        let labelColor = "#ff8888";
+        let labelText = `MASK ${idx + 1}`;
+        
+        if (zone.zoneType === "tripwire") {
+          strokeColor = "rgba(249, 115, 22, 1)"; // Tripwire (Orange)
+          fillColor = "transparent";
+          labelColor = "#f97316";
+          labelText = `TRIPWIRE ${idx + 1}`;
+        } else if (zone.zoneType === "intrusion") {
+          strokeColor = "rgba(234, 179, 8, 1)"; // Intrusion (Yellow)
+          fillColor = "rgba(234, 179, 8, 0.2)";
+          labelColor = "#eab308";
+          labelText = `INTRUSION ${idx + 1}`;
+        }
+
+        if ((zone.type === "polygon" || zone.type === "line") && zone.points && zone.points.length >= 2) {
+          ctx.fillStyle = fillColor;
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = zone.type === "line" ? 3 : 1.5;
           ctx.beginPath();
           ctx.moveTo(zone.points[0].x * w, zone.points[0].y * h);
           for (let i = 1; i < zone.points.length; i++) {
             ctx.lineTo(zone.points[i].x * w, zone.points[i].y * h);
           }
-          ctx.closePath();
-          ctx.fill();
+          if (zone.type === "polygon" && zone.points.length >= 3) {
+            ctx.closePath();
+            ctx.fill();
+          }
           ctx.stroke();
 
-          ctx.fillStyle = "#ff8888";
+          ctx.fillStyle = labelColor;
           ctx.font = "bold 9px monospace";
-          ctx.fillText(`MASK ${idx + 1}`, zone.points[0].x * w + 5, zone.points[0].y * h + 12);
-        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
-          ctx.fillStyle = "rgba(239, 68, 68, 0.18)";
-          ctx.strokeStyle = "rgba(239, 68, 68, 0.95)";
+          ctx.fillText(labelText, zone.points[0].x * w + 5, zone.points[0].y * h + 12);
+        } else if (zone.type === "rect" && zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+          ctx.fillStyle = fillColor;
+          ctx.strokeStyle = strokeColor;
           ctx.lineWidth = 1.5;
           const zx = zone.x * w;
           const zy = zone.y * h;
@@ -205,30 +225,30 @@ export function SmartDetectionEditor({
           ctx.fillRect(zx, zy, zw, zh);
           ctx.strokeRect(zx, zy, zw, zh);
 
-          ctx.fillStyle = "#ff8888";
+          ctx.fillStyle = labelColor;
           ctx.font = "bold 9px monospace";
-          ctx.fillText(`MASK ${idx + 1}`, zx + 5, zy + 12);
+          ctx.fillText(labelText, zx + 5, zy + 12);
         }
       });
 
-      // 2. Draw in-progress drawing polygon (Yellow/Orange)
-      if (mode === "polygon" && polyPoints.length > 0) {
-        const previewPoints = hoverPoint ? [...polyPoints, hoverPoint] : polyPoints;
-        ctx.fillStyle = "rgba(251, 191, 36, 0.12)";
-        ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(previewPoints[0].x * w, previewPoints[0].y * h);
-        for (let i = 1; i < previewPoints.length; i++) {
-          ctx.lineTo(previewPoints[i].x * w, previewPoints[i].y * h);
-        }
-        if (previewPoints.length >= 3) {
-          ctx.closePath();
-        }
-        ctx.stroke();
-        if (previewPoints.length >= 3) {
-          ctx.fill();
-        }
+      // 2. Draw in-progress drawing polygon/line
+      if (mode.includes("poly") || mode === "tripwire") {
+        if (polyPoints.length > 0) {
+          const previewPoints = hoverPoint ? [...polyPoints, hoverPoint] : polyPoints;
+          ctx.fillStyle = "rgba(251, 191, 36, 0.12)";
+          ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(previewPoints[0].x * w, previewPoints[0].y * h);
+          for (let i = 1; i < previewPoints.length; i++) {
+            ctx.lineTo(previewPoints[i].x * w, previewPoints[i].y * h);
+          }
+          
+          if (mode.includes("poly") && previewPoints.length >= 3) {
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.stroke();
 
         // Draw dots
         ctx.fillStyle = "#fcd34d";
@@ -431,7 +451,7 @@ export function SmartDetectionEditor({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mode !== "rect") return;
+    if (mode !== "exclude_rect") return;
     const coords = getRelativeCoords(e);
     if (!coords) return;
     setRectStart(coords);
@@ -443,18 +463,23 @@ export function SmartDetectionEditor({
     const coords = getRelativeCoords(e);
     if (!coords) return;
 
-    if (mode === "rect" && isDrawingRect) {
+    if (mode === "exclude_rect" && isDrawingRect) {
       setRectCurrent(coords);
-    } else if (mode === "polygon") {
+    } else if (mode.includes("poly") || mode === "tripwire") {
       setHoverPoint(coords);
     }
 
-    if (mode === "none" || (mode === "polygon" && polyPoints.length === 0)) {
+    if (mode === "none" || ((mode.includes("poly") || mode === "tripwire") && polyPoints.length === 0)) {
       let hovering = false;
       for (const zone of value) {
-        if (zone.type === "polygon" && zone.points) {
-          if (isPointInPolygon(coords, zone.points)) { hovering = true; break; }
-        } else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+        if ((zone.type === "polygon" || zone.type === "line") && zone.points) {
+          if (zone.type === "polygon") {
+            if (isPointInPolygon(coords, zone.points)) { hovering = true; break; }
+          } else if (zone.type === "line") {
+            // Rough distance check for line hover (simplistic)
+            hovering = false; // Disable hovering detection for lines to avoid complexity
+          }
+        } else if (zone.type === "rect" && zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
           if (coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h) { hovering = true; break; }
         }
       }
@@ -465,7 +490,7 @@ export function SmartDetectionEditor({
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mode !== "rect" || !isDrawingRect) return;
+    if (mode !== "exclude_rect" || !isDrawingRect) return;
     setIsDrawingRect(false);
     const coords = getRelativeCoords(e);
     if (!coords) return;
@@ -474,13 +499,29 @@ export function SmartDetectionEditor({
     const mw = Math.max(0.01, Math.abs(rectStart.x - coords.x));
     const mh = Math.max(0.01, Math.abs(rectStart.y - coords.y));
     if (mw > 0.02 && mh > 0.02) {
-      onChange([...value, { type: "rect", x, y, w: mw, h: mh, enabled: true, name: `Mask Kotak ${value.length + 1}` }]);
+      onChange([...value, { type: "rect", zoneType: "exclude", x, y, w: mw, h: mh, enabled: true, name: `Mask Kotak ${value.length + 1}` }]);
     }
   };
 
   const finishPolygon = () => {
-    if (polyPoints.length < 3) return;
-    onChange([...value, { type: "polygon", points: polyPoints, enabled: true, name: `Mask Polygon ${value.length + 1}` }]);
+    if (mode === "tripwire" && polyPoints.length < 2) return;
+    if (mode.includes("poly") && polyPoints.length < 3) return;
+    
+    let zoneType: "exclude" | "intrusion" | "tripwire" = "exclude";
+    let type: "polygon" | "line" = "polygon";
+    let namePrefix = "Mask Polygon";
+
+    if (mode === "tripwire") {
+      zoneType = "tripwire";
+      type = "line";
+      namePrefix = "Tripwire";
+    } else if (mode === "intrusion_poly") {
+      zoneType = "intrusion";
+      type = "polygon";
+      namePrefix = "Intrusion Zone";
+    }
+
+    onChange([...value, { type, zoneType, points: polyPoints, enabled: true, name: `${namePrefix} ${value.length + 1}` }]);
     setPolyPoints([]);
     setHoverPoint(null);
   };
@@ -488,20 +529,20 @@ export function SmartDetectionEditor({
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getRelativeCoords(e);
     if (!coords) return;
-    if (mode === "polygon") {
-      if (polyPoints.length >= 3) {
+    if (mode.includes("poly") || mode === "tripwire") {
+      if (mode.includes("poly") && polyPoints.length >= 3) {
         const first = polyPoints[0];
         const dx = coords.x - first.x;
         const dy = coords.y - first.y;
         if (Math.sqrt(dx * dx + dy * dy) < 0.03) { finishPolygon(); return; }
       }
       setPolyPoints((prev) => [...prev, coords]);
-    } else if (mode === "none" || (mode === "rect" && !isDrawingRect)) {
+    } else if (mode === "none" || (mode === "exclude_rect" && !isDrawingRect)) {
       for (let i = value.length - 1; i >= 0; i--) {
         const zone = value[i];
         let hit = false;
         if (zone.type === "polygon" && zone.points) { hit = isPointInPolygon(coords, zone.points); }
-        else if (zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
+        else if (zone.type === "rect" && zone.x != null && zone.y != null && zone.w != null && zone.h != null) {
           hit = coords.x >= zone.x && coords.x <= zone.x + zone.w && coords.y >= zone.y && coords.y <= zone.y + zone.h;
         }
         if (hit) { removeArea(i); return; }
@@ -606,33 +647,63 @@ export function SmartDetectionEditor({
       </div>
 
       {/* ══════ Drawing Toolbar ══════ */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant={mode === "polygon" ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setPolyPoints([]);
-            setHoverPoint(null);
-            setMode(mode === "polygon" ? "none" : "polygon");
-          }}
-          className="text-[11px] h-7"
-        >
-          ✏️ Gambar Polygon
-        </Button>
-        <Button
-          type="button"
-          variant={mode === "rect" ? "default" : "outline"}
-          size="sm"
-          onClick={() => { setMode(mode === "rect" ? "none" : "rect"); }}
-          className="text-[11px] h-7"
-        >
-          ▭ Gambar Kotak
-        </Button>
+      <div className="flex flex-wrap items-center gap-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800">
+        <div className="flex items-center gap-1 border-r border-slate-700 pr-2">
+          <Button
+            type="button"
+            variant={mode === "tripwire" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              setPolyPoints([]); setHoverPoint(null);
+              setMode(mode === "tripwire" ? "none" : "tripwire");
+            }}
+            className={cn("text-[11px] h-7 px-2", mode === "tripwire" && "bg-orange-600 hover:bg-orange-700")}
+          >
+            〰️ Tripwire
+          </Button>
+          <Button
+            type="button"
+            variant={mode === "intrusion_poly" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              setPolyPoints([]); setHoverPoint(null);
+              setMode(mode === "intrusion_poly" ? "none" : "intrusion_poly");
+            }}
+            className={cn("text-[11px] h-7 px-2", mode === "intrusion_poly" && "bg-yellow-600 hover:bg-yellow-700")}
+          >
+            ⚠️ Intrusion Zone
+          </Button>
+        </div>
 
-        {mode === "polygon" && polyPoints.length > 0 && (
-          <>
-            <Button type="button" variant="outline" size="sm" onClick={undoPoint} className="text-[11px] h-7">
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant={mode === "exclude_poly" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              setPolyPoints([]); setHoverPoint(null);
+              setMode(mode === "exclude_poly" ? "none" : "exclude_poly");
+            }}
+            className={cn("text-[11px] h-7 px-2", mode === "exclude_poly" && "bg-red-600 hover:bg-red-700")}
+            title="Abaikan gerakan di area ini (Polygon)"
+          >
+            🚫 Exclude Poly
+          </Button>
+          <Button
+            type="button"
+            variant={mode === "exclude_rect" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => { setMode(mode === "exclude_rect" ? "none" : "exclude_rect"); }}
+            className={cn("text-[11px] h-7 px-2", mode === "exclude_rect" && "bg-red-600 hover:bg-red-700")}
+            title="Abaikan gerakan di area ini (Kotak)"
+          >
+            🚫 Exclude Kotak
+          </Button>
+        </div>
+
+        {(mode.includes("poly") || mode === "tripwire") && polyPoints.length > 0 && (
+          <div className="flex items-center gap-1 ml-2">
+            <Button type="button" variant="outline" size="sm" onClick={undoPoint} className="text-[11px] h-7 px-2">
               ↩ Undo
             </Button>
             <Button
@@ -640,17 +711,17 @@ export function SmartDetectionEditor({
               variant="default"
               size="sm"
               onClick={finishPolygon}
-              disabled={polyPoints.length < 3}
-              className="text-[11px] h-7 bg-green-600 hover:bg-green-700 text-white font-medium animate-pulse"
+              disabled={mode === "tripwire" ? polyPoints.length < 2 : polyPoints.length < 3}
+              className="text-[11px] h-7 px-2 bg-green-600 hover:bg-green-700 text-white font-medium animate-pulse"
             >
-              ✓ Simpan Polygon ({polyPoints.length} titik)
+              ✓ Simpan ({polyPoints.length} titik)
             </Button>
-          </>
+          </div>
         )}
 
         <div className="flex-1" />
         <span className="text-xs text-muted-foreground font-mono">
-          {value.length} Mask Active
+          {value.length} Zones
         </span>
         {value.length > 0 && (
           <Button
@@ -658,7 +729,7 @@ export function SmartDetectionEditor({
             variant="ghost"
             size="sm"
             onClick={() => onChange([])}
-            className="text-[11px] text-destructive hover:bg-destructive/10 h-7"
+            className="text-[11px] text-destructive hover:bg-destructive/10 h-7 px-2"
           >
             Hapus Semua
           </Button>
