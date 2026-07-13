@@ -89,18 +89,26 @@ Bertugas menangani penyimpanan *Hardisk* dan notifikasi. Modul ini tidak tahu me
 
 ## Future Roadmap: Smooth Rendering Pipeline
 
-Saat ini, `MJPEG FPS` dan `AI FPS` terikat pada frekuensi yang sama (~2 FPS) demi kesederhanaan. Ke depannya, sistem akan mengadopsi arsitektur *Client-Side Interpolation* untuk memberikan *User Experience* yang sangat halus tanpa mengorbankan CPU Raspberry Pi.
+### Phase 2: Client-Side Interpolation & Prediction (UX Enhancement)
 
-**Target Arsitektur (Phase 2):**
+**Objective**: Meningkatkan kemulusan pergerakan visual (*smoothness*) pada antarmuka *Smart Detection* di *Browser* tanpa membebani Raspberry Pi dengan *software encoding* berlebih.
 
-1. **Decoupled FPS:**
-   - FFmpeg memproduksi `MJPEG` pada 10 FPS untuk browser.
-   - AI Sampler berjalan independen di 2 FPS.
-2. **Tracker Upgrade (Kalman Filter / State Estimator):**
-   - `ObjectTracker` tidak hanya menyimpan posisi, tapi menghitung `Velocity` (dx, dy).
-   - Tracker melakukan *Prediction* (menebak posisi di frame sela) dan *Correction* (mengoreksi posisi saat AI selesai inferensi).
-3. **Client-Side Rendering (Browser):**
-   - Backend memancarkan SSE berisi `Track ID`, `Bounding Box`, `Velocity`, dan `Timestamp`.
+**Latar Belakang Eksperimen**:
+Pada iterasi *Phase 2.1* pertama, telah dibuktikan melalui uji lapangan bahwa mencoba memisahkan *MJPEG Display FPS* menjadi 10 FPS melalui *Software Encoding FFmpeg* di Raspberry Pi 4 (untuk 3 kamera) mengakibatkan *CPU Starvation* secara instan. Beban FFmpeg menembus ~170%, mencekik *Event Loop NodeJS* hingga durasi inferensi AI melar dari hitungan milidetik menjadi **21 detik per frame**.
+**Kesimpulan Arsitektur**: *Hardware* Raspberry Pi harus dibiarkan bekerja pada kecepatan serendah mungkin (Misal 2 FPS untuk sinkronisasi MJPEG dan AI), sementara beban animasi dan kemulusan visual harus sepenuhnya diserahkan kepada GPU pada perangkat *Client* (Browser).
+
+#### Roadmap Revisi:
+
+1. **Phase 2.1 — Canvas Interpolation / Client-Side Prediction**
+   - **Tantangan:** *Browser* menerima posisi *Bounding Box* hanya 2 kali per detik, sehingga pergerakan kotak terlihat melompat.
+   - **Solusi:** Modifikasi `SmartDetectionEditor.tsx` agar menggunakan animasi `requestAnimationFrame()` 60 FPS untuk melakukan interpolasi linear posisi *Bounding Box* di antara 2 titik waktu (*Client-side Prediction*).
+   - **Success Criteria:** *Bounding Box* bergerak sangat mulus melintasi layar meskipun Raspberry Pi dan AI sebenarnya hanya mengirimkan data 2 frame per detik.
+
+2. **Phase 2.2 — Object Trail & Velocity Visualizations**
+   - Setelah sistem interpolasi *Canvas* berfungsi, tambahkan jejak objek (*Object Trail*) dan arah pergerakan objek (*Velocity Arrows*) di sisi *Client*.
+   - **Catatan:** Seluruh visualisasi grafis berlapis harus dikelola oleh *Browser GPU* (di dalam elemen *Canvas* tunggal), sama sekali tidak menyentuh FFmpeg maupun Backend.
+
+### Phase 3: Advanced Tracking (Future Evaluation) SSE berisi `Track ID`, `Bounding Box`, `Velocity`, dan `Timestamp`.
    - Browser merender video MJPEG 10 FPS, dan menggunakan `requestAnimationFrame()` untuk meluncurkan animasi kotak merah (*Client-Side Interpolation*) berdasarkan *Velocity*.
 
 Dengan arsitektur ini, Raspberry Pi tetap sedingin es (hanya memproses AI 2 FPS), sementara perangkat pengguna (Laptop/HP) akan menggunakan GPU lokal mereka untuk merender pergerakan *Bounding Box* sehalus 30/60 FPS.
