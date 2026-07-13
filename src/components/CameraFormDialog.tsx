@@ -425,7 +425,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         motionSensitivity: camera.motionSensitivity ?? 50,
         motionArea: camera.motionArea || null,
         excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
-        smartZones: Array.isArray(camera.smartZones) ? camera.smartZones : (Array.isArray(camera.excludeAreas) ? camera.excludeAreas : []),
+        smartZones: [
+          ...(Array.isArray(camera.excludeAreas) ? camera.excludeAreas.map(z => ({ ...z, zoneType: "exclude" })) : []),
+          ...(Array.isArray(camera.smartZones) ? camera.smartZones.filter(z => z.zoneType !== "exclude") : [])
+        ],
         detectionModes: Array.isArray(camera.detectionModes) ? camera.detectionModes : ["pixel", "human", "pet"],
         detectResolution: camera.detectResolution ?? "480p",
         enableSoundDetection: camera.enableSoundDetection ?? false,
@@ -507,8 +510,8 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       enableNotifications: form.enableNotifications,
       motionSensitivity: form.motionSensitivity,
       motionArea: form.motionArea,
-      excludeAreas: form.excludeAreas,
-      smartZones: form.smartZones,
+      excludeAreas: form.smartZones.filter(z => !z.zoneType || z.zoneType === "exclude"),
+      smartZones: form.smartZones.filter(z => z.zoneType && z.zoneType !== "exclude"),
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
       detectFps: form.detectFps,
