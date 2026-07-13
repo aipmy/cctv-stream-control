@@ -84,8 +84,39 @@ async function handleMotionDetected(camera, predictions = null, pixelBoxes = nul
     if (now - active.startedAt > 900000) {
       console.log(`[Motion Detection] ⏱️ Event ${active.eventId} reached max duration (15m). Closing and starting a new one.`);
       activeMotionEvents.delete(camera.id);
+    } else if (predictions && predictions.length > 0) {
+      // Count objects by class in current detection
+      const currentCounts = {};
+      for (const p of predictions) { currentCounts[p.class] = (currentCounts[p.class] || 0) + 1; }
+
+      // Check if any class has MORE objects than when the event started
+      const prevCounts = active.objectCounts || {};
+      let countIncreased = false;
+      for (const cls of Object.keys(currentCounts)) {
+        if ((currentCounts[cls] || 0) > (prevCounts[cls] || 0)) {
+          console.log(`[Motion Detection] 👥 ${cls} count increased: ${prevCounts[cls] || 0} → ${currentCounts[cls]} on ${camera.name}`);
+          countIncreased = true;
+          break;
+        }
+      }
+
+      if (countIncreased) {
+        // Force close old event, create new one below
+        console.log(`[Motion Detection] 🔄 Object count increased — creating new event for ${camera.name}`);
+        activeMotionEvents.delete(camera.id);
+      } else {
+        // Same or fewer objects — just extend existing event
+        active.lastMotionAt = now;
+        // Update peak counts
+        for (const cls of Object.keys(currentCounts)) {
+          if ((currentCounts[cls] || 0) > (prevCounts[cls] || 0)) {
+            prevCounts[cls] = currentCounts[cls];
+          }
+        }
+        return;
+      }
     } else {
-      // Extend the existing event
+      // Pixel motion or no predictions — extend existing event
       active.lastMotionAt = now;
       return;
     }
@@ -93,8 +124,15 @@ async function handleMotionDetected(camera, predictions = null, pixelBoxes = nul
 
   // Trigger a NEW event
   console.log(`[Motion Detection] ⚠️ ${reason} detected on camera: ${camera.name} (${camera.id})!`);
+
+  // Track object counts at the time of event creation
+  const initialCounts = {};
+  if (predictions) {
+    for (const p of predictions) { initialCounts[p.class] = (initialCounts[p.class] || 0) + 1; }
+  }
+
   // Prevent async race condition
-  activeMotionEvents.set(camera.id, { eventId: "pending", lastMotionAt: now, startedAt: now });
+  activeMotionEvents.set(camera.id, { eventId: "pending", lastMotionAt: now, startedAt: now, objectCounts: initialCounts });
   try {
     const newEvent = await triggerEvent(camera.id, reason, { predictions, pixelBoxes, snapshotBuffer });
     const active = activeMotionEvents.get(camera.id);
