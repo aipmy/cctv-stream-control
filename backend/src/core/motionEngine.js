@@ -83,7 +83,17 @@ export function detectMotion(prev, curr, width, height, options) {
       }
       const centerX = (x0 + x1) / 2 / width;
       const centerY = (y0 + y1) / 2 / height;
-      if (isIgnoredPoint(centerX, centerY, ignoreZones)) continue;
+      let ignored = isIgnoredPoint(centerX, centerY, ignoreZones);
+      if (!ignored) {
+        // Forgiving mask: if center is not ignored, check corners to effectively expand the mask slightly
+        const leftX = x0 / width, rightX = x1 / width;
+        const topY = y0 / height, bottomY = y1 / height;
+        ignored = isIgnoredPoint(leftX, topY, ignoreZones) || 
+                  isIgnoredPoint(rightX, topY, ignoreZones) ||
+                  isIgnoredPoint(leftX, bottomY, ignoreZones) ||
+                  isIgnoredPoint(rightX, bottomY, ignoreZones);
+      }
+      if (ignored) continue;
       if ((sum / Math.max(1, count)) >= diffThreshold) { active[by * cols + bx] = 1; activeCount++; }
     }
   }
