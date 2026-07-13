@@ -436,6 +436,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         detectFps: camera.detectFps ?? 6,
       });
       setSdAiSensitivity(camera.aiSensitivity ?? 50);
+      setSdMotionSensitivity(camera.motionSensitivity ?? 50);
       setSdShowPerson(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("human") : true);
       setSdShowPet(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("pet") : false);
       setSdShowObject(Array.isArray(camera.detectionModes) ? camera.detectionModes.includes("object") : false);
@@ -510,6 +511,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       smartZones: form.smartZones,
       detectionModes: form.detectionModes,
       detectResolution: form.detectResolution,
+      detectFps: form.detectFps,
       aiSensitivity: form.aiSensitivity,
       enableSoundDetection: form.enableSoundDetection,
       recordingMode: form.recordingMode ?? "continuous",
