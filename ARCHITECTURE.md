@@ -84,3 +84,23 @@ Bertugas menangani penyimpanan *Hardisk* dan notifikasi. Modul ini tidak tahu me
   - Melakukan *extend* durasi rekaman (+15 detik).
   - Menyambungkan klip HLS menjadi MP4.
   - Memanggil *FCM Push Notification*.
+
+---
+
+## Future Roadmap: Smooth Rendering Pipeline
+
+Saat ini, `MJPEG FPS` dan `AI FPS` terikat pada frekuensi yang sama (~2 FPS) demi kesederhanaan. Ke depannya, sistem akan mengadopsi arsitektur *Client-Side Interpolation* untuk memberikan *User Experience* yang sangat halus tanpa mengorbankan CPU Raspberry Pi.
+
+**Target Arsitektur (Phase 2):**
+
+1. **Decoupled FPS:**
+   - FFmpeg memproduksi `MJPEG` pada 10 FPS untuk browser.
+   - AI Sampler berjalan independen di 2 FPS.
+2. **Tracker Upgrade (Kalman Filter / State Estimator):**
+   - `ObjectTracker` tidak hanya menyimpan posisi, tapi menghitung `Velocity` (dx, dy).
+   - Tracker melakukan *Prediction* (menebak posisi di frame sela) dan *Correction* (mengoreksi posisi saat AI selesai inferensi).
+3. **Client-Side Rendering (Browser):**
+   - Backend memancarkan SSE berisi `Track ID`, `Bounding Box`, `Velocity`, dan `Timestamp`.
+   - Browser merender video MJPEG 10 FPS, dan menggunakan `requestAnimationFrame()` untuk meluncurkan animasi kotak merah (*Client-Side Interpolation*) berdasarkan *Velocity*.
+
+Dengan arsitektur ini, Raspberry Pi tetap sedingin es (hanya memproses AI 2 FPS), sementara perangkat pengguna (Laptop/HP) akan menggunakan GPU lokal mereka untuk merender pergerakan *Bounding Box* sehalus 30/60 FPS.
