@@ -185,7 +185,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     args.push(
       ...audioArgsRecord(camera, audioFallback),
       "-f", "hls",
-      "-hls_time", "2",
+      "-hls_time", String(options.segmentDuration || 15),
       "-hls_list_size", "20",
       "-hls_delete_threshold", "3",
       "-hls_flags", recordFlags.join("+"),

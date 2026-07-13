@@ -17,7 +17,7 @@ import {
   normalizeRtspTransport,
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
-import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
+import { triggerEvent, updateLastMotionAt, extendEventDuration, getSettings } from "../services/recordingService.js";
 
 import { ObjectTracker } from "../core/objectTracker.js";
 import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
@@ -406,7 +406,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     }
     
     const audioFallback = audioFailures.has(id);
-    const args = buildHlsArgs({ camera, output, dir, recordDir, options: config, audioFallback });
+    const settings = await getSettings();
+    const optionsWithSettings = { ...config, segmentDuration: settings.segmentDuration || 15 };
+    const args = buildHlsArgs({ camera, output, dir, recordDir, options: optionsWithSettings, audioFallback });
 
     const hasSmartFeatures = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
 
