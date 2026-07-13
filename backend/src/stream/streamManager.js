@@ -543,22 +543,24 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   if (filtered.length > 0) {
                     session.lastAiPredictions = filtered;
                     session.lastAiPredictionTime = now;
-                  } else if (session.lastAiPredictions && now - session.lastAiPredictionTime < 2000) {
-                    // Temporal smoothing: Keep the box for 2 seconds if the AI momentarily drops it
+                  } else if (session.lastAiPredictions && now - session.lastAiPredictionTime < 3000) {
+                    // Temporal smoothing: Keep the box for 3 seconds if the AI momentarily drops it
                     finalPredictions = session.lastAiPredictions;
                   } else {
                     session.lastAiPredictions = null;
                   }
                   
-                  // Emit filtered AI results (>= 10%) to frontend via SSE so they appear in live view
-                  // Emit new SSE Contract (Future-proof for Phase 2.2 Timestamp Sync)
-                  motionEmitter.emit(`ai-motion-${id}`, {
-                    cameraId: id,
-                    frameId: session.frameCount || 0,
-                    timestamp: session.lastFrameAt, // Source of truth: NodeJS frame arrival time
-                    ts: new Date().toISOString(),
-                    predictions: finalPredictions
-                  });
+                  // Only emit to frontend when we have predictions
+                  // Let the frontend's own fade-out handle disappearance naturally
+                  if (finalPredictions.length > 0) {
+                    motionEmitter.emit(`ai-motion-${id}`, {
+                      cameraId: id,
+                      frameId: session.frameCount || 0,
+                      timestamp: session.lastFrameAt,
+                      ts: new Date().toISOString(),
+                      predictions: finalPredictions
+                    });
+                  }
 
                   // Filter again strictly for events (must meet camera's AI Sensitivity setting)
                   const eventFiltered = finalPredictions.filter(p => p.score >= threshold);

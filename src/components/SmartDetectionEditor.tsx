@@ -383,9 +383,9 @@ export function SmartDetectionEditor({
       let filteredCount = 0;
       const now = Date.now();
       const LERP_SPEED = 0.15; // Smoothing factor (0=frozen, 1=instant)
-      const FADE_IN_SPEED = 0.12;
-      const FADE_OUT_SPEED = 0.04;
-      const LOST_TIMEOUT_MS = 1500; // Keep box visible 1.5s after last detection
+      const FADE_IN_SPEED = 0.15;
+      const FADE_OUT_SPEED = 0.025;
+      const LOST_TIMEOUT_MS = 3000; // Keep box visible 3s after last detection
 
       const tracked = trackedBoxesRef.current;
 
