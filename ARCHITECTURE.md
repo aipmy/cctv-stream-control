@@ -104,3 +104,30 @@ Saat ini, `MJPEG FPS` dan `AI FPS` terikat pada frekuensi yang sama (~2 FPS) dem
    - Browser merender video MJPEG 10 FPS, dan menggunakan `requestAnimationFrame()` untuk meluncurkan animasi kotak merah (*Client-Side Interpolation*) berdasarkan *Velocity*.
 
 Dengan arsitektur ini, Raspberry Pi tetap sedingin es (hanya memproses AI 2 FPS), sementara perangkat pengguna (Laptop/HP) akan menggunakan GPU lokal mereka untuk merender pergerakan *Bounding Box* sehalus 30/60 FPS.
+
+---
+
+## Prinsip Pengembangan Berbasis Data (Data-Driven Engineering)
+
+Semua poin pada `Future Roadmap` di atas diperlakukan murni sebagai **Hipotesis Engineering**. Sebuah fitur baru tidak akan di-_merged_ secara permanen hanya karena "secara teori terdengar bagus" atau "secara visual terlihat halus".
+
+Setiap implementasi besar wajib melewati siklus berikut:
+`Problem ➔ Measurement ➔ Implementation ➔ Benchmark ➔ Decision`
+
+### Standar Evaluasi Metrik (Performance Dashboard)
+
+Setiap *Pull Request* atau *Commit* arsitektur besar harus diiringi dengan tabel perbandingan metrik kinerja secara objektif menggunakan spesifikasi *hardware* yang sama (misal: Raspberry Pi 4, 1 Kamera 1080p).
+
+**Contoh Format Evaluasi Metrik:**
+
+| Metric | Baseline (Sebelum) | Eksperimen (Sesudah) | Kriteria Keputusan |
+| :--- | :--- | :--- | :--- |
+| **CPU Usage (%)** | 42% | 44% | Kenaikan max < 5% |
+| **RAM Usage (MB)** | 512 MB | 515 MB | Kebocoran memori < 10 MB |
+| **MJPEG FPS** | 2 | 10 | Target Tercapai |
+| **AI FPS** | 2 | 2 | Tetap Ringan |
+| **Detection Latency** | 180 ms | 182 ms | Pertambahan wajar |
+| **Browser FPS** | 2 | 10 | Lebih *Smooth* |
+| **Miss Detection / ID Switch** | 1.8% | 1.7% | Akurasi tidak menurun |
+
+Prinsip ini menjamin bahwa **kompleksitas kode tambahan sepadan dengan manfaat operasional** di dunia nyata. Optimasi harus selalu berbasis pada data (*Data-Driven*), bukan asumsi.
