@@ -445,6 +445,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     child.stdout.on("data", (chunk) => {
       recordCameraTraffic(id, "pull", chunk.length);
       parse(chunk, (frame) => {
+        session.frameCount = (session.frameCount || 0) + 1;
         session.lastFrame = frame;
         session.lastFrameAt = Date.now();
         
@@ -550,7 +551,11 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   }
                   
                   // Emit filtered AI results (>= 10%) to frontend via SSE so they appear in live view
+                  // Emit new SSE Contract (Future-proof for Phase 2.2 Timestamp Sync)
                   motionEmitter.emit(`ai-motion-${id}`, {
+                    cameraId: id,
+                    frameId: session.frameCount || 0,
+                    timestamp: session.lastFrameAt, // Source of truth: NodeJS frame arrival time
                     ts: new Date().toISOString(),
                     predictions: finalPredictions
                   });
