@@ -437,6 +437,7 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const flatHlsDir = path.join(config.storageDir, "record_hls", id);
     const hierarchicalHlsDir = path.join(config.storageDir, "record_hls", id);
     const mp4BaseDir = path.join(config.storageDir, "record_mp4", id);
+    const segments = [];
 
     const scanFlatDir = async () => {
       try {
