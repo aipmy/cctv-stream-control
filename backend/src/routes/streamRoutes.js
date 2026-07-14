@@ -509,16 +509,24 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const q = segmentQuery(req, output);
     for (let i = 0; i < segments.length; i++) {
       const current = segments[i];
-      let duration = segDur;
+      let duration = 60; // Default expected duration for recording
+      
       if (i < segments.length - 1) {
         const diff = segments[i + 1].ts - current.ts;
-        if (diff > 0 && diff <= segDur + 1) {
+        if (diff > 0 && diff <= 65) {
           duration = diff;
         }
+      } else if (i > 0) {
+        // Estimate last segment duration based on previous segment diff, max 60s
+        const diff = current.ts - segments[i - 1].ts;
+        if (diff > 0 && diff <= 65) duration = diff;
       }
       
-      if (i > 0 && current.ts - segments[i - 1].ts > segDur + 1) {
-        lines.push("#EXT-X-DISCONTINUITY");
+      if (i > 0) {
+        const gap = current.ts - segments[i - 1].ts;
+        if (gap > 65) {
+          lines.push("#EXT-X-DISCONTINUITY");
+        }
       }
       
       lines.push(`#EXTINF:${duration.toFixed(6)},`);
