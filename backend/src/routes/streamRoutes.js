@@ -364,14 +364,19 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
       let activeBlock = null;
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
-        let duration = targetDuration;
+        // Calculate actual duration based on gap to next segment
+        let duration = 60; // default ~60s for recording segments
         let isContiguous = false;
         if (i < segments.length - 1) {
           const diff = segments[i + 1].ts - seg.ts;
-          if (diff > 0 && diff <= 5) {
+          if (diff > 0 && diff <= 65) {
             duration = diff;
             isContiguous = true;
           }
+        } else if (i > 0) {
+          // Last segment: estimate from previous gap
+          const prevDiff = seg.ts - segments[i - 1].ts;
+          if (prevDiff > 0 && prevDiff <= 65) duration = prevDiff;
         }
         if (!activeBlock) {
           activeBlock = {
@@ -387,6 +392,10 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
           currentOffset += activeBlock.duration;
           activeBlock = null;
         }
+      }
+      // Push any remaining active block
+      if (activeBlock) {
+        segmentMappings.push(activeBlock);
       }
     }
 
