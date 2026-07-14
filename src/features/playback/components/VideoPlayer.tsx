@@ -183,6 +183,7 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
       seekToTimestamp(jumpToTimeTrigger);
       setTimelineCenterTs(jumpToTimeTrigger);
       setJumpToTimeTrigger(null); // consume trigger
+      setTimeout(() => setActivePosterUrl(null), 500); // clear poster overlay
     }
   }, [jumpToTimeTrigger]);
 
