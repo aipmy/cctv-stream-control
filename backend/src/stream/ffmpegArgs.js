@@ -189,7 +189,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
       "-hls_list_size", "5",
       "-strftime", "1",
       "-strftime_mkdir", "1",
-      "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M.ts"),
+      "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M_%S.ts"),
       path.join(recordDir, "live.m3u8")
     );
   }

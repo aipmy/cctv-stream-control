@@ -378,8 +378,8 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const startUnix = req.query.start ? parseInt(req.query.start, 10) : Math.floor(startOfDay.getTime() / 1000);
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
-    const segments = [];
     const flatHlsDir = path.join(config.storageDir, "record_hls", id);
+    const hierarchicalHlsDir = path.join(config.storageDir, "record_hls", id);
     const mp4BaseDir = path.join(config.storageDir, "record_mp4", id);
 
     const scanFlatDir = async () => {
@@ -407,24 +407,35 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
         const MM = String(current.getMonth() + 1).padStart(2, '0');
         const DD = String(current.getDate()).padStart(2, '0');
         const HH = String(current.getHours()).padStart(2, '0');
+        const hourDirs = [
+          path.join(hierarchicalHlsDir, YYYY, MM, DD, HH),
+          path.join(mp4BaseDir, YYYY, MM, DD, HH) // Fallback for old mp4 files
+        ];
         
-        const hourDir = path.join(mp4BaseDir, YYYY, MM, DD, HH);
-        try {
-          const files = await fs.promises.readdir(hourDir);
-          for (const file of files) {
-            if (!file.endsWith('.ts')) continue;
-            const mm = parseInt(file.replace('.ts', ''), 10);
-            if (isNaN(mm)) continue;
-            
-            const segDate = new Date(current);
-            segDate.setMinutes(mm, 0, 0);
-            const segTs = Math.floor(segDate.getTime() / 1000);
-            
-            if (segTs >= startUnix && segTs <= endUnix) {
-              segments.push({ file: `${YYYY}/${MM}/${DD}/${HH}/${file}`, ts: segTs });
+        for (const hourDir of hourDirs) {
+          try {
+            const files = await fs.promises.readdir(hourDir);
+            for (const file of files) {
+              if (!file.endsWith('.ts') && !file.endsWith('.mp4')) continue;
+              
+              let mm, ss = 0;
+              const matchSeg = file.match(/^(\d+)(?:_(\d+))?\.(ts|mp4)$/);
+              if (!matchSeg) continue;
+              
+              mm = parseInt(matchSeg[1], 10);
+              ss = matchSeg[2] ? parseInt(matchSeg[2], 10) : 0;
+              if (isNaN(mm)) continue;
+              
+              const segDate = new Date(current);
+              segDate.setMinutes(mm, ss, 0);
+              const segTs = Math.floor(segDate.getTime() / 1000);
+              
+              if (segTs >= startUnix && segTs <= endUnix) {
+                segments.push({ file: `${YYYY}/${MM}/${DD}/${HH}/${file}`, ts: segTs });
+              }
             }
-          }
-        } catch (err) {}
+          } catch (err) {}
+        }
         current.setHours(current.getHours() + 1);
       }
     };
