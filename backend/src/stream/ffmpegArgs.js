@@ -65,11 +65,9 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const detectFilter = `fps=${detectFps},scale=${detectWidth}:-2`;
 
   const streamFlags = ["omit_endlist", "independent_segments", "temp_file"];
-  if (streamMode === "transcode") streamFlags.push("program_date_time");
   if (!camera.enableRecording) streamFlags.push("delete_segments");
 
   const recordFlags = ["omit_endlist", "independent_segments", "temp_file"];
-  if (recordMode === "transcode") recordFlags.push("program_date_time");
 
   const buildTranscodeArgs = (resolution, isLowLatency) => {
     const scaleFilter = resolution ? `,scale=-2:${resolution.replace("p", "")}` : "";
@@ -185,15 +183,14 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     args.push(
       ...audioArgsRecord(camera, audioFallback),
       "-f", "hls",
-      "-hls_time", String(options.segmentDuration || 15),
-      "-hls_list_size", "20",
-      "-hls_delete_threshold", "3",
-      "-hls_flags", recordFlags.join("+"),
-      "-hls_allow_cache", "0",
+      "-hls_time", "60",
       "-hls_segment_type", "mpegts",
+      "-hls_flags", "split_by_time+append_list",
+      "-hls_list_size", "5",
       "-strftime", "1",
-      "-hls_segment_filename", path.join(recordDir, "seg_%s.ts"),
-      path.join(recordDir, "index.m3u8")
+      "-strftime_mkdir", "1",
+      "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M.ts"),
+      path.join(recordDir, "live.m3u8")
     );
   }
 

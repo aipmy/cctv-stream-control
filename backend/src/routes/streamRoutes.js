@@ -11,6 +11,37 @@ import { requirePermission } from "../middleware/authMiddleware.js";
 
 export const streamRoutes = Router();
 const diskUsageCache = new Map(); // cameraId -> { size, ts }
+const diskUsageCalculating = new Map(); // cameraId -> boolean
+
+const calculateDirSize = async (dirPath) => {
+  let total = 0;
+  const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
+  for (const item of list) {
+    const fullPath = path.join(dirPath, item.name);
+    if (item.isDirectory()) {
+      total += await calculateDirSize(fullPath);
+    } else if (item.isFile()) {
+      const stats = await fs.promises.stat(fullPath);
+      total += stats.size;
+    }
+  }
+  return total;
+};
+
+const triggerBackgroundSizeCalculation = (id, dirPath) => {
+  if (diskUsageCalculating.get(id)) return;
+  diskUsageCalculating.set(id, true);
+  calculateDirSize(dirPath)
+    .then((size) => {
+      diskUsageCache.set(id, { size, ts: Date.now() });
+    })
+    .catch((err) => {
+      console.error(`Error calculating disk usage in background for ${id}:`, err);
+    })
+    .finally(() => {
+      diskUsageCalculating.set(id, false);
+    });
+};
 
 // Validate camera access by user's allowedGroups/sites
 streamRoutes.param("id", async (req, res, next, id) => {
@@ -232,25 +263,11 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
       if (fs.existsSync(hlsBaseDir)) {
         const cached = diskUsageCache.get(id);
         const now = Date.now();
-        if (cached && now - cached.ts < 30000) { // Cache for 30s
+        if (cached) {
           diskUsageBytes = cached.size;
-        } else {
-          const calculateDirSize = async (dirPath) => {
-            let total = 0;
-            const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
-            for (const item of list) {
-              const fullPath = path.join(dirPath, item.name);
-              if (item.isDirectory()) {
-                total += await calculateDirSize(fullPath);
-              } else if (item.isFile()) {
-                const stats = await fs.promises.stat(fullPath);
-                total += stats.size;
-              }
-            }
-            return total;
-          };
-          diskUsageBytes = await calculateDirSize(hlsBaseDir);
-          diskUsageCache.set(id, { size: diskUsageBytes, ts: now });
+        }
+        if (!cached || now - cached.ts > 600000) { // 10 minutes cache
+          triggerBackgroundSizeCalculation(id, hlsBaseDir);
         }
       }
     } catch (err) {
@@ -361,18 +378,59 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const startUnix = req.query.start ? parseInt(req.query.start, 10) : Math.floor(startOfDay.getTime() / 1000);
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
-    const files = await fs.promises.readdir(dir);
     const segments = [];
+    const flatHlsDir = path.join(config.storageDir, "record_hls", id);
+    const mp4BaseDir = path.join(config.storageDir, "record_mp4", id);
 
-    for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
-      if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
-        segments.push({ file, ts });
+    const scanFlatDir = async () => {
+      try {
+        const files = await fs.promises.readdir(flatHlsDir);
+        for (const file of files) {
+          if (!file.endsWith('.ts') && !file.endsWith('.mp4')) continue;
+          const match = file.match(/seg_(\d+)\.(ts|mp4)/);
+          if (!match) continue;
+          const fileTs = parseInt(match[1], 10);
+          if (fileTs >= startUnix && fileTs <= endUnix) {
+            segments.push({ file: file, ts: fileTs });
+          }
+        }
+      } catch (err) {}
+    };
+
+    const scanHierarchical = async () => {
+      let current = new Date(startUnix * 1000);
+      current.setMinutes(0, 0, 0); // start of the hour
+      const end = new Date(endUnix * 1000);
+      
+      while (current <= end) {
+        const YYYY = current.getFullYear().toString();
+        const MM = String(current.getMonth() + 1).padStart(2, '0');
+        const DD = String(current.getDate()).padStart(2, '0');
+        const HH = String(current.getHours()).padStart(2, '0');
+        
+        const hourDir = path.join(mp4BaseDir, YYYY, MM, DD, HH);
+        try {
+          const files = await fs.promises.readdir(hourDir);
+          for (const file of files) {
+            if (!file.endsWith('.ts')) continue;
+            const mm = parseInt(file.replace('.ts', ''), 10);
+            if (isNaN(mm)) continue;
+            
+            const segDate = new Date(current);
+            segDate.setMinutes(mm, 0, 0);
+            const segTs = Math.floor(segDate.getTime() / 1000);
+            
+            if (segTs >= startUnix && segTs <= endUnix) {
+              segments.push({ file: `${YYYY}/${MM}/${DD}/${HH}/${file}`, ts: segTs });
+            }
+          }
+        } catch (err) {}
+        current.setHours(current.getHours() + 1);
       }
-    }
+    };
+
+    await scanFlatDir();
+    await scanHierarchical();
 
     if (segments.length === 0) {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -384,9 +442,9 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
 
     const lines = [
       "#EXTM3U",
-      "#EXT-X-VERSION:3",
+      "#EXT-X-VERSION:7",
       "#EXT-X-PLAYLIST-TYPE:VOD",
-      `#EXT-X-TARGETDURATION:${targetDuration}`,
+      "#EXT-X-TARGETDURATION:60",
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
 
@@ -512,26 +570,59 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
     }
 
     const output = await getCameraOutput(id);
-    const dir = path.join(config.storageDir, "record_hls", id);
-    if (!dir || !fs.existsSync(dir)) {
-      return res.status(404).send("Stream directory not found");
-    }
-
-    const files = await fs.promises.readdir(dir);
     const segments = [];
-    for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
-      if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
-        segments.push({
-          file,
-          path: path.join(dir, file),
-          ts,
-        });
+    const flatHlsDir = path.join(config.storageDir, "record_hls", id);
+    const mp4BaseDir = path.join(config.storageDir, "record_mp4", id);
+
+    const scanFlatDir = async () => {
+      try {
+        const files = await fs.promises.readdir(flatHlsDir);
+        for (const file of files) {
+          if (!file.endsWith('.ts') && !file.endsWith('.mp4')) continue;
+          const match = file.match(/seg_(\d+)\.(ts|mp4)/);
+          if (!match) continue;
+          const ts = parseInt(match[1], 10);
+          if (ts >= startUnix && ts <= endUnix) {
+            segments.push({ file, path: path.join(flatHlsDir, file), ts });
+          }
+        }
+      } catch (err) {}
+    };
+
+    const scanHierarchical = async () => {
+      let current = new Date(startUnix * 1000);
+      current.setMinutes(0, 0, 0); // start of the hour
+      const end = new Date(endUnix * 1000);
+      
+      while (current <= end) {
+        const YYYY = current.getFullYear().toString();
+        const MM = String(current.getMonth() + 1).padStart(2, '0');
+        const DD = String(current.getDate()).padStart(2, '0');
+        const HH = String(current.getHours()).padStart(2, '0');
+        
+        const hourDir = path.join(mp4BaseDir, YYYY, MM, DD, HH);
+        try {
+          const files = await fs.promises.readdir(hourDir);
+          for (const file of files) {
+            if (!file.endsWith('.ts')) continue;
+            const mm = parseInt(file.replace('.ts', ''), 10);
+            if (isNaN(mm)) continue;
+            
+            const segDate = new Date(current);
+            segDate.setMinutes(mm, 0, 0);
+            const segTs = Math.floor(segDate.getTime() / 1000);
+            
+            if (segTs >= startUnix && segTs <= endUnix) {
+              segments.push({ file, path: path.join(hourDir, file), ts: segTs });
+            }
+          }
+        } catch (err) {}
+        current.setHours(current.getHours() + 1);
       }
-    }
+    };
+
+    await scanFlatDir();
+    await scanHierarchical();
 
     if (segments.length === 0) {
       return res.status(404).send("No recorded video segments found in this time range");
@@ -581,16 +672,18 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
   }
 });
 
-streamRoutes.get("/:id/:file", async (req, res, next) => {
+streamRoutes.get("/:id/:file(*)", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
     recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
     let filePath = getHlsFilePath(req.params.id, output, req.params.file);
     if (!filePath || !fs.existsSync(filePath)) {
-      // Fallback to record_hls directory for playback segments
       const recordFilePath = path.join(config.storageDir, "record_hls", req.params.id, req.params.file);
+      const mp4FilePath = path.join(config.storageDir, "record_mp4", req.params.id, req.params.file);
       if (fs.existsSync(recordFilePath) && !req.params.file.includes("..")) {
         filePath = recordFilePath;
+      } else if (fs.existsSync(mp4FilePath) && !req.params.file.includes("..")) {
+        filePath = mp4FilePath;
       } else {
         return res.status(404).send("Segment not found");
       }

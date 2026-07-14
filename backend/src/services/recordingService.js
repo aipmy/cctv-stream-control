@@ -350,6 +350,27 @@ export async function runStorageCleanup() {
     const hlsBaseDirs = [path.join(config.storageDir, "hls"), path.join(config.storageDir, "record_hls")];
     let zeroByteCleaned = 0;
 
+    const scanMp4Dir = async (dir, cameraId, fileInfos) => {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await scanMp4Dir(fullPath, cameraId, fileInfos);
+          } else if (entry.isFile() && entry.name.endsWith('.mp4')) {
+            const stats = await fs.stat(fullPath);
+            fileInfos.push({
+              type: "segment",
+              name: entry.name,
+              path: fullPath,
+              size: stats.size,
+              time: stats.mtimeMs,
+            });
+          }
+        }
+      } catch (err) {}
+    };
+
     // Pre-load events and cameras once (not per hlsBaseDir)
     const events = await listEvents();
     const eventsByCamera = new Map();
@@ -452,6 +473,15 @@ export async function runStorageCleanup() {
       }
     }
 
+    const mp4BaseDir = path.join(config.storageDir, "record_mp4");
+    if (fsSync.existsSync(mp4BaseDir)) {
+      const cameraDirs = await fs.readdir(mp4BaseDir).catch(() => []);
+      for (const cameraId of cameraDirs) {
+        if (cameraId.startsWith('.')) continue;
+        await scanMp4Dir(path.join(mp4BaseDir, cameraId), cameraId, fileInfos);
+      }
+    }
+
     if (zeroByteCleaned > 0) {
       console.log(`[Storage Cleanup] Removed ${zeroByteCleaned} empty (0-byte) segment files.`);
     }
@@ -509,6 +539,11 @@ export async function deleteRecordingsForDate(cameraId, date) {
   const startUnix = Math.floor(startOfDay.getTime() / 1000);
   const endUnix = Math.floor(endOfDay.getTime() / 1000);
 
+  const mp4DateDir = path.join(config.storageDir, "record_mp4", cameraId, ...date.split('-'));
+  if (fsSync.existsSync(mp4DateDir)) {
+    await fs.rm(mp4DateDir, { recursive: true, force: true }).catch(() => {});
+  }
+
   const hlsBaseDirs = [path.join(config.storageDir, "hls", cameraId), path.join(config.storageDir, "record_hls", cameraId)];
   let deletedCount = 0;
 
@@ -558,7 +593,7 @@ export async function deleteRecordingsForDate(cameraId, date) {
 }
 
 export async function deleteAllRecordings(cameraId) {
-  const hlsBaseDirs = [path.join(config.storageDir, "hls", cameraId), path.join(config.storageDir, "record_hls", cameraId)];
+  const hlsBaseDirs = [path.join(config.storageDir, "hls", cameraId), path.join(config.storageDir, "record_hls", cameraId), path.join(config.storageDir, "record_mp4", cameraId)];
   for (const baseDir of hlsBaseDirs) {
     if (fsSync.existsSync(baseDir)) {
       await fs.rm(baseDir, { recursive: true, force: true }).catch(() => {});
@@ -574,3 +609,6 @@ export async function deleteSnapshotFile(eventId) {
   }
   return true;
 }
+
+
+
