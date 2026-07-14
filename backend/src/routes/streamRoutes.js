@@ -281,29 +281,76 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
 
     const output = await getCameraOutput(id);
     
-    // Determine the correct recording directory (unified under record_hls/<id>/)
-    const dir = path.join(config.storageDir, "record_hls", id);
+    const segments = [];
+    const flatHlsDir = path.join(config.storageDir, "record_hls", id);
+    const hierarchicalHlsDir = path.join(config.storageDir, "record_hls", id);
+    const mp4BaseDir = path.join(config.storageDir, "record_mp4", id);
     
-    if (!dir || !fs.existsSync(dir)) {
-      return res.json({ hasRecording: false, diskUsageBytes });
-    }
-
     const startOfDay = new Date(`${date}T00:00:00`);
     const endOfDay = new Date(`${date}T23:59:59.999`);
     const startUnix = req.query.start ? parseInt(req.query.start, 10) : Math.floor(startOfDay.getTime() / 1000);
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
-    const files = await fs.promises.readdir(dir);
-    const segments = [];
-    for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
-      if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
-        segments.push({ ts });
+    const scanFlatDir = async () => {
+      try {
+        const files = await fs.promises.readdir(flatHlsDir);
+        for (const file of files) {
+          if (!file.endsWith('.ts') && !file.endsWith('.mp4')) continue;
+          const match = file.match(/seg_(\d+)\.(ts|mp4)/);
+          if (!match) continue;
+          const fileTs = parseInt(match[1], 10);
+          if (fileTs >= startUnix && fileTs <= endUnix) {
+            segments.push({ ts: fileTs });
+          }
+        }
+      } catch (err) {}
+    };
+
+    const scanHierarchical = async () => {
+      let current = new Date(startUnix * 1000);
+      current.setMinutes(0, 0, 0); 
+      const end = new Date(endUnix * 1000);
+      
+      while (current <= end) {
+        const YYYY = current.getFullYear().toString();
+        const MM = String(current.getMonth() + 1).padStart(2, '0');
+        const DD = String(current.getDate()).padStart(2, '0');
+        const HH = String(current.getHours()).padStart(2, '0');
+        const hourDirs = [
+          path.join(hierarchicalHlsDir, YYYY, MM, DD, HH),
+          path.join(mp4BaseDir, YYYY, MM, DD, HH)
+        ];
+        
+        for (const hourDir of hourDirs) {
+          try {
+            const files = await fs.promises.readdir(hourDir);
+            for (const file of files) {
+              if (!file.endsWith('.ts') && !file.endsWith('.mp4')) continue;
+              
+              let mm, ss = 0;
+              const matchSeg = file.match(/^(\d+)(?:_(\d+))?\.(ts|mp4)$/);
+              if (!matchSeg) continue;
+              
+              mm = parseInt(matchSeg[1], 10);
+              ss = matchSeg[2] ? parseInt(matchSeg[2], 10) : 0;
+              if (isNaN(mm)) continue;
+              
+              const segDate = new Date(current);
+              segDate.setMinutes(mm, ss, 0);
+              const segTs = Math.floor(segDate.getTime() / 1000);
+              
+              if (segTs >= startUnix && segTs <= endUnix) {
+                segments.push({ ts: segTs });
+              }
+            }
+          } catch (err) {}
+        }
+        current.setHours(current.getHours() + 1);
       }
-    }
+    };
+
+    await scanFlatDir();
+    await scanHierarchical();
 
     if (segments.length === 0) {
       return res.json({ hasRecording: false, diskUsageBytes });
