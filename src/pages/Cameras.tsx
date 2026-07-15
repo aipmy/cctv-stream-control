@@ -22,7 +22,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 export default function Cameras() {
   const camerasQuery = useCamerasQuery();
   const cameras = camerasQuery.data || [];
-  const { deleteCamera, restartCamera, probeAll, probeCamera } = useCameraActions();
+  const actions = useCameraActions();
+  const { deleteCamera, restartCamera, probeAllCameras, probeCamera } = actions;
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
@@ -93,7 +94,7 @@ export default function Cameras() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={async () => { 
             try { 
-              await probeAll(false); 
+              await probeAllCameras(false); 
               toast.success(t("probeFinished")); 
             } catch (err) { 
               toast.error(err instanceof Error ? err.message : t("probeFailed")); 
@@ -296,6 +297,11 @@ export default function Cameras() {
                         <div className="font-semibold text-foreground">{t("cameraManagementPreviewTitle")}</div>
                         <div>{t("cameraManagementPreviewHelp")}</div>
                         <div>Stream: <span className="font-mono text-foreground/80">{c.streamType}</span> · HLS Mode: <span className="font-mono text-foreground/80">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono text-foreground/80">{c.streamQuality || "Auto"}</span></div>
+                        {c.metadata && (
+                          <div className="text-emerald-500/90 dark:text-emerald-400/90">
+                            Smart Profile: <span className="font-mono font-medium">{c.metadata.videoCodec.toUpperCase()} {c.metadata.width}x{c.metadata.height} {c.metadata.fps}fps {c.metadata.hasAudio ? `(+${c.metadata.audioCodec?.toUpperCase()})` : '(No Audio)'}</span>
+                          </div>
+                        )}
                         <div>Audio: <span className="font-mono text-foreground/80">{c.audioMode}</span> · PTZ: <span className="font-mono text-foreground/80">{c.enablePTZ ? t("active") : t("inactive")}</span></div>
                         <div>Status: <span className="font-mono text-foreground/80">{c.status}</span> · Viewer: <span className="font-mono text-foreground/80">{c.viewerCount || 0}</span></div>
                         <div>Pull CCTV: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span> · Output viewer: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span></div>

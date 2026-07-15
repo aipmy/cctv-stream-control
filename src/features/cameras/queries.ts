@@ -69,6 +69,10 @@ export function useCameraActions() {
     mutationFn: cameraApi.remove,
     onSuccess: refresh,
   });
+  const syncProfile = useMutation({
+    mutationFn: cameraApi.syncProfile,
+    onSuccess: refresh,
+  });
   const restart = useMutation({
     mutationFn: ({ id, output }: { id: string; output?: Camera["streamType"] }) =>
       cameraApi.restart(id, output),
@@ -98,9 +102,10 @@ export function useCameraActions() {
     updateCamera: (id: string, payload: Partial<CameraInput>) =>
       update.mutateAsync({ id, payload }),
     deleteCamera: remove.mutateAsync,
+    syncProfile: syncProfile.mutateAsync,
     restartCamera: (id: string, output?: Camera["streamType"]) =>
       restart.mutateAsync({ id, output }),
-    probeCamera: (id: string, deep = false) => probe.mutateAsync({ id, deep }),
-    probeAll: (deep = false) => probeAll.mutateAsync(deep),
+    probeCamera: (id: string, deep?: boolean) => probe.mutateAsync({ id, deep }),
+    probeAllCameras: probeAll.mutateAsync,
   };
 }

@@ -128,8 +128,8 @@ export function EventList() {
 
   const handleEventClick = (evt: SmartEvent) => {
     setActivePosterUrl(eventApi.snapshotUrl(evt.id));
-    // Jump 3s before event
-    const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
+    // Jump 10s before event to provide better pre-roll
+    const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 10;
     setJumpToTimeTrigger(eventTime);
   };
 
@@ -168,7 +168,7 @@ export function EventList() {
                       setActivePosterUrl(eventApi.snapshotUrl(evt.id));
                       setSelectedCameraIds([evt.cameraId]);
                       
-                      const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
+                      const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 10;
                       setJumpToTimeTrigger(eventTime);
                     }}
                   >

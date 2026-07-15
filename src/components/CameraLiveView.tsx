@@ -42,6 +42,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
   const [error, setError] = useState<string | null>(null);
   const [mjpegSrc, setMjpegSrc] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const src = useMemo(() => streamUrl(camera, output), [camera.id, output]);
   const { t } = useTranslation();
 
@@ -173,6 +174,15 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
                  const errMsg = video.error ? `${video.error.message} (Code: ${video.error.code})` : "";
                  setError(tRef.current("streamFailedToLoadInBrowser", { output, errMsg: errMsg || tRef.current("checkCodecOrTranscode") }));
               }
+              
+              // Auto-reconnect after 5 seconds
+              window.setTimeout(() => {
+                if (!disposed) {
+                  setError(null);
+                  setLoading(true);
+                  setRetryCount((c) => c + 1);
+                }
+              }, 5000);
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
@@ -199,15 +209,15 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
 
         hls = new HlsLib({
           lowLatencyMode: output === "HLS Low Latency",
-          backBufferLength: 30,
-          liveSyncDurationCount: output === "HLS Low Latency" ? 3 : 3,
-          liveMaxLatencyDurationCount: output === "HLS Low Latency" ? 6 : 8,
-          maxBufferLength: output === "HLS Low Latency" ? 15 : 60,
-          maxMaxBufferLength: output === "HLS Low Latency" ? 20 : 90,
-          manifestLoadingMaxRetry: 8,
-          manifestLoadingRetryDelay: 800,
-          levelLoadingMaxRetry: 8,
-          fragLoadingMaxRetry: 8,
+          backBufferLength: output === "HLS Low Latency" ? 5 : 30,
+          liveSyncDurationCount: output === "HLS Low Latency" ? 1.5 : 3,
+          liveMaxLatencyDurationCount: output === "HLS Low Latency" ? 3 : 8,
+          maxBufferLength: output === "HLS Low Latency" ? 4 : 60,
+          maxMaxBufferLength: output === "HLS Low Latency" ? 6 : 90,
+          manifestLoadingMaxRetry: 12,
+          manifestLoadingRetryDelay: 500,
+          levelLoadingMaxRetry: 12,
+          fragLoadingMaxRetry: 12,
         });
         hls.loadSource(src);
         hls.attachMedia(video);
@@ -252,18 +262,41 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           }
           setLoading(false);
           const base = playbackErrorMessage(tRef.current, data.details, data.type);
+          
+          const scheduleRetry = () => {
+            window.setTimeout(() => {
+              if (!disposed) {
+                setError(null);
+                setLoading(true);
+                setRetryCount((c) => c + 1);
+              }
+            }, 5000);
+          };
+
           void streamApi.status()
             .then((items) => {
               if (disposed) return;
               const item = items.find((x) => x.id === camera.id && x.output === output);
               setError(item?.error?.message || base);
+              scheduleRetry();
             })
-            .catch(() => setError(base));
+            .catch(() => {
+              if (disposed) return;
+              setError(base);
+              scheduleRetry();
+            });
         });
       } catch (err) {
         if (!disposed) {
           setLoading(false);
           setError(err instanceof Error ? err.message : tRef.current("streamFailedToLoad", { output }));
+          window.setTimeout(() => {
+            if (!disposed) {
+              setError(null);
+              setLoading(true);
+              setRetryCount((c) => c + 1);
+            }
+          }, 5000);
         }
       }
     }
@@ -277,7 +310,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
       video.removeAttribute("src");
       video.load();
     };
-  }, [camera.id, camera.enabled, output, src]);
+  }, [camera.id, camera.enabled, output, src, retryCount]);
 
   if (!camera.enabled) {
     return (

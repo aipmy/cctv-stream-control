@@ -1,7 +1,7 @@
 export type Role = "admin" | "teknisi" | "guest" | "internal" | "external";
 export type StreamType = "HLS Stable" | "HLS Low Latency" | "MJPEG";
 export type RtspTransport = "tcp" | "udp" | "auto";
-export type HlsMode = "copy" | "transcode";
+export type HlsMode = "smart" | "copy" | "transcode";
 export type Brand = "Universal" | "Bardi" | "EZVIZ" | "Hikvision";
 export type SourceType = "RTSP" | "RTSP+ONVIF" | "MJPEG" | "HLS";
 export type CameraStatus = "online" | "offline" | "starting";
@@ -69,6 +69,16 @@ export interface Camera {
     manufacturer: string;
     model: string;
     firmware: string;
+  };
+  metadata?: {
+    hasAudio?: boolean;
+    videoCodec?: string;
+    audioCodec?: string;
+    width?: number;
+    height?: number;
+    fps?: number;
+    profileVersion?: number;
+    [key: string]: any;
   };
 }
 

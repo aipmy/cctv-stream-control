@@ -76,7 +76,7 @@ export function normalizeCamera(input, existing = {}) {
     rtspTransport: ["tcp", "udp", "auto"].includes(String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase())
       ? String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase()
       : "tcp",
-    hlsMode: String(input.hlsMode ?? existing.hlsMode ?? "copy").toLowerCase() === "transcode" ? "transcode" : "copy",
+    hlsMode: ["smart", "copy", "transcode"].includes(String(input.hlsMode ?? existing.hlsMode ?? "smart").toLowerCase()) ? String(input.hlsMode ?? existing.hlsMode ?? "smart").toLowerCase() : "smart",
     rtspPort: Number(input.rtspPort ?? existing.rtspPort ?? DEFAULT_PORTS[sourceType]?.primary ?? 554),
     onvifPort: Number(input.onvifPort ?? existing.onvifPort ?? 80),
     httpPort: Number(input.httpPort ?? existing.httpPort ?? (sourceType === "HLS" ? 443 : 80)),
@@ -198,6 +198,7 @@ export function normalizeCamera(input, existing = {}) {
       : existing.aiSensitivity !== undefined
         ? Number(existing.aiSensitivity)
         : 50,
+    metadata: input.metadata !== undefined ? input.metadata : (existing.metadata !== undefined ? existing.metadata : null),
   };
   if (!camera.enabled) camera.status = "offline";
   camera.rtspUrl = buildSourceUrl(camera);

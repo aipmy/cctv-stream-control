@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { URL } from "node:url";
 import { config } from "../core/config.js";
 import { buildSourceUrl } from "../core/cctv.js";
-import { getCamera, markCameraStatus, logCameraError } from "../services/cameraService.js";
+import { getCamera, markCameraStatus, logCameraError, updateCamera } from "../services/cameraService.js";
 import { recordTraffic } from "../core/traffic.js";
 import {
   buildHlsArgs,
@@ -17,6 +17,7 @@ import {
   normalizeRtspTransport,
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
+import { probeCameraStream } from "./ffprobeService.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration, getSettings } from "../services/recordingService.js";
 
 import { ObjectTracker } from "../core/objectTracker.js";
@@ -241,6 +242,13 @@ export function recordViewer(id, viewerId, output = "HLS Stable", details = {}) 
     if (now - v.lastSeen > VIEWER_TTL_MS) viewers.delete(k);
   }
   if (viewers.size === 0) streamViewers.delete(id);
+
+  // Keep stream alive: if a viewer is actively pinging, refresh lastRequestAt
+  // This prevents the 10-second idle-timeout watchdog from killing the stream
+  const session = hlsSessions.get(id);
+  if (session) {
+    session.lastRequestAt = now;
+  }
 }
 
 export function getActiveViewerList(id) {
@@ -318,6 +326,30 @@ export function isChildAlive(child) {
   return child && child.exitCode === null && child.signalCode === null;
 }
 
+const autoProbeLocks = new Map();
+async function triggerAutoProbe(id) {
+  const now = Date.now();
+  const lastProbe = autoProbeLocks.get(id) || 0;
+  // Limit auto-probe to once per minute per camera to avoid spam
+  if (now - lastProbe < 60000) return;
+  autoProbeLocks.set(id, now);
+  
+  try {
+    const camera = await getCamera(id, { revealSecret: true });
+    if (!camera || !camera.enabled) return;
+    
+    console.log(`[Watchdog] Triggering auto-probe for ${id} due to stream failure/freeze`);
+    const metadata = await probeCameraStream(camera);
+    const newVersion = (camera.metadata?.profileVersion || 0) + 1;
+    metadata.profileVersion = newVersion;
+    
+    await updateCamera(id, { metadata }, { revealSecret: true });
+    console.log(`[Watchdog] Auto-probe successful for ${id}. Profile updated to version ${newVersion}`);
+  } catch (err) {
+    console.error(`[Watchdog] Auto-probe failed for ${id}: ${err.message}`);
+  }
+}
+
 function scheduleHlsIdleCleanup() {
   const interval = Math.max(5000, Math.floor(config.streamIdleMs / 2));
   const timer = setInterval(() => {
@@ -330,12 +362,15 @@ function scheduleHlsIdleCleanup() {
         continue;
       }
       
-      // Watchdog: Detect frozen stream (no frames for 45s)
-      if (session.lastFrameAt && now - session.lastFrameAt > 45000) {
-        logLifecycle(session, `watchdog timeout: no frames received for 45s, stream appears stuck. Killing ffmpeg.`);
+      // Watchdog: Detect frozen stream (no frames for 90s)
+      // Increased from 45s because some cameras (especially via routed networks)
+      // need significant time to negotiate RTSP and start producing frames
+      if (session.lastFrameAt && now - session.lastFrameAt > 90000) {
+        logLifecycle(session, `watchdog timeout: no frames received for 90s, stream appears stuck. Killing ffmpeg.`);
         session.status = "error";
         session.rawError = "Stream frozen (Watchdog timeout: no frames received)";
         session.child.kill("SIGKILL");
+        triggerAutoProbe(id);
         continue;
       }
 
@@ -685,6 +720,17 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         }
         await markCameraStatus(id, { status: "offline" });
         await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
+        
+        // Auto-heal on crash
+        triggerAutoProbe(id);
+      }
+      // Also trigger audio fallback on code=0 premature exits (e.g. HEVC cameras with broken audio headers)
+      if (!wasRequestedStop && code === 0 && session.startedAt) {
+        const runDurationMs = Date.now() - new Date(session.startedAt).getTime();
+        if (runDurationMs < 60000 && camera.audioMode === "Auto" && !audioFailures.has(id)) {
+          audioFailures.add(id);
+          console.log(`[Audio Fallback] Stream ${id} exited cleanly after only ${Math.round(runDurationMs/1000)}s. Disabling audio for next attempt.`);
+        }
       }
     });
     child.on("error", async (err) => {

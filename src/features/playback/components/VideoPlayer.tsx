@@ -14,7 +14,7 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
   const effectiveState = location.state as { cameraId?: string; date?: string; eventSeek?: boolean; timestamp?: number } | null;
 
   const {
-    selectedCameraIds, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
+    selectedCameraIds, selectedDate, playbackWindowMinutes, playbackWindowCenterTs, setPlaybackWindowCenterTs,
     playbackInfoMap, loading, error, setError,
     isPlaying, setIsPlaying,
     isMuted, setIsMuted,
@@ -33,6 +33,7 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<any | null>(null);
   const initialSeekDone = useRef(false);
+  const pendingSeekTs = useRef<number | null>(null);
   const [isBuffering, setIsBuffering] = useState(false);
 
   // Synchronize URL query changes to reset seek ref
@@ -68,7 +69,10 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
         video.onloadedmetadata = () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+            if (pendingSeekTs.current !== null) {
+              seekToTimestamp(pendingSeekTs.current);
+              pendingSeekTs.current = null;
+            } else if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
               seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
@@ -120,7 +124,10 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+            if (pendingSeekTs.current !== null) {
+              seekToTimestamp(pendingSeekTs.current);
+              pendingSeekTs.current = null;
+            } else if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
               seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
@@ -180,12 +187,20 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
   // Handle manual jump triggers from context
   useEffect(() => {
     if (jumpToTimeTrigger !== null) {
-      seekToTimestamp(jumpToTimeTrigger);
+      pendingSeekTs.current = jumpToTimeTrigger;
+      
+      if (playbackWindowMinutes !== "none") {
+        setPlaybackWindowCenterTs(jumpToTimeTrigger);
+      } else {
+        seekToTimestamp(jumpToTimeTrigger);
+        pendingSeekTs.current = null;
+      }
+      
       setTimelineCenterTs(jumpToTimeTrigger);
       setJumpToTimeTrigger(null); // consume trigger
       setTimeout(() => setActivePosterUrl(null), 500); // clear poster overlay
     }
-  }, [jumpToTimeTrigger]);
+  }, [jumpToTimeTrigger, playbackWindowMinutes]);
 
   const seekToTimestamp = (targetTs: number) => {
     const video = videoRef.current;
@@ -336,6 +351,12 @@ export function VideoPlayer({ cameraId }: { cameraId: string }) {
                 }}
                 onPlay={() => setIsPlaying(true)}
                 onClick={togglePlay}
+                onEnded={() => {
+                  if (playbackWindowMinutes !== "none" && playbackWindowCenterTs !== null) {
+                    const windowSeconds = parseInt(playbackWindowMinutes, 10) * 60;
+                    setPlaybackWindowCenterTs(playbackWindowCenterTs + windowSeconds);
+                  }
+                }}
               />
               {activePosterUrl && (
                 <div className="absolute inset-0 bg-slate-950 flex items-center justify-center z-10 pointer-events-none">

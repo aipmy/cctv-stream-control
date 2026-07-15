@@ -5,6 +5,7 @@ import { stopCameraStreams } from "../stream/streamManager.js";
 import { clearPtzCache, sendPtzCommand, testPtzConnection } from "../services/ptzService.js";
 import { requireRole, requirePermission } from "../middleware/authMiddleware.js";
 import { auditRequest, changedFields } from "../modules/audit/auditService.js";
+import { probeCameraStream } from "../stream/ffprobeService.js";
 
 export const cameraRoutes = Router();
 
@@ -54,6 +55,13 @@ cameraRoutes.post("/", requirePermission("canAddCamera"), async (req, res, next)
       details: { site: camera.site, sourceType: camera.sourceType },
     });
     res.status(201).json(camera);
+
+    // Auto-probe in background to populate Smart Profile
+    probeCameraStream(camera).then((metadata) => {
+      metadata.profileVersion = 1;
+      updateCamera(camera.id, { metadata }, { revealSecret: true }).catch(() => {});
+    }).catch(() => {});
+
   } catch (err) {
     await auditRequest(req, {
       action: "camera.create",
@@ -113,12 +121,57 @@ cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, ne
       },
     });
     res.json(camera);
+
+    // Auto-probe in background if RTSP settings likely changed
+    if (needsRestart) {
+      probeCameraStream(camera).then((metadata) => {
+        metadata.profileVersion = (camera.metadata?.profileVersion || 0) + 1;
+        updateCamera(camera.id, { metadata }, { revealSecret: true }).catch(() => {});
+      }).catch(() => {});
+    }
+
   } catch (err) {
     await auditRequest(req, {
       action: "camera.update",
       outcome: "failure",
       target: { type: "camera", id: req.params.id },
       details: { error: err?.message || "Gagal memperbarui kamera" },
+    });
+    next(err);
+  }
+});
+
+cameraRoutes.post("/:id/sync-profile", requirePermission("canEditCamera"), async (req, res, next) => {
+  try {
+    const camera = await getCamera(req.params.id, { revealSecret: true });
+    if (!camera) return res.status(404).json({ error: "Camera not found" });
+
+    // Ensure ffprobeService is imported at the top, we'll do that next
+    const { probeCameraStream } = await import("../stream/ffprobeService.js");
+    
+    const metadata = await probeCameraStream(camera);
+    const newVersion = (camera.metadata?.profileVersion || 0) + 1;
+    metadata.profileVersion = newVersion;
+
+    const updatedCamera = await updateCamera(req.params.id, { metadata }, { revealSecret: true });
+    
+    // Stop the stream so the next request spins it up with the new profile
+    await stopCameraStreams(req.params.id);
+
+    await auditRequest(req, {
+      action: "camera.sync",
+      outcome: "success",
+      target: { type: "camera", id: camera.id, label: camera.name },
+      details: { metadata },
+    });
+
+    res.json(updatedCamera);
+  } catch (err) {
+    await auditRequest(req, {
+      action: "camera.sync",
+      outcome: "failure",
+      target: { type: "camera", id: req.params.id },
+      details: { error: err?.message || "Gagal melakukan probing" },
     });
     next(err);
   }

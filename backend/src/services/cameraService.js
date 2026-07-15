@@ -121,7 +121,7 @@ function httpProbe(urlString, timeoutMs = 1800) {
   });
 }
 
-function ffprobeCamera(camera, timeoutMs = 4000) {
+function ffprobeCamera(camera, timeoutMs = 15000) {
   return new Promise((resolve) => {
     const source = buildSourceUrl(camera);
     const transport = ["tcp", "udp", "auto"].includes(String(camera.rtspTransport || "tcp")) ? String(camera.rtspTransport || "tcp") : "tcp";

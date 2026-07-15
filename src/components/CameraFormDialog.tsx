@@ -42,7 +42,7 @@ const empty = {
   site: "",
   streamType: "HLS Stable" as StreamType,
   rtspTransport: "tcp" as RtspTransport,
-  hlsMode: "copy" as HlsMode,
+  hlsMode: "smart" as HlsMode,
   streamQuality: "Auto" as Camera["streamQuality"],
   audioMode: "Auto" as Camera["audioMode"],
   enablePTZ: false,
@@ -87,7 +87,7 @@ const PRESETS: Preset[] = [
     descKey: "preset0Desc",
     streamType: "HLS Low Latency",
     rtspTransport: "tcp",
-    hlsMode: "copy",
+    hlsMode: "smart",
     audioMode: "Disable",
   },
   {
@@ -111,7 +111,7 @@ const PRESETS: Preset[] = [
     descKey: "preset3Desc",
     streamType: "MJPEG",
     rtspTransport: "tcp",
-    hlsMode: "copy",
+    hlsMode: "smart",
     audioMode: "Disable",
   },
 ];
@@ -415,7 +415,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         streamType: camera.streamType,
         streamQuality: camera.streamQuality || "Auto",
         rtspTransport: camera.rtspTransport ?? "tcp",
-        hlsMode: camera.hlsMode ?? "copy",
+        hlsMode: camera.hlsMode ?? "smart",
         audioMode: camera.audioMode ?? "Auto",
         enablePTZ: camera.enablePTZ,
         enabled: camera.enabled ?? true,
@@ -426,7 +426,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
         motionArea: camera.motionArea || null,
         excludeAreas: Array.isArray(camera.excludeAreas) ? camera.excludeAreas : [],
         smartZones: [
-          ...(Array.isArray(camera.excludeAreas) ? camera.excludeAreas.map(z => ({ ...z, zoneType: "exclude" })) : []),
+          ...(Array.isArray(camera.excludeAreas) ? camera.excludeAreas.map(z => ({ ...z, zoneType: "exclude" as const })) : []),
           ...(Array.isArray(camera.smartZones) ? camera.smartZones.filter(z => z.zoneType !== "exclude") : [])
         ],
         detectionModes: Array.isArray(camera.detectionModes) ? camera.detectionModes : ["pixel", "human", "pet"],
@@ -986,8 +986,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               <Select value={form.hlsMode} onValueChange={(v) => setForm({ ...form, hlsMode: v as HlsMode })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="copy">Copy — ringan, sesuai command manual</SelectItem>
-                  <SelectItem value="transcode">Transcode — kompatibel, CPU lebih berat</SelectItem>
+                  <SelectItem value="smart">Smart Mode (Auto-detect Codec)</SelectItem>
+                  <SelectItem value="copy">Force Copy (H.264 Only)</SelectItem>
+                  <SelectItem value="transcode">Force Transcode</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground mt-1">{t("hlsModeHelp")}</p>

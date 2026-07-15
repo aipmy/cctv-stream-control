@@ -80,6 +80,7 @@ export const cameraApi = {
   create: (payload: CameraInput) => api<Camera>("/api/cameras", { method: "POST", json: payload }),
   update: (id: string, payload: Partial<CameraInput>) => api<Camera>(`/api/cameras/${encodeURIComponent(id)}`, { method: "PUT", json: payload }),
   remove: (id: string) => api<void>(`/api/cameras/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  syncProfile: (id: string) => api<Camera>(`/api/cameras/${encodeURIComponent(id)}/sync-profile`, { method: "POST" }),
   restart: (id: string, output?: Camera["streamType"]) => api<{ ok: boolean }>(`/api/cameras/${encodeURIComponent(id)}/restart`, { method: "POST", json: { output } }),
   ptz: (id: string, action: "up" | "down" | "left" | "right" | "home" | "zoomIn" | "zoomOut" | "stop") =>
     api<PtzResult>(`/api/cameras/${encodeURIComponent(id)}/ptz`, { method: "POST", json: { action } }),
