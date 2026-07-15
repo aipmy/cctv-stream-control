@@ -402,50 +402,40 @@ export async function runStorageCleanup() {
       return false;
     };
 
-    for (const hlsBaseDir of hlsBaseDirs) {
-      if (!fsSync.existsSync(hlsBaseDir)) continue;
-
-      const cameraDirs = await fs.readdir(hlsBaseDir);
-      for (const cameraId of cameraDirs) {
-        const camDir = path.join(hlsBaseDir, cameraId);
-        const subdirs = ["hls_stable", "hls_low_latency", "copy", "transcode"];
-        
-        let allDirsToScan = [];
-        try {
-          const innerDirs = await fs.readdir(camDir);
-          allDirsToScan = innerDirs.filter(d => subdirs.includes(d) || !d.includes("."));
-        } catch { continue; }
-
-        // Also scan camDir itself (record_hls segments are directly in camDir)
-        allDirsToScan.push(".");
-
-        for (const subdir of allDirsToScan) {
-          const dirPath = subdir === "." ? camDir : path.join(camDir, subdir);
-          if (!fsSync.existsSync(dirPath)) continue;
-
-          const files = await fs.readdir(dirPath);
-          for (const file of files) {
-            if (!file.endsWith(".ts")) continue;
-            const match = file.match(/seg_(\d+)\.ts/);
-            if (!match) continue;
-            let timestampSec = parseInt(match[1], 10);
-            let timestamp = timestampSec * 1000;
-            const filePath = path.join(dirPath, file);
-
+    const scanTsDir = async (dir, camDir, cameraId, fileInfos) => {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await scanTsDir(fullPath, camDir, cameraId, fileInfos);
+          } else if (entry.isFile() && entry.name.endsWith('.ts')) {
             try {
-              const stats = await fs.stat(filePath);
+              const stats = await fs.stat(fullPath);
 
               // Clean up 0-byte files immediately (result of ENOSPC writes)
               if (stats.size === 0) {
-                await fs.unlink(filePath).catch(() => {});
+                await fs.unlink(fullPath).catch(() => {});
                 zeroByteCleaned++;
                 continue;
               }
 
-              const isSequential = timestampSec < 1000000000;
-              if (isSequential) {
-                timestamp = stats.mtime.getTime();
-                timestampSec = Math.floor(timestamp / 1000);
+              // Extract sequence or timestamp
+              let timestamp = stats.mtime.getTime();
+              let timestampSec = Math.floor(timestamp / 1000);
+
+              const match = entry.name.match(/seg_(\d+)\.ts/);
+              let isSequential = true;
+              if (match) {
+                const seq = parseInt(match[1], 10);
+                if (seq >= 1000000000) {
+                  isSequential = false;
+                  timestampSec = seq;
+                  timestamp = seq * 1000;
+                }
+              } else {
+                // If it doesn't match seg_*.ts (e.g. %M_%S.ts), treat as mtime-based non-sequential
+                isSequential = false;
               }
 
               const camera = cameraMap.get(cameraId);
@@ -454,22 +444,39 @@ export async function runStorageCleanup() {
 
               // Delete segment if recording is disabled, or if event mode is active and segment is outside motion window
               if (!recordingEnabled || (isEventMode && !isSegmentActive(cameraId, timestampSec, isSequential))) {
-                await fs.unlink(filePath).catch(() => {});
+                await fs.unlink(fullPath).catch(() => {});
                 continue;
               }
 
-              if (stats.isFile()) {
-                fileInfos.push({
-                  type: "segment",
-                  name: file,
-                  path: filePath,
-                  size: stats.size,
-                  time: timestamp,
-                });
-              }
+              fileInfos.push({
+                type: "segment",
+                name: entry.name,
+                path: fullPath,
+                size: stats.size,
+                time: timestamp,
+              });
             } catch { /* ignore */ }
           }
         }
+
+        // Clean up empty directories (except for camera root directories)
+        if (dir !== camDir) {
+          const remaining = await fs.readdir(dir);
+          if (remaining.length === 0) {
+            await fs.rmdir(dir).catch(() => {});
+          }
+        }
+      } catch (err) {}
+    };
+
+    for (const hlsBaseDir of hlsBaseDirs) {
+      if (!fsSync.existsSync(hlsBaseDir)) continue;
+
+      const cameraDirs = await fs.readdir(hlsBaseDir);
+      for (const cameraId of cameraDirs) {
+        if (cameraId.startsWith('.')) continue;
+        const camDir = path.join(hlsBaseDir, cameraId);
+        await scanTsDir(camDir, camDir, cameraId, fileInfos);
       }
     }
 
