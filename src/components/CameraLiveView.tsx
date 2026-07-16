@@ -296,13 +296,14 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
               hls?.recoverMediaError();
               return;
             }
-            if (!disposed && output !== "MJPEG") {
-              void streamApi.fallback(camera.id).then(() => {
-                if (!disposed) {
-                  void queryClient.invalidateQueries({ queryKey: ["cameras"] });
-                }
-              });
-            }
+            // Disabled fallback to transcode mode per user request
+            // if (!disposed && output !== "MJPEG") {
+            //   void streamApi.fallback(camera.id).then(() => {
+            //     if (!disposed) {
+            //       void queryClient.invalidateQueries({ queryKey: ["cameras"] });
+            //     }
+            //   });
+            // }
           }
           setLoading(false);
           const base = playbackErrorMessage(tRef.current, data.details, data.type);
