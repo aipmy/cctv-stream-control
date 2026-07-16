@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type Hls from "hls.js";
-import { AlertTriangle, Loader2, PowerOff } from "lucide-react";
+import { AlertTriangle, Loader2, PowerOff, WifiOff } from "lucide-react";
 import type { Camera, StreamType } from "@/types";
 import { streamApi, streamUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -237,8 +237,9 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           backBufferLength: output === "HLS Low Latency" ? 5 : 30,
           liveSyncDurationCount: output === "HLS Low Latency" ? 1.5 : 3,
           liveMaxLatencyDurationCount: output === "HLS Low Latency" ? 3 : 6,
-          maxBufferLength: output === "HLS Low Latency" ? 4 : 60,
-          maxMaxBufferLength: output === "HLS Low Latency" ? 6 : 90,
+          // Limit buffering to avoid saturating HTTP/1.1 connection limits (6 max per domain)
+          maxBufferLength: output === "HLS Low Latency" ? 4 : 12,
+          maxMaxBufferLength: output === "HLS Low Latency" ? 6 : 24,
           maxBufferHole: 0.5,
           maxFragLookUpTolerance: 0.25,
           manifestLoadingMaxRetry: 12,
@@ -360,6 +361,18 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         <PowerOff className="h-6 w-6 mb-2 text-white/50" />
         <div className="text-xs font-medium">{t("cameraDisabled")}</div>
         <div className="text-[11px] text-white/45 mt-1">{t("cameraDisabledHelp")}</div>
+      </div>
+    );
+  }
+
+  if (camera.status === "offline") {
+    return (
+      <div className={cn("absolute inset-0 flex flex-col items-center justify-center bg-black text-white/75", className)}>
+        <WifiOff className="h-6 w-6 mb-2 text-white/50 opacity-50" />
+        <div className="text-xs font-medium">Kamera Offline</div>
+        <div className="text-[11px] text-white/45 mt-1 max-w-[200px] text-center">
+          Kamera tidak merespon. Periksa sumber daya dan jaringan kamera.
+        </div>
       </div>
     );
   }
