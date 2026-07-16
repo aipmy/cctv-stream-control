@@ -205,6 +205,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-map", "[vdetout]",
     "-an",
     "-vcodec", "mjpeg",
+    "-pix_fmt", "yuvj420p",
     "-q:v", String(options.mjpegQuality || 7),
     "-f", "image2pipe",
     "pipe:1"
