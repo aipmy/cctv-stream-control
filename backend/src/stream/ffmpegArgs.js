@@ -40,14 +40,14 @@ export function buildRtspInputArgs(camera, options = {}) {
     // Fast stream startup: reduce probe size to 2 seconds instead of 5 seconds
     "-analyzeduration", "2000000",
     "-probesize", "2000000",
+    "-timeout", "20000000",
   ];
 
   // Timeout for reading from the RTSP source
   const timeoutOption = normalizeRtspTimeoutOption(camera.rtspTimeoutOption, options);
   const timeoutUs = Number(camera.streamReadTimeoutUs || options.streamReadTimeoutUs || 0);
   if (timeoutOption !== "none" && timeoutUs > 0) {
-    const optionName = timeoutOption === "timeout" ? "stimeout" : timeoutOption;
-    args.push(`-${optionName}`, String(timeoutUs));
+    args.push(`-${timeoutOption}`, String(timeoutUs));
   }
 
   return args;
