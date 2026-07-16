@@ -202,7 +202,8 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           let stallTicks = 0;
           latencyInterval = window.setInterval(() => {
             if (disposed) return;
-            if (video.currentTime === lastCurrentTime && !video.paused && !video.ended) {
+            // Only detect stalls if we have actually started playing (currentTime > 0)
+            if (video.currentTime === lastCurrentTime && !video.paused && !video.ended && video.currentTime > 0) {
               stallTicks++;
               if (stallTicks >= 15) {
                 console.warn("[CameraLiveView] Native HLS stalled for 15s, forcing reconnect");
@@ -261,7 +262,8 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         latencyInterval = window.setInterval(() => {
           if (disposed || !hls || !video) return;
           
-          if (video.currentTime === lastCurrentTime && !video.paused && !video.ended) {
+          // Only detect stalls if we have actually started playing (currentTime > 0)
+          if (video.currentTime === lastCurrentTime && !video.paused && !video.ended && video.currentTime > 0) {
             stallTicks++;
             if (stallTicks >= 15) {
               console.warn("[CameraLiveView] hls.js stalled for 15s, forcing reconnect");
