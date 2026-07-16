@@ -417,7 +417,7 @@ async function precreateRecordDirs(baseDir) {
 }
 
 function streamDir(id, output = "HLS Stable") {
-  return path.join("/tmp", "cctv_hls", id, output.replace(/\W+/g, "_").toLowerCase());
+  return path.join(process.cwd(), "storage", "cctv_hls", id, output.replace(/\W+/g, "_").toLowerCase());
 }
 
 async function exists(filePath) {

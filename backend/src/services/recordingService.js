@@ -291,8 +291,8 @@ export async function runStorageCleanup() {
     const maxSizeBytes = settings.maxStorageGb * 1024 * 1024 * 1024;
     const now = Date.now();
 
-    // ── 0. Clean /tmp/cctv_hls stale live-view segments (older than 2 min) ──
-    const tmpHlsDir = "/tmp/cctv_hls";
+    // ── 0. Clean storage/cctv_hls stale live-view segments (older than 2 min) ──
+    const tmpHlsDir = path.join(process.cwd(), "storage", "cctv_hls");
     let tmpCleaned = 0;
     if (fsSync.existsSync(tmpHlsDir)) {
       try {
@@ -321,7 +321,7 @@ export async function runStorageCleanup() {
       } catch { /* ignore */ }
     }
     if (tmpCleaned > 0) {
-      console.log(`[Storage Cleanup] Cleaned ${tmpCleaned} stale /tmp/cctv_hls segments.`);
+      console.log(`[Storage Cleanup] Cleaned ${tmpCleaned} stale storage/cctv_hls segments.`);
     }
 
     const fileInfos = [];
