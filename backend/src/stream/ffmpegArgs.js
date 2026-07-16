@@ -140,7 +140,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const audioArgs = audioEnabled
     ? (camera.metadata && camera.metadata.audioCodec === "aac"
         ? ["-map", "0:a?", "-c:a", "copy"]
-        : ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2", "-async", "1"])
+        : ["-map", "0:a?", "-c:a", "aac", "-ar", "44100", "-b:a", "128k", "-ac", "2"])
     : ["-an"];
 
   // ========== Build the full command ==========
