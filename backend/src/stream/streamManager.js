@@ -442,11 +442,10 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     const existing = hlsSessions.get(id);
     if (existing) {
       if (isChildAlive(existing.child)) {
-        if (existing.output === output) {
-          existing.lastRequestAt = Date.now();
-          return existing;
-        }
-        await stopHls(id);
+        // Reuse the running stream even if the requested output format differs.
+        // This prevents different browser clients from causing a restart deadlock loop.
+        existing.lastRequestAt = Date.now();
+        return existing;
       } else {
         const closedAtMs = existing.closedAt ? new Date(existing.closedAt).getTime() : 0;
         if (existing.status === "error" && Date.now() - closedAtMs < 10000) {
