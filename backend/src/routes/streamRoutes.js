@@ -5,7 +5,7 @@ import os from "node:os";
 import { Router } from "express";
 import { config } from "../core/config.js";
 import { getCamera, markCameraStatus } from "../services/cameraService.js";
-import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter, getStreamHealthFor } from "../stream/streamManager.js";
+import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter, getStreamHealthFor, getActiveStreamOutputFor } from "../stream/streamManager.js";
 import { getCollectorMetrics } from "../stream/streamMetricsCollector.js";
 import { classifyStreamError } from "../stream/streamError.js";
 import { requirePermission } from "../middleware/authMiddleware.js";
@@ -793,7 +793,8 @@ streamRoutes.get("/:id/health", async (req, res, next) => {
 
 streamRoutes.get("/:id/:file(*)", async (req, res, next) => {
   try {
-    const output = await getCameraOutput(req.params.id);
+    const activeOutput = getActiveStreamOutputFor(req.params.id);
+    const output = activeOutput || await getCameraOutput(req.params.id);
     recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
     let filePath = getHlsFilePath(req.params.id, output, req.params.file);
     if (!filePath || !fs.existsSync(filePath)) {

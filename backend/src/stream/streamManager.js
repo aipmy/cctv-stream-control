@@ -1288,3 +1288,8 @@ export function getStreamHealthFor(id) {
   return session ? session.health : null;
 }
 
+export function getActiveStreamOutputFor(id) {
+  const session = hlsSessions.get(id);
+  return session ? session.output : null;
+}
+
