@@ -41,7 +41,7 @@ export function buildRtspInputArgs(camera, options = {}) {
     // Fast stream startup: reduce probe size to 2 seconds instead of 5 seconds
     "-analyzeduration", "2000000",
     "-probesize", "2000000",
-    "-stimeout", "20000000",
+    "-timeout", "20000000",
   ];
 
   // Timeout for reading from the RTSP source
