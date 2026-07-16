@@ -184,14 +184,16 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
                  setError(tRef.current("streamFailedToLoadInBrowser", { output, errMsg: errMsg || tRef.current("checkCodecOrTranscode") }));
               }
               
-              // Auto-reconnect after 5 seconds
-              window.setTimeout(() => {
-                if (!disposed) {
-                  setError(null);
-                  setLoading(true);
-                  setRetryCount((c) => c + 1);
-                }
-              }, 5000);
+              // Auto-reconnect after 5 seconds (max 3 times)
+              if (retryCount < 3) {
+                window.setTimeout(() => {
+                  if (!disposed) {
+                    setError(null);
+                    setLoading(true);
+                    setRetryCount((c) => c + 1);
+                  }
+                }, 5000);
+              }
             }
           };
           video.volume = Math.max(0, Math.min(1, volume));
@@ -306,6 +308,7 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           const base = playbackErrorMessage(tRef.current, data.details, data.type);
           
           const scheduleRetry = () => {
+            if (retryCount >= 3) return;
             window.setTimeout(() => {
               if (!disposed) {
                 setError(null);
@@ -332,13 +335,15 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
         if (!disposed) {
           setLoading(false);
           setError(err instanceof Error ? err.message : tRef.current("streamFailedToLoad", { output }));
-          window.setTimeout(() => {
-            if (!disposed) {
-              setError(null);
-              setLoading(true);
-              setRetryCount((c) => c + 1);
-            }
-          }, 5000);
+          if (retryCount < 3) {
+            window.setTimeout(() => {
+              if (!disposed) {
+                setError(null);
+                setLoading(true);
+                setRetryCount((c) => c + 1);
+              }
+            }, 5000);
+          }
         }
       }
     }
@@ -424,6 +429,18 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           <AlertTriangle className="h-6 w-6 text-warning mb-2" />
           <div className="text-xs font-medium">{t("streamFailed")}</div>
           <div className="text-[11px] text-white/65 mt-1 max-w-md">{error}</div>
+          {retryCount >= 3 && (
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                setRetryCount(0);
+              }}
+              className="mt-3 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-[11px] font-medium transition-colors"
+            >
+              Coba Lagi
+            </button>
+          )}
           {showErrorUrl && <div className="text-[10px] text-white/45 mt-2 font-mono break-all">{src}</div>}
         </div>
       )}
