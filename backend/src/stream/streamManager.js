@@ -729,12 +729,15 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       session.signalCode = signal;
       session.closedAt = nowIso();
       logLifecycle(session, `closed: code=${code} signal=${signal || "-"}`);
+      // Always sync DB status to "offline" when FFmpeg exits, regardless of reason.
+      // This prevents stale "starting"/"online" status lingering in the database
+      // which would desync the status badge across all connected clients.
+      await markCameraStatus(id, { status: "offline" });
       if (!wasRequestedStop && code !== 0 && signal !== "SIGTERM") {
         if (camera.audioMode === "Auto" && !audioFailures.has(id)) {
           audioFailures.add(id);
           session.rawError += "\n[Audio Fallback] FFmpeg crashed. Mematikan audio untuk percobaan berikutnya.";
         }
-        await markCameraStatus(id, { status: "offline" });
         await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
         
         // Auto-heal on crash
@@ -1067,7 +1070,10 @@ export function streamRuntimeStatusFor(id) {
   if (mjpeg && isChildAlive(mjpeg.child)) {
     return mjpeg.status === "running" ? "online" : "starting";
   }
-  return null;
+  // Return "offline" explicitly instead of null.
+  // This ensures enrichCameras always uses this authoritative runtime status
+  // and never falls through to a potentially stale camera.status from the DB.
+  return "offline";
 }
 
 function cameraTrafficRatesFor(id, fallbackPullKbps = 0, fallbackOutKbps = 0) {
