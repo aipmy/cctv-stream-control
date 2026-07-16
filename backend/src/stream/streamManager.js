@@ -400,6 +400,21 @@ scheduleHlsIdleCleanup();
 function normalizeOutput(output = "HLS Stable") {
   return output === "HLS Low Latency" || output === "ll" ? "HLS Low Latency" : "HLS Stable";
 }
+async function precreateRecordDirs(baseDir) {
+  const now = new Date();
+  // Pre-create for today and tomorrow to handle midnight rollovers safely
+  for (let offset = 0; offset < 2; offset++) {
+    const d = new Date(now.getTime() + offset * 86400000);
+    const year = d.getFullYear().toString();
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
+    for (let hour = 0; hour < 24; hour++) {
+      const hStr = hour.toString().padStart(2, "0");
+      const target = path.join(baseDir, year, month, day, hStr);
+      await fs.mkdir(target, { recursive: true }).catch(() => {});
+    }
+  }
+}
 
 function streamDir(id, output = "HLS Stable") {
   return path.join("/tmp", "cctv_hls", id, output.replace(/\W+/g, "_").toLowerCase());
@@ -471,8 +486,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
       if (needsSeparateRecordOutput) {
         recordDir = path.join(config.storageDir, "record_hls", id);
-        await fs.mkdir(recordDir, { recursive: true });
-        await fs.unlink(path.join(recordDir, "index.m3u8")).catch(() => {});
+        await fs.mkdir(recordDir, { recursive: true }).catch(() => {});
+        await precreateRecordDirs(recordDir);
+        await fs.unlink(path.join(recordDir, "live.m3u8")).catch(() => {});
       } else {
         const oldRecordDir = path.join(config.storageDir, "record_hls", id);
         await fs.rm(oldRecordDir, { recursive: true, force: true }).catch(() => {});
