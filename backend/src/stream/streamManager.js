@@ -19,9 +19,16 @@ import {
 import { classifyStreamError } from "./streamError.js";
 import { probeCameraStream } from "./ffprobeService.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration, getSettings } from "../services/recordingService.js";
+import pidusage from "pidusage";
+import { getOrCreateCollector, removeCollector, getCollectorMetrics } from "./streamMetricsCollector.js";
+import { calculateHealthScore } from "./healthScoreEngine.js";
+import { logMetricsToHistory } from "../services/streamMetricsHistoryService.js";
 
 import { ObjectTracker } from "../core/objectTracker.js";
 import { CameraMotionEngine, motionEmitter, isIgnoredPoint } from "../core/motionEngine.js";
+
+const restartHistory = new Map(); // cameraId -> array of timestamps
+
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
@@ -485,7 +492,14 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
     const hasSmartFeatures = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
 
+    const spawnTime = Date.now();
+    const restarts = restartHistory.get(id) || [];
+    restarts.push(spawnTime);
+    restartHistory.set(id, restarts.filter(t => spawnTime - t < 600000));
+
     const child = spawn(config.ffmpegBin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const collector = getOrCreateCollector(id, dir);
+
     const session = {
       id,
       key: id,
@@ -498,6 +512,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       child,
       pid: child.pid,
       startedAt: nowIso(),
+      spawnTime,
       status: "starting",
       rawError: "",
       lastRequestAt: Date.now(),
@@ -697,12 +712,14 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
     child.stderr.on("data", (chunk) => {
       writeFfmpegLog(session, chunk);
+      collector.parseStderr(chunk);
     });
     child.on("spawn", () => {
       session.status = "starting";
       session.pid = child.pid;
     });
     child.on("close", async (code, signal) => {
+      removeCollector(id);
       const wasRequestedStop = session.status === "stopped" || session.status === "idle-timeout";
       if (!wasRequestedStop) {
         session.status = signal === "SIGTERM" ? "stopped" : code === 0 ? "ended" : "error";
@@ -788,10 +805,12 @@ export async function stopHls(id, _output) {
 
 export async function waitForPlaylist(session) {
   const started = Date.now();
+  session.spawnTime = session.spawnTime || started;
   while (Date.now() - started < config.hlsStartTimeoutMs) {
     // eslint-disable-next-line no-await-in-loop
     if (await playlistReady(session.playlist)) {
       session.status = "running";
+      session.lastRecoveryMs = Date.now() - session.spawnTime;
       await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
       return true;
     }
@@ -802,6 +821,7 @@ export async function waitForPlaylist(session) {
   const ok = await exists(session.playlist);
   if (ok) {
     session.status = "running";
+    session.lastRecoveryMs = Date.now() - session.spawnTime;
     await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
   }
   return ok;
@@ -1149,3 +1169,123 @@ export async function stopAllStreams() {
   await stopHls();
   mjpegSessions.clear();
 }
+
+// ============================================================================
+// METRICS EVALUATOR & SELF-OPTIMIZATION ENGINE
+// ============================================================================
+const degradedDuration = new Map();
+
+async function handleSelfOptimization(id) {
+  try {
+    const camera = await getCamera(id, { revealSecret: true });
+    if (!camera) return;
+    
+    let changed = false;
+    const updates = {};
+    
+    if (camera.streamQuality === "Auto" || camera.streamQuality === "1080p") {
+      updates.streamQuality = "720p";
+      changed = true;
+      console.log(`[Self-Optimization][${id}] Lowering streamQuality from ${camera.streamQuality || "Auto"} to 720p.`);
+    } else if (camera.streamQuality === "720p") {
+      updates.streamQuality = "480p";
+      changed = true;
+      console.log(`[Self-Optimization][${id}] Lowering streamQuality from 720p to 480p.`);
+    }
+    
+    if (changed) {
+      await updateCamera(id, updates, { revealSecret: true });
+      const session = hlsSessions.get(id);
+      if (session && isChildAlive(session.child)) {
+        session.child.kill("SIGTERM");
+      }
+    }
+  } catch (err) {
+    console.error(`[Self-Optimization][${id}] Failed to optimize stream:`, err);
+  }
+}
+
+function scheduleMetricsEvaluator() {
+  const timer = setInterval(async () => {
+    const now = Date.now();
+    for (const [id, session] of hlsSessions.entries()) {
+      const alive = isChildAlive(session.child);
+      if (!alive) continue;
+
+      if (session.pid) {
+        try {
+          const stats = await pidusage(session.pid);
+          session.cpu = Math.round(stats.cpu);
+          session.memory = Math.round(stats.memory / 1024 / 1024);
+        } catch {
+          session.cpu = session.cpu || 0;
+          session.memory = session.memory || 0;
+        }
+      }
+
+      const metrics = getCollectorMetrics(id);
+      if (metrics) {
+        const restarts = restartHistory.get(id) || [];
+        const cleanRestarts = restarts.filter(t => now - t < 600000);
+        restartHistory.set(id, cleanRestarts);
+
+        const recoveryInfo = {
+          restartCount: cleanRestarts.length,
+          lastRecoveryMs: session.lastRecoveryMs || 0
+        };
+
+        const health = calculateHealthScore(metrics, recoveryInfo);
+        session.health = {
+          score: health.score,
+          status: health.status,
+          reasons: health.reasons,
+          cpu: session.cpu || 0,
+          memory: session.memory || 0,
+          recovery: recoveryInfo
+        };
+
+        const lastLogHour = session.lastLogHour || 0;
+        const currentHour = new Date().getHours();
+        if (currentHour !== lastLogHour) {
+          session.lastLogHour = currentHour;
+          logMetricsToHistory({
+            cameraId: id,
+            score: health.score,
+            status: health.status,
+            restarts: recoveryInfo.restartCount,
+            cpu: session.cpu || 0,
+            memory: session.memory || 0,
+            speed: metrics.speed,
+            fps: metrics.outputFps,
+            droppedFrames: metrics.droppedFrames,
+            segmentDelay: metrics.segmentDelay
+          });
+        }
+
+        if (metrics.speed < 0.9) {
+          if (!degradedDuration.has(id)) {
+            degradedDuration.set(id, now);
+          } else {
+            const durationSec = (now - degradedDuration.get(id)) / 1000;
+            if (durationSec >= 30) {
+              degradedDuration.delete(id);
+              console.log(`[Self-Optimization][${id}] Stream health degraded (speed < 0.9 for 30s). Triggering auto-mitigation.`);
+              void handleSelfOptimization(id);
+            }
+          }
+        } else {
+          degradedDuration.delete(id);
+        }
+      }
+    }
+  }, 5000);
+  timer.unref?.();
+}
+
+scheduleMetricsEvaluator();
+
+export function getStreamHealthFor(id) {
+  const session = hlsSessions.get(id);
+  return session ? session.health : null;
+}
+

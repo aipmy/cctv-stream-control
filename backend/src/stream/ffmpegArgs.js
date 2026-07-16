@@ -57,7 +57,7 @@ function isAudioEnabled(camera, audioFallback) {
 export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, audioFallback = false }) {
   const source = buildSourceUrl(camera);
   const lowLatency = output === "HLS Low Latency";
-  const hlsTime = lowLatency ? "1" : "2";
+  const hlsTime = lowLatency ? "1" : "4";
   const isSubStream = camera.sourcePath && (camera.sourcePath.includes("102") || camera.sourcePath.includes("sub"));
 
   // Video settings - optimized bitrates to prevent network congestion & freezing
@@ -110,17 +110,19 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   // HLS flags - live stream should always delete old segments to save disk space and stay fresh
   const streamFlags = ["omit_endlist", "independent_segments", "temp_file", "delete_segments"];
 
+  const keyframeInterval = lowLatency ? 1 : 2;
+  const gopValue = String(Number(fps) * keyframeInterval);
+
   // Encoder args (always libx264)
   const encoderArgs = [
     "-c:v", "libx264",
     "-preset", lowLatency ? "ultrafast" : "veryfast",
-    "-tune", "zerolatency",
-    "-profile:v", "baseline",
+    "-profile:v", "main",
     "-pix_fmt", "yuv420p",
-    "-g", gop,
-    "-keyint_min", gop,
+    "-g", gopValue,
+    "-keyint_min", gopValue,
     "-sc_threshold", "0",
-    "-force_key_frames", `expr:gte(t,n_forced*${hlsTime})`,
+    "-force_key_frames", `expr:gte(t,n_forced*${keyframeInterval})`,
     "-b:v", bitrate,
     "-maxrate", maxrate,
     "-bufsize", bufsize,
@@ -141,7 +143,6 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-hide_banner", "-nostdin",
     // Input options for maximum stability
     "-fflags", "+genpts+discardcorrupt",
-    "-flags", "low_delay",
     "-loglevel", options.ffmpegLogLevel || "warning",
     "-err_detect", "ignore_err",
     ...buildRtspInputArgs(camera, options),
@@ -166,7 +167,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   args.push(
     "-f", "hls",
     "-hls_time", hlsTime,
-    "-hls_list_size", lowLatency ? "6" : "8",
+    "-hls_list_size", lowLatency ? "6" : "5",
     "-hls_delete_threshold", "1",
     "-hls_flags", streamFlags.join("+"),
     "-hls_allow_cache", "0",

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { listCameras } from "../services/cameraService.js";
-import { streamMetricsFor, streamRuntimeStatusFor } from "../stream/streamManager.js";
+import { streamMetricsFor, streamRuntimeStatusFor, getStreamHealthFor } from "../stream/streamManager.js";
 import { getLatestTraffic, getTrafficHistory } from "../modules/stats/trafficHistoryService.js";
+import { getMetricsHistory } from "../services/streamMetricsHistoryService.js";
 
 export const statRoutes = Router();
 
@@ -19,6 +20,7 @@ function enrichCameras(cameras) {
       pullBytesPerSec: m.pullBytesPerSec || 0,
       latencyMs: m.latencyMs,
       activeViewers: m.activeViewers || [],
+      health: getStreamHealthFor(camera.id)
     };
   });
 }
@@ -65,4 +67,12 @@ statRoutes.get("/traffic", async (_req, res, next) => {
 
 statRoutes.get("/traffic/history", async (req, res, next) => {
   try { res.json(getTrafficHistory(req.query.range)); } catch (err) { next(err); }
+});
+
+statRoutes.get("/health-history", async (req, res, next) => {
+  try {
+    res.json(getMetricsHistory());
+  } catch (err) {
+    next(err);
+  }
 });

@@ -5,7 +5,8 @@ import os from "node:os";
 import { Router } from "express";
 import { config } from "../core/config.js";
 import { getCamera, markCameraStatus } from "../services/cameraService.js";
-import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter } from "../stream/streamManager.js";
+import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter, getStreamHealthFor } from "../stream/streamManager.js";
+import { getCollectorMetrics } from "../stream/streamMetricsCollector.js";
 import { classifyStreamError } from "../stream/streamError.js";
 import { requirePermission } from "../middleware/authMiddleware.js";
 
@@ -729,6 +730,61 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
       // Clean up temp files after transfer completed/aborted
       await fs.promises.unlink(concatTxtPath).catch(() => {});
       await fs.promises.unlink(tempMp4Path).catch(() => {});
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+streamRoutes.get("/:id/health", async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const health = getStreamHealthFor(id);
+    const metrics = getCollectorMetrics(id) || {
+      inputFps: 0,
+      outputFps: 0,
+      speed: 1.0,
+      bitrate: 0,
+      droppedFrames: 0,
+      dtsDiscontinuities: 0,
+      segmentDuration: 4.0,
+      playlistAge: 0,
+      segmentDelay: 0
+    };
+    
+    if (!health) {
+      return res.json({
+        cameraId: id,
+        status: "critical",
+        stream: { inputFps: 0, outputFps: 0, speed: 1.0, bitrate: 0, videoCodec: "H264", audioCodec: "AAC" },
+        hls: { segmentDuration: 4.0, playlistAge: 999, segmentDelay: 0 },
+        encoder: { cpu: 0, memory: 0 },
+        recovery: { restartCount: 0, lastRecoveryMs: 0 }
+      });
+    }
+
+    const camera = await getCamera(id);
+    res.json({
+      cameraId: id,
+      status: health.status,
+      stream: {
+        inputFps: metrics.inputFps,
+        outputFps: metrics.outputFps,
+        speed: metrics.speed,
+        bitrate: metrics.bitrate,
+        videoCodec: camera?.metadata?.videoCodec || "H264",
+        audioCodec: camera?.metadata?.audioCodec || "AAC"
+      },
+      hls: {
+        segmentDuration: metrics.segmentDuration,
+        playlistAge: metrics.playlistAge,
+        segmentDelay: metrics.segmentDelay
+      },
+      encoder: {
+        cpu: health.cpu,
+        memory: health.memory
+      },
+      recovery: health.recovery
     });
   } catch (err) {
     next(err);
