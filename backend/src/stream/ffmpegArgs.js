@@ -64,10 +64,42 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const fps = lowLatency ? "15" : "15";
   const gop = String(Number(fps) * Number(hlsTime));
   
-  // Reduce bitrates (1080p main stream uses 1500k instead of 4000k)
-  const bitrate = isSubStream ? "600k" : "1500k";
-  const maxrate = isSubStream ? "800k" : "2000k";
-  const bufsize = isSubStream ? "1200k" : "3000k";
+  // 1. Bitrate & Quality calculation
+  let bitrate = isSubStream ? "600k" : "3000k"; // Default main stream to 3000k for high quality
+  let maxrate = isSubStream ? "800k" : "4000k";
+  let bufsize = isSubStream ? "1200k" : "6000k";
+
+  if (camera.streamQuality && camera.streamQuality !== "Auto") {
+    const qualityBitrates = {
+      "1080p": { b: "4000k", max: "5000k", buf: "8000k" },
+      "720p": { b: "2500k", max: "3500k", buf: "5000k" },
+      "480p": { b: "1200k", max: "1600k", buf: "2400k" },
+      "360p": { b: "800k", max: "1200k", buf: "1800k" },
+      "144p": { b: "250k", max: "350k", buf: "500k" }
+    };
+    const override = qualityBitrates[camera.streamQuality];
+    if (override) {
+      bitrate = override.b;
+      maxrate = override.max;
+      bufsize = override.buf;
+    }
+  }
+
+  // 2. Set HLS output scale filter if a specific quality is chosen
+  let streamFilter = `fps=${fps}`;
+  if (camera.streamQuality && camera.streamQuality !== "Auto") {
+    const qualityWidths = {
+      "1080p": 1920,
+      "720p": 1280,
+      "480p": 854,
+      "360p": 640,
+      "144p": 256
+    };
+    const width = qualityWidths[camera.streamQuality];
+    if (width) {
+      streamFilter += `,scale=${width}:-2`;
+    }
+  }
 
   // Detection settings
   const detectFps = (camera.detectFps !== undefined && camera.detectFps > 0) ? camera.detectFps : (options.mjpegFps || 8);
@@ -118,13 +150,11 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
 
   // Filter complex — always transcode with split
   if (recordDir) {
-    const streamFilter = `fps=${fps}`;
     const recordFilter = `fps=${fps}`;
     args.push("-filter_complex",
       `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamFilter}[vhlsout];[vrec]${recordFilter}[vrecout];[vdet]${detectFilter}[vdetout]`
     );
   } else {
-    const streamFilter = `fps=${fps}`;
     args.push("-filter_complex",
       `[0:v:0]split=2[vhls][vdet];[vhls]${streamFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`
     );
