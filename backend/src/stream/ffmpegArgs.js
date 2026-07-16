@@ -30,19 +30,24 @@ export function normalizeRtspTimeoutOption(value, options = {}) {
 export function buildRtspInputArgs(camera, options = {}) {
   if (camera.sourceType !== "RTSP" && camera.sourceType !== "RTSP+ONVIF") return [];
 
+  const transport = (camera.rtspTransport && camera.rtspTransport !== "auto")
+    ? camera.rtspTransport.toLowerCase()
+    : "tcp";
+
   const args = [
-    "-rtsp_transport", "tcp",
+    "-rtsp_transport", transport,
     "-use_wallclock_as_timestamps", "1",
-    // Give slow cameras more time to respond before giving up
-    "-analyzeduration", "5000000",
-    "-probesize", "5000000",
+    // Fast stream startup: reduce probe size to 2 seconds instead of 5 seconds
+    "-analyzeduration", "2000000",
+    "-probesize", "2000000",
   ];
 
   // Timeout for reading from the RTSP source
   const timeoutOption = normalizeRtspTimeoutOption(camera.rtspTimeoutOption, options);
   const timeoutUs = Number(camera.streamReadTimeoutUs || options.streamReadTimeoutUs || 0);
   if (timeoutOption !== "none" && timeoutUs > 0) {
-    args.push(`-${timeoutOption}`, String(timeoutUs));
+    const optionName = timeoutOption === "timeout" ? "stimeout" : timeoutOption;
+    args.push(`-${optionName}`, String(timeoutUs));
   }
 
   return args;
