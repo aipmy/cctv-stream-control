@@ -36,6 +36,7 @@ export function buildRtspInputArgs(camera, options = {}) {
 
   const args = [
     "-rtsp_transport", transport,
+    "-use_wallclock_as_timestamps", "1",
     // Fast stream startup: reduce probe size to 2 seconds instead of 5 seconds
     "-analyzeduration", "2000000",
     "-probesize", "2000000",
