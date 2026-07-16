@@ -14,10 +14,9 @@ export function normalizeRtspTransport() {
   return "tcp";
 }
 
-export function normalizeHlsMode() {
-  // Always transcode — fixes timestamp issues, codec incompatibility,
-  // and produces clean H264+AAC output universally
-  return "transcode";
+export function normalizeHlsMode(mode, options = {}) {
+  const normalized = String(mode || options.hlsMode || "transcode").toLowerCase();
+  return normalized === "copy" ? "copy" : "transcode";
 }
 
 export function normalizeRtspTimeoutOption(value, options = {}) {
@@ -154,62 +153,112 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-i", source,
   ];
 
-  // Filter complex — always transcode with split
-  if (recordDir) {
-    const recordFilter = `fps=${fps}`;
-    args.push("-filter_complex",
-      `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamFilter}[vhlsout];[vrec]${recordFilter}[vrecout];[vdet]${detectFilter}[vdetout]`
-    );
-  } else {
-    args.push("-filter_complex",
-      `[0:v:0]split=2[vhls][vdet];[vhls]${streamFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`
-    );
-  }
+  const isCopy = normalizeHlsMode(camera.hlsMode, options) === "copy";
 
-  // 1. Live Stream Output (always transcode to H264)
-  args.push("-map", "[vhlsout]", ...encoderArgs);
-  args.push(...audioArgs);
-  args.push(
-    "-f", "hls",
-    "-hls_time", hlsTime,
-    "-hls_list_size", lowLatency ? "6" : "5",
-    "-hls_delete_threshold", "1",
-    "-hls_flags", streamFlags.join("+"),
-    "-hls_allow_cache", "0",
-    "-hls_segment_type", "mpegts",
-    "-max_interleave_delta", "0",
-    "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
-    path.join(dir, "index.m3u8")
-  );
-
-  // 2. Record HLS Output (also transcode to H264 for consistency)
-  if (recordDir) {
-    args.push("-map", "[vrecout]", ...encoderArgs);
+  if (isCopy) {
+    // 1. Live Stream Output
+    args.push("-map", "0:v:0", "-c:v", "copy");
     args.push(...audioArgs);
     args.push(
       "-f", "hls",
-      "-hls_time", "60",
+      "-hls_time", hlsTime,
+      "-hls_list_size", lowLatency ? "6" : "5",
+      "-hls_delete_threshold", "1",
+      "-hls_flags", streamFlags.join("+"),
+      "-hls_allow_cache", "0",
       "-hls_segment_type", "mpegts",
-      "-hls_flags", "split_by_time+append_list",
-      "-hls_list_size", "5",
       "-max_interleave_delta", "0",
-      "-strftime", "1",
-      "-strftime_mkdir", "1",
-      "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M_%S.ts"),
-      path.join(recordDir, "live.m3u8")
+      "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
+      path.join(dir, "index.m3u8")
+    );
+
+    // 2. Record Output
+    if (recordDir) {
+      args.push("-map", "0:v:0", "-c:v", "copy");
+      args.push(...audioArgs);
+      args.push(
+        "-f", "hls",
+        "-hls_time", "60",
+        "-hls_segment_type", "mpegts",
+        "-hls_flags", "split_by_time+append_list",
+        "-hls_list_size", "5",
+        "-max_interleave_delta", "0",
+        "-strftime", "1",
+        "-strftime_mkdir", "1",
+        "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M_%S.ts"),
+        path.join(recordDir, "live.m3u8")
+      );
+    }
+
+    // 3. Motion Detection Output
+    args.push(
+      "-map", "0:v:0",
+      "-an",
+      "-vcodec", "mjpeg",
+      "-pix_fmt", "yuvj420p",
+      "-q:v", String(options.mjpegQuality || 7),
+      "-vf", detectFilter,
+      "-f", "image2pipe",
+      "pipe:1"
+    );
+  } else {
+    // Filter complex — always transcode with split
+    if (recordDir) {
+      const recordFilter = `fps=${fps}`;
+      args.push("-filter_complex",
+        `[0:v:0]split=3[vhls][vrec][vdet];[vhls]${streamFilter}[vhlsout];[vrec]${recordFilter}[vrecout];[vdet]${detectFilter}[vdetout]`
+      );
+    } else {
+      args.push("-filter_complex",
+        `[0:v:0]split=2[vhls][vdet];[vhls]${streamFilter}[vhlsout];[vdet]${detectFilter}[vdetout]`
+      );
+    }
+
+    // 1. Live Stream Output (always transcode to H264)
+    args.push("-map", "[vhlsout]", ...encoderArgs);
+    args.push(...audioArgs);
+    args.push(
+      "-f", "hls",
+      "-hls_time", hlsTime,
+      "-hls_list_size", lowLatency ? "6" : "5",
+      "-hls_delete_threshold", "1",
+      "-hls_flags", streamFlags.join("+"),
+      "-hls_allow_cache", "0",
+      "-hls_segment_type", "mpegts",
+      "-max_interleave_delta", "0",
+      "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
+      path.join(dir, "index.m3u8")
+    );
+
+    // 2. Record HLS Output (also transcode to H264 for consistency)
+    if (recordDir) {
+      args.push("-map", "[vrecout]", ...encoderArgs);
+      args.push(...audioArgs);
+      args.push(
+        "-f", "hls",
+        "-hls_time", "60",
+        "-hls_segment_type", "mpegts",
+        "-hls_flags", "split_by_time+append_list",
+        "-hls_list_size", "5",
+        "-max_interleave_delta", "0",
+        "-strftime", "1",
+        "-strftime_mkdir", "1",
+        "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M_%S.ts"),
+        path.join(recordDir, "live.m3u8")
+      );
+    }
+
+    // 3. Motion Detection Output (MJPEG pipe)
+    args.push(
+      "-map", "[vdetout]",
+      "-an",
+      "-vcodec", "mjpeg",
+      "-pix_fmt", "yuvj420p",
+      "-q:v", String(options.mjpegQuality || 7),
+      "-f", "image2pipe",
+      "pipe:1"
     );
   }
-
-  // 3. Motion Detection Output (MJPEG pipe)
-  args.push(
-    "-map", "[vdetout]",
-    "-an",
-    "-vcodec", "mjpeg",
-    "-pix_fmt", "yuvj420p",
-    "-q:v", String(options.mjpegQuality || 7),
-    "-f", "image2pipe",
-    "pipe:1"
-  );
 
   return args;
 }
