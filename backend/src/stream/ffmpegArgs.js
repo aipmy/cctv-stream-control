@@ -172,6 +172,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
     "-hls_flags", streamFlags.join("+"),
     "-hls_allow_cache", "0",
     "-hls_segment_type", "mpegts",
+    "-max_interleave_delta", "0",
     "-hls_segment_filename", path.join(dir, "seg_%06d.ts"),
     path.join(dir, "index.m3u8")
   );
@@ -186,6 +187,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
       "-hls_segment_type", "mpegts",
       "-hls_flags", "split_by_time+append_list",
       "-hls_list_size", "5",
+      "-max_interleave_delta", "0",
       "-strftime", "1",
       "-strftime_mkdir", "1",
       "-hls_segment_filename", path.join(recordDir, "%Y/%m/%d/%H/%M_%S.ts"),
