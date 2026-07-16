@@ -147,7 +147,7 @@ export function buildHlsArgs({ camera, output, dir, recordDir, options = {}, aud
   const args = [
     "-hide_banner", "-nostdin",
     // Input options for maximum stability
-    "-fflags", "+genpts+discardcorrupt",
+    "-fflags", "+genpts",
     "-loglevel", options.ffmpegLogLevel || "warning",
     "-err_detect", "ignore_err",
     ...buildRtspInputArgs(camera, options),
