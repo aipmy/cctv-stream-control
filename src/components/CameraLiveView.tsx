@@ -68,6 +68,15 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
     setLatency(null);
   }, [camera.id, camera.enabled, output]);
 
+  // Auto-reconnect when backend stream restarts (status changes from starting to online)
+  const prevStatusRef = useRef(camera.status);
+  useEffect(() => {
+    if (prevStatusRef.current === "starting" && camera.status === "online") {
+      setRetryCount((c) => c + 1);
+    }
+    prevStatusRef.current = camera.status;
+  }, [camera.status]);
+
   useEffect(() => {
     if (!camera.enabled || output !== "MJPEG") return;
     let disposed = false;
@@ -188,9 +197,24 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           video.volume = Math.max(0, Math.min(1, volume));
           video.muted = muted || video.volume <= 0.02;
 
-          // Track latency for native player (Safari)
+          // Track latency and stalls for native player (Safari)
+          let lastCurrentTime = -1;
+          let stallTicks = 0;
           latencyInterval = window.setInterval(() => {
-            if (!disposed && video.seekable && video.seekable.length > 0) {
+            if (disposed) return;
+            if (video.currentTime === lastCurrentTime && !video.paused && !video.ended) {
+              stallTicks++;
+              if (stallTicks >= 15) {
+                console.warn("[CameraLiveView] Native HLS stalled for 15s, forcing reconnect");
+                setRetryCount(c => c + 1);
+                return;
+              }
+            } else {
+              stallTicks = 0;
+              lastCurrentTime = video.currentTime;
+            }
+
+            if (video.seekable && video.seekable.length > 0) {
               const end = video.seekable.end(video.seekable.length - 1);
               const lat = end - video.currentTime;
               if (lat >= 0 && lat < 60) {
@@ -231,17 +255,31 @@ export function CameraLiveView({ camera, output = camera.streamType, className, 
           void video.play().catch(() => undefined);
         });
 
-        // Track latency for hls.js player
+        // Track latency and stalls for hls.js player
+        let lastCurrentTime = -1;
+        let stallTicks = 0;
         latencyInterval = window.setInterval(() => {
-          if (!disposed && hls && video) {
-            const lat = hls.latency;
-            if (typeof lat === "number" && isFinite(lat) && lat > 0) {
-              setLatency(lat);
-            } else if (hls.liveSyncPosition) {
-              const diff = hls.liveSyncPosition - video.currentTime;
-              if (diff >= 0) {
-                setLatency(diff);
-              }
+          if (disposed || !hls || !video) return;
+          
+          if (video.currentTime === lastCurrentTime && !video.paused && !video.ended) {
+            stallTicks++;
+            if (stallTicks >= 15) {
+              console.warn("[CameraLiveView] hls.js stalled for 15s, forcing reconnect");
+              setRetryCount(c => c + 1);
+              return;
+            }
+          } else {
+            stallTicks = 0;
+            lastCurrentTime = video.currentTime;
+          }
+
+          const lat = hls.latency;
+          if (typeof lat === "number" && isFinite(lat) && lat > 0) {
+            setLatency(lat);
+          } else if (hls.liveSyncPosition) {
+            const diff = hls.liveSyncPosition - video.currentTime;
+            if (diff >= 0) {
+              setLatency(diff);
             }
           }
         }, 1000);
