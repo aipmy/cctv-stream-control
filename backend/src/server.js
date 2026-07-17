@@ -87,7 +87,14 @@ function proxyToGo2rtc(req, res) {
     method: req.method,
     headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
   }, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    const headers = { ...proxyRes.headers };
+    // Ensure Content-Type is set for JS files (required for dynamic import())
+    if (req.originalUrl.endsWith(".js") && !headers["content-type"]) {
+      headers["content-type"] = "application/javascript; charset=utf-8";
+    }
+    // Remove nosniff if no content-type was provided by upstream
+    // (browser will refuse dynamic import if nosniff + wrong/missing type)
+    res.writeHead(proxyRes.statusCode, headers);
     proxyRes.pipe(res, { end: true });
   });
   proxyReq.on("error", (err) => {
