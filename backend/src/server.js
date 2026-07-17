@@ -75,6 +75,18 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, name: "CCTV Monitoring Lite Backend", port: config.port, auth: config.requireAuth, time: new Date().toISOString() });
 });
 
+// go2rtc proxy — MUST be registered BEFORE requireAuth so WebSocket
+// connections from video-rtc.js are not blocked by authentication.
+const go2rtcProxy = createProxyMiddleware({
+  target: "http://127.0.0.1:1984",
+  changeOrigin: true,
+  ws: true,
+  logLevel: "error",
+});
+
+app.use("/api/ws", go2rtcProxy);
+app.use("/video-rtc.js", go2rtcProxy);
+
 app.use("/api/setup", setupRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", requireAuth);
@@ -85,16 +97,6 @@ app.use("/api/stats", statRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/events", eventRoutes);
-
-const go2rtcProxy = createProxyMiddleware({
-  target: "http://127.0.0.1:1984",
-  changeOrigin: true,
-  ws: true, // Enable websocket proxying
-  logLevel: "error",
-});
-
-app.use("/api/ws", go2rtcProxy);
-app.use("/video-rtc.js", go2rtcProxy);
 
 if (fs.existsSync(config.frontendDist)) {
   app.use(express.static(config.frontendDist));
