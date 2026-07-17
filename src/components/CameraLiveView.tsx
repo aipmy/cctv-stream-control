@@ -22,6 +22,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   const [scriptLoaded, setScriptLoaded] = useState(false);
   type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   useEffect(() => {
     if (onStatusChange) {
@@ -77,6 +78,11 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     videoRtc.style.height = "100%";
 
     containerRef.current.appendChild(videoRtc);
+    videoRtc.addEventListener("stream-error", (e: any) => {
+      console.warn("Go2RTC Backend Error:", e.detail);
+      setErrorMsg(e.detail);
+      setStatus("error");
+    });
     videoRtc.src = src;
 
     const attachEvents = () => {
@@ -108,19 +114,6 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     }
   }, [muted, volume]);
 
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    if (status === "connecting" || status === "buffering") {
-      timeoutId = setTimeout(() => {
-        console.warn(`Go2RTC Timeout: Stream stuck in '${status}' for 15s`);
-        setStatus("error");
-      }, 15000);
-    }
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [status]);
-
   if (!camera.enabled) {
     return (
       <div className={cn("absolute inset-0 flex flex-col items-center justify-center bg-black text-white/75", className)}>
@@ -148,8 +141,8 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
           <div className="text-xs font-semibold tracking-widest uppercase text-destructive/90">
             Koneksi Terputus
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1 max-w-[80%] text-center">
-            Kamera lambat merespon atau server terputus dari jaringan CCTV.
+          <div className="text-[10px] text-muted-foreground mt-1 max-w-[90%] text-center px-4 font-mono">
+            {errorMsg || "Kamera lambat merespon atau server terputus dari jaringan CCTV."}
           </div>
         </div>
       )}
