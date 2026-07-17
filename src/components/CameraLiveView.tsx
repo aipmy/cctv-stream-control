@@ -81,19 +81,13 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       if (internalVideo) {
         internalVideo.controls = controls;
         internalVideo.muted = typeof muted === 'boolean' ? muted : true;
-        let initialTimeout = setTimeout(() => {
-          setStatus(prev => prev === "connecting" ? "error" : prev);
-        }, 15000);
-
-        const clearInitialTimeout = () => clearTimeout(initialTimeout);
-
-        internalVideo.addEventListener("playing", () => { clearInitialTimeout(); setStatus("playing"); });
-        internalVideo.addEventListener("canplay", () => { clearInitialTimeout(); setStatus("playing"); });
+        internalVideo.addEventListener("playing", () => setStatus("playing"));
+        internalVideo.addEventListener("canplay", () => setStatus("playing"));
         internalVideo.addEventListener("waiting", () => {
           setStatus(prev => prev === "playing" ? "buffering" : "connecting");
         });
         internalVideo.addEventListener("stalled", () => setStatus("buffering"));
-        internalVideo.addEventListener("error", () => { clearInitialTimeout(); setStatus("error"); });
+        internalVideo.addEventListener("error", () => setStatus("error"));
       } else {
         setTimeout(attachEvents, 100);
       }
@@ -110,6 +104,19 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       if (typeof volume === 'number') internalVideo.volume = volume;
     }
   }, [muted, volume]);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (status === "connecting" || status === "buffering") {
+      timeoutId = setTimeout(() => {
+        console.warn(`Go2RTC Timeout: Stream stuck in '${status}' for 15s`);
+        setStatus("error");
+      }, 15000);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [status]);
 
   if (!camera.enabled) {
     return (
