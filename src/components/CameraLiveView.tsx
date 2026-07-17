@@ -26,17 +26,30 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         setScriptLoaded(true);
         return;
       }
-      try {
-        // Bypass Vite's dynamic import transformation for absolute remote URLs
-        const importRemote = new Function('url', 'return import(url)');
-        const module = await importRemote(`/video-rtc.js`);
-        if (!customElements.get("video-rtc")) {
-          customElements.define("video-rtc", module.VideoRTC);
-        }
-        setScriptLoaded(true);
-      } catch (e) {
-        console.error("Failed to load video-rtc.js", e);
+      // Use a <script> tag instead of dynamic import() — more resilient
+      // across reverse proxies (Cloudflare) that may strip/alter headers.
+      if (document.querySelector('script[data-go2rtc]')) {
+        // Script tag already added, wait for it to load
+        const waitForElement = () => {
+          if (customElements.get("video-rtc")) { setScriptLoaded(true); return; }
+          setTimeout(waitForElement, 100);
+        };
+        waitForElement();
+        return;
       }
+      const script = document.createElement('script');
+      script.setAttribute('data-go2rtc', 'true');
+      script.type = 'module';
+      script.textContent = `
+        import { VideoRTC } from '/video-rtc.js';
+        if (!customElements.get('video-rtc')) {
+          customElements.define('video-rtc', VideoRTC);
+        }
+        window.dispatchEvent(new Event('video-rtc-ready'));
+      `;
+      const onReady = () => { setScriptLoaded(true); window.removeEventListener('video-rtc-ready', onReady); };
+      window.addEventListener('video-rtc-ready', onReady);
+      document.head.appendChild(script);
     };
     loadGo2RTC();
   }, []);

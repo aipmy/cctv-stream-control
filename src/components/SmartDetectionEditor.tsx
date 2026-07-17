@@ -83,16 +83,27 @@ export function SmartDetectionEditor({
         setScriptLoaded(true);
         return;
       }
-      try {
-        const importRemote = new Function('url', 'return import(url)');
-        const module = await importRemote(`/video-rtc.js`);
-        if (!customElements.get("video-rtc")) {
-          customElements.define("video-rtc", module.VideoRTC);
-        }
-        setScriptLoaded(true);
-      } catch (e) {
-        console.error("Failed to load video-rtc.js", e);
+      if (document.querySelector('script[data-go2rtc]')) {
+        const waitForElement = () => {
+          if (customElements.get("video-rtc")) { setScriptLoaded(true); return; }
+          setTimeout(waitForElement, 100);
+        };
+        waitForElement();
+        return;
       }
+      const script = document.createElement('script');
+      script.setAttribute('data-go2rtc', 'true');
+      script.type = 'module';
+      script.textContent = `
+        import { VideoRTC } from '/video-rtc.js';
+        if (!customElements.get('video-rtc')) {
+          customElements.define('video-rtc', VideoRTC);
+        }
+        window.dispatchEvent(new Event('video-rtc-ready'));
+      `;
+      const onReady = () => { setScriptLoaded(true); window.removeEventListener('video-rtc-ready', onReady); };
+      window.addEventListener('video-rtc-ready', onReady);
+      document.head.appendChild(script);
     };
     loadGo2RTC();
   }, []);
