@@ -131,9 +131,12 @@ export function SmartDetectionEditor({
     // Check periodically if the video is ready to remove the loading spinner
     const interval = setInterval(() => {
        const internalVideo = videoRtc.querySelector("video");
-       if (internalVideo && internalVideo.readyState >= 2) { // HAVE_CURRENT_DATA
-         setImgLoaded(true);
-         clearInterval(interval);
+       if (internalVideo) {
+         internalVideo.controls = false;
+         if (internalVideo.readyState >= 2) { // HAVE_CURRENT_DATA
+           setImgLoaded(true);
+           clearInterval(interval);
+         }
        }
     }, 500);
     
