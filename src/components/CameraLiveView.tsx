@@ -112,7 +112,8 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
           if (disposed) return;
           const err = internalVideo.error;
           if (err) {
-            if (err.code === 3 && modes !== "mjpeg") {
+            const isAutoSelect = !camera.streamType || camera.streamType.includes("webrtc,mse");
+            if (err.code === 3 && modes !== "mjpeg" && isAutoSelect) {
               console.warn("Auto-falling back to MJPEG due to MEDIA_ERR_DECODE");
               setFallbackMode("mjpeg");
               return;
