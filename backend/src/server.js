@@ -68,6 +68,7 @@ app.use((req, res, next) => {
 app.use(trafficMiddleware);
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan((tokens, req, res) => [
+  `[${tokens["remote-addr"](req, res)}]`,
   tokens.method(req, res),
   sanitizeRequestUrl(tokens.url(req, res)),
   tokens.status(req, res),
