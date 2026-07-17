@@ -136,6 +136,8 @@ const server = app.listen(config.port, config.host, () => {
   console.log(`Storage dir: ${config.storageDir}`);
 });
 
+server.on("upgrade", go2rtcProxy.upgrade);
+
 
 async function shutdown(signal) {
   console.log(`Received ${signal}, stopping streams...`);
