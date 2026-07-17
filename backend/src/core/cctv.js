@@ -19,11 +19,7 @@ export function buildStreamUrl(camera, opts = {}) {
 
   switch (sourceType) {
     case "ONVIF": {
-      let url = `onvif://${auth}${host}:${port}`;
-      if (camera.audioMode === "Enable" || camera.audioMode === "Auto") {
-        url += "#backchannel=1#audio=opus";
-      }
-      return url;
+      return `onvif://${auth}${host}:${port}`;
     }
     case "RTSP": {
       const path = camera.streamPath || "/Streaming/Channels/101";
