@@ -87,8 +87,10 @@ function proxyToGo2rtc(req, res) {
     const proxySocket = net.connect(GO2RTC_PORT, GO2RTC_HOST, () => {
       let rawReq = `${req.method} ${req.originalUrl} HTTP/1.1\r\n`;
       const headers = { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` };
+      // Force explicitly to ensure Gorilla WS accepts it
       headers.connection = "Upgrade";
       headers.upgrade = "websocket";
+      delete headers.origin;
       
       for (const [key, value] of Object.entries(headers)) {
         if (Array.isArray(value)) {
@@ -244,6 +246,7 @@ server.on("upgrade", (req, socket, head) => {
     // Force explicitly to ensure Gorilla WS accepts it
     headers.connection = "Upgrade";
     headers.upgrade = "websocket";
+    delete headers.origin;
     
     for (const [key, value] of Object.entries(headers)) {
       if (Array.isArray(value)) {
