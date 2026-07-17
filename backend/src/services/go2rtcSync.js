@@ -27,6 +27,17 @@ export async function syncGo2rtc(cameras) {
       streamsNode = doc.get("streams");
     }
 
+    // Ensure default settings exist if not manually overridden
+    if (!doc.has("api")) {
+      doc.set("api", doc.createNode({ listen: ":1984", origin: "*" }));
+    }
+    if (!doc.has("webrtc")) {
+      doc.set("webrtc", doc.createNode({ listen: ":8555" }));
+    }
+    if (!doc.has("rtsp")) {
+      doc.set("rtsp", doc.createNode({ listen: ":8554" }));
+    }
+
     const currentIds = new Set();
 
     // 2. Remove all unknown or old cameras from AST to keep it clean
