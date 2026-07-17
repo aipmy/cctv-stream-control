@@ -122,10 +122,13 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const stopTimer = useRef<number | null>(null);
   const activePtzPointer = useRef<number | null>(null);
   const feedbackTimer = useRef<number | null>(null);
+  const [liveStatus, setLiveStatus] = useState<"connecting" | "playing" | "buffering" | "error">("connecting");
   const [audio, setAudio] = useState(() => readAudioState(camera));
   const [controlsVisible, setControlsVisible] = useState(false);
   const [ptzFeedback, setPtzFeedback] = useState<PtzFeedback | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const effectiveStatus = liveStatus === "error" ? "offline" : camera.status;
 
   useEffect(() => {
     setAudio(readAudioState(camera));
@@ -249,7 +252,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     <Card className="overflow-hidden border-border/60 glass-panel transition-shadow hover:shadow-card">
       <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
-          <span className={cn("status-dot", !camera.enabled || camera.status === "offline" ? "status-dot-offline" : camera.status === "starting" ? "status-dot-warning" : "status-dot-online")} />
+          <span className={cn("status-dot", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
           <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -270,8 +273,8 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
             </Badge>
           )}
           <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
-          <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[camera.status])}>
-            {isDisabled ? t("inactive") : camera.status === "online" ? t("online") : camera.status === "offline" ? t("offline") : camera.status}
+          <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
+            {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
           </Badge>
         </div>
       </div>
@@ -283,7 +286,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
       >
-        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} />
+        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} onStatusChange={setLiveStatus} />
         {ptzFeedback && (
           <Badge
             variant="outline"

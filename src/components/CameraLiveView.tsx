@@ -13,15 +13,22 @@ interface Props {
   showErrorUrl?: boolean;
   controls?: boolean;
   controlsVisible?: boolean;
+  onStatusChange?: (status: "connecting" | "playing" | "buffering" | "error") => void;
 }
 
-export function CameraLiveView({ camera, output, className, controls = false, muted = true, volume = 1 }: Props) {
+export function CameraLiveView({ camera, output, className, controls = false, muted = true, volume = 1, onStatusChange }: Props) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
-  
+
+  useEffect(() => {
+    if (onStatusChange) {
+      onStatusChange(status);
+    }
+  }, [status, onStatusChange]);
+
   useEffect(() => {
     const loadGo2RTC = async () => {
       if (customElements.get("video-rtc")) {
