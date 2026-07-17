@@ -226,20 +226,33 @@ setInterval(async () => {
 
         if (streamData) {
           if (streamData.consumers) {
-            newViewers = streamData.consumers.length;
-            outBytes = streamData.consumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
+            const validConsumers = streamData.consumers.filter(c => c.format_name !== 'keyframe' && c.format_name !== 'snapshot');
+            newViewers = validConsumers.length;
+            outBytes = validConsumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
             
-            activeViewers = streamData.consumers.map(c => {
-              const username = getUsernameByIp(c.remote_addr) || "go2rtc_client";
-              return {
-                id: String(c.id),
-                username,
-                ip: c.remote_addr || "Unknown IP",
-                userAgent: c.user_agent || "Unknown Browser",
-                output: c.format_name || "unknown",
-                lastSeenAgoSeconds: 0
-              };
-            });
+            activeViewers = validConsumers
+              .map(c => {
+                let rawIp = c.remote_addr || "Unknown IP";
+                let realIp = rawIp;
+                
+                // If go2rtc appended forwarded IP (e.g. "127.0.0.1:1234 forwarded 192.168.1.5")
+                if (rawIp.includes("forwarded ")) {
+                  realIp = rawIp.split("forwarded ")[1].trim();
+                } else if (rawIp.includes(":")) {
+                  // Strip port if no forwarded info exists (e.g. "192.168.1.5:1234")
+                  realIp = rawIp.split(":")[0].replace(/\[|\]/g, ''); // also handle ipv6 [::1]:80
+                }
+
+                const username = getUsernameByIp(realIp) || "go2rtc_client";
+                return {
+                  id: String(c.id),
+                  username,
+                  ip: realIp,
+                  userAgent: c.user_agent || "Unknown Browser",
+                  output: c.format_name || "unknown",
+                  lastSeenAgoSeconds: 0
+                };
+              });
           }
           if (streamData.producers) {
             pullBytes = streamData.producers.reduce((acc, p) => acc + (p.bytes_recv || 0), 0);
