@@ -1,0 +1,31 @@
+api:
+  listen: ":1984" # default public port for WebUI and HTTP API
+  origin: "*"
+
+log:
+  level: "info" # default log level
+  format: "color"
+  output: "stdout"
+
+rtsp:
+  listen: ":8554" # default public port for RTSP server
+
+streams:
+  # NOTE: The streams section is automatically populated by the CCTV Monitoring Lite backend.
+  # Any camera added via the web UI will appear here with an ID prefix like 'cam_XXXXX'.
+  # 
+  # You can also add manual streams here. The sync script will preserve them
+  # as long as their keys do not conflict with the auto-generated ones.
+  #
+  # Examples:
+  #
+  # sample_onvif_camera:
+  #   - onvif://admin:password123@192.168.1.100:80
+  #
+  # sample_rtsp_camera:
+  #   - rtsp://admin:password123@192.168.1.101:554/cam/realmonitor?channel=1&subtype=0
+
+webrtc:
+  listen: ":8555" # default public port for WebRTC server (TCP and UDP)
+  ice_servers:
+    - urls: [ "stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302" ]
