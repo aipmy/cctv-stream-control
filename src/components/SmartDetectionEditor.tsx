@@ -116,7 +116,7 @@ export function SmartDetectionEditor({
     const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(cameraId)}`;
     
     const videoRtc = document.createElement("video-rtc") as any;
-    videoRtc.mode = "mjpeg";
+    videoRtc.mode = "webrtc,mse,hls,mjpeg";
     videoRtc.background = true;
     videoRtc.volume = 0;
     videoRtc.muted = true;
