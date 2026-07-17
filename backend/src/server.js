@@ -81,6 +81,38 @@ app.get("/api/health", (_req, res) => {
 // Proxy /api/ws and /video-rtc.js to go2rtc running on port 1984.
 // Uses native http.request — http-proxy-middleware v3 silently fails with ESM.
 function proxyToGo2rtc(req, res) {
+  // If it's the websocket endpoint, hijack the socket from Express
+  // Cloudflare sometimes drops Connection: Upgrade so it hits Express instead of server.on('upgrade')
+  if (req.originalUrl.startsWith("/api/ws")) {
+    const proxySocket = net.connect(GO2RTC_PORT, GO2RTC_HOST, () => {
+      let rawReq = `${req.method} ${req.originalUrl} HTTP/1.1\r\n`;
+      const headers = { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` };
+      headers.connection = "Upgrade";
+      headers.upgrade = "websocket";
+      
+      for (const [key, value] of Object.entries(headers)) {
+        if (Array.isArray(value)) {
+          value.forEach(v => { rawReq += `${key}: ${v}\r\n`; });
+        } else {
+          rawReq += `${key}: ${value}\r\n`;
+        }
+      }
+      rawReq += "\r\n";
+      
+      proxySocket.write(rawReq);
+      proxySocket.pipe(req.socket);
+      req.socket.pipe(proxySocket);
+    });
+    
+    proxySocket.on("error", (err) => {
+      console.error("[go2rtc express-ws-proxy] error:", err.message);
+      req.socket.destroy();
+    });
+    req.socket.on("error", () => proxySocket.destroy());
+    return;
+  }
+
+  // Standard HTTP proxy for /video-rtc.js or other routes
   const proxyReq = http.request({
     hostname: GO2RTC_HOST,
     port: GO2RTC_PORT,
@@ -89,12 +121,9 @@ function proxyToGo2rtc(req, res) {
     headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
   }, (proxyRes) => {
     const headers = { ...proxyRes.headers };
-    // Ensure Content-Type is set for JS files (required for dynamic import())
     if (req.originalUrl.endsWith(".js") && !headers["content-type"]) {
       headers["content-type"] = "application/javascript; charset=utf-8";
     }
-    // Remove nosniff if no content-type was provided by upstream
-    // (browser will refuse dynamic import if nosniff + wrong/missing type)
     res.writeHead(proxyRes.statusCode, headers);
     proxyRes.pipe(res, { end: true });
   });
