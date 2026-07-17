@@ -90,6 +90,7 @@ function proxyToGo2rtc(req, res) {
       // Force explicitly to ensure Gorilla WS accepts it
       headers.connection = "Upgrade";
       headers.upgrade = "websocket";
+      headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
       delete headers.origin;
       
       for (const [key, value] of Object.entries(headers)) {
@@ -246,6 +247,7 @@ server.on("upgrade", (req, socket, head) => {
     // Force explicitly to ensure Gorilla WS accepts it
     headers.connection = "Upgrade";
     headers.upgrade = "websocket";
+    headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
     delete headers.origin;
     
     for (const [key, value] of Object.entries(headers)) {
