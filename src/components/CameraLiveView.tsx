@@ -162,7 +162,13 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       )}
       
       {/* Container managed purely by Vanilla JS for video-rtc */}
-      <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+      <div 
+        ref={containerRef} 
+        className={cn(
+          "absolute inset-0 w-full h-full transition-opacity duration-500",
+          status === "playing" ? "opacity-100" : "opacity-0"
+        )} 
+      />
     </div>
   );
 }

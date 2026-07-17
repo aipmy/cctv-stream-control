@@ -724,7 +724,10 @@ export function SmartDetectionEditor({
       <div className="relative w-full aspect-video border bg-slate-950 rounded-lg overflow-hidden border-slate-800 select-none">
         <div 
           ref={videoContainerRef} 
-          className="w-full h-full block" 
+          className={cn(
+            "w-full h-full block transition-opacity duration-500",
+            imgLoaded ? "opacity-100" : "opacity-0"
+          )} 
         />
         
         {!imgLoaded && (
