@@ -23,6 +23,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [fallbackMode, setFallbackMode] = useState<string | null>(null);
 
   useEffect(() => {
     if (onStatusChange) {
@@ -69,7 +70,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     setStatus("connecting");
     setErrorMsg("");
 
-    const modes = output || camera.streamType || "webrtc,mse,hls,mjpeg";
+    const modes = fallbackMode || output || camera.streamType || "webrtc,mse,hls,mjpeg";
     const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
     
     const videoRtc = document.createElement("video-rtc") as any;
@@ -111,6 +112,11 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
           if (disposed) return;
           const err = internalVideo.error;
           if (err) {
+            if (err.code === 3 && modes !== "mjpeg") {
+              console.warn("Auto-falling back to MJPEG due to MEDIA_ERR_DECODE");
+              setFallbackMode("mjpeg");
+              return;
+            }
             setErrorMsg(`Stream Error [${err.code}]: ${err.message || "Network or decoding failed"}`);
           }
           setStatus("error");
@@ -132,7 +138,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         }
       } catch (e) {}
     };
-  }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls]);
+  }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls, fallbackMode]);
 
   useEffect(() => {
     if (!containerRef.current) return;
