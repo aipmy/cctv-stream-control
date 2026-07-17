@@ -70,6 +70,10 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     videoRtc.style.height = "100%";
 
     containerRef.current.appendChild(videoRtc);
+    videoRtc.addEventListener("stream-error", (e: any) => {
+      console.warn("Go2RTC Backend Error:", e.detail);
+      setStatus("error");
+    });
     videoRtc.src = src;
 
     const attachEvents = () => {
