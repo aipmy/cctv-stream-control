@@ -25,6 +25,7 @@ import { closeAudit, initializeAudit } from "./modules/audit/auditService.js";
 import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
 import { listCameras } from "./services/cameraService.js";
 import { syncGo2rtc } from "./services/go2rtcSync.js";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 app.set("trust proxy", true);
@@ -84,6 +85,16 @@ app.use("/api/stats", statRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/events", eventRoutes);
+
+const go2rtcProxy = createProxyMiddleware({
+  target: "http://127.0.0.1:1984",
+  changeOrigin: true,
+  ws: true, // Enable websocket proxying
+  logLevel: "error",
+});
+
+app.use("/api/ws", go2rtcProxy);
+app.use("/video-rtc.js", go2rtcProxy);
 
 if (fs.existsSync(config.frontendDist)) {
   app.use(express.static(config.frontendDist));

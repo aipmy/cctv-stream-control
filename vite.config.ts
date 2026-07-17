@@ -15,7 +15,12 @@ export default defineConfig(({ mode }) => ({
       "/api": {
         target: process.env.VITE_DEV_API_TARGET || "http://127.0.0.1:4200",
         changeOrigin: true,
+        ws: true,
       },
+      "/video-rtc.js": {
+        target: process.env.VITE_DEV_API_TARGET || "http://127.0.0.1:4200",
+        changeOrigin: true,
+      }
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

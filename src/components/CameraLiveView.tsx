@@ -29,7 +29,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       try {
         // Bypass Vite's dynamic import transformation for absolute remote URLs
         const importRemote = new Function('url', 'return import(url)');
-        const module = await importRemote(`http://${window.location.hostname}:1984/video-rtc.js`);
+        const module = await importRemote(`/video-rtc.js`);
         if (!customElements.get("video-rtc")) {
           customElements.define("video-rtc", module.VideoRTC);
         }
@@ -51,8 +51,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     
     // video-rtc.js internally converts http:// to ws:// in its src setter.
     // So we must pass an http:// URL here, NOT ws://.
-    const go2rtcHost = window.location.hostname;
-    const src = `http://${go2rtcHost}:1984/api/ws?src=${encodeURIComponent(camera.id)}`;
+    const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
     
     // Create the video-rtc web component
     const videoRtc = document.createElement("video-rtc") as any;
