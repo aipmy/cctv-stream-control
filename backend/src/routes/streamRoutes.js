@@ -168,7 +168,10 @@ streamRoutes.get("/:id/poster", async (req, res, next) => {
       }
     } catch (err) {}
 
-    res.status(404).json({ error: "Poster tidak ditemukan" });
+    const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#0f172a"/><text x="400" y="225" font-family="sans-serif" font-size="20" fill="#475569" text-anchor="middle">No Snapshot Available</text></svg>`;
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("image/svg+xml");
+    return res.send(placeholderSvg);
   } catch (err) { next(err); }
 });
 
