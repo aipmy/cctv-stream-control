@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import Jimp from "jimp";
 import net from "node:net";
 import http from "node:http";
 import express from "express";
@@ -151,11 +152,16 @@ app.get("/api/streams/:id/poster", async (req, res, next) => {
     await fs.promises.mkdir(thumbnailDir, { recursive: true });
     const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
 
-    // Fire & Forget: ambil frame terbaru dari Go2RTC, timpa file lokal
+    // Fire & Forget: ambil frame terbaru dari Go2RTC, kompres dengan Jimp, lalu simpan
     fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`)
       .then(r => { if (r.ok) return r.arrayBuffer(); throw new Error("fail"); })
-      .then(buf => fs.promises.writeFile(thumbnailPath, Buffer.from(buf)))
-      .catch(() => {});
+      .then(buf => Jimp.read(Buffer.from(buf)))
+      .then(img => {
+        if (img.bitmap.width > 800) img.resize({ w: 800 });
+        return img.getBuffer("image/jpeg", { quality: 50 });
+      })
+      .then(outBuf => fs.promises.writeFile(thumbnailPath, outBuf))
+      .catch((e) => { console.error("[Poster] Compress error:", e.message); });
 
     // Lazy load: jika file sudah ada, kirim langsung tanpa menunggu Go2RTC
     if (fs.existsSync(thumbnailPath)) {
