@@ -64,6 +64,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   useEffect(() => {
     if (!scriptLoaded || !camera.enabled || !containerRef.current) return;
     
+    let disposed = false;
     containerRef.current.innerHTML = "";
     setStatus("connecting");
     setErrorMsg("");
@@ -80,6 +81,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
 
     containerRef.current.appendChild(videoRtc);
     videoRtc.addEventListener("stream-error", (e: any) => {
+      if (disposed) return;
       console.warn("Go2RTC Backend Error:", e.detail);
       const msg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
       setErrorMsg(msg || "Unknown backend error");
@@ -88,17 +90,25 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     videoRtc.src = src;
 
     const attachEvents = () => {
+      if (disposed) return;
       const internalVideo = videoRtc.querySelector("video");
       if (internalVideo) {
         internalVideo.controls = controls;
         internalVideo.muted = typeof muted === 'boolean' ? muted : true;
-        internalVideo.addEventListener("playing", () => setStatus("playing"));
-        internalVideo.addEventListener("canplay", () => setStatus("playing"));
-        internalVideo.addEventListener("waiting", () => {
-          setStatus(prev => prev === "playing" ? "buffering" : "connecting");
+        internalVideo.addEventListener("playing", () => {
+          if (!disposed) setStatus("playing");
         });
-        internalVideo.addEventListener("stalled", () => setStatus("buffering"));
+        internalVideo.addEventListener("canplay", () => {
+          if (!disposed) setStatus("playing");
+        });
+        internalVideo.addEventListener("waiting", () => {
+          if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting");
+        });
+        internalVideo.addEventListener("stalled", () => {
+          if (!disposed) setStatus("buffering");
+        });
         internalVideo.addEventListener("error", () => {
+          if (disposed) return;
           const err = internalVideo.error;
           if (err) {
             setErrorMsg(`Stream Error [${err.code}]: ${err.message || "Network or decoding failed"}`);
@@ -110,6 +120,18 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       }
     };
     attachEvents();
+
+    return () => {
+      disposed = true;
+      if (videoRtc && typeof videoRtc.ondisconnect === 'function') {
+        videoRtc.ondisconnect();
+      }
+      try {
+        if (containerRef.current && containerRef.current.contains(videoRtc)) {
+          containerRef.current.removeChild(videoRtc);
+        }
+      } catch (e) {}
+    };
   }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls]);
 
   useEffect(() => {
