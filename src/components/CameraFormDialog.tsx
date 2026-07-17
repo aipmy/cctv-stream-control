@@ -483,33 +483,45 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                 {/* Output Format checkboxes */}
-                <div className="md:col-span-2 space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output Format (go2rtc)</Label>
-                  <div className="flex flex-wrap gap-3 mt-1.5">
-                    {["webrtc", "mse", "hls", "mjpeg"].map((mode) => {
-                      const isChecked = form.streamType.toLowerCase().includes(mode);
+                <div className="md:col-span-2 space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Internal Player Format</Label>
+                  <p className="text-[11px] text-muted-foreground mt-1 mb-2">Pilih format streaming yang akan digunakan saat memutar video di dalam browser/aplikasi ini. Urutan ceklis menentukan prioritas (fallback).</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1.5">
+                    {[
+                      { id: 'webrtc', label: 'WebRTC', desc: 'Real-time (H264, PCMU, OPUS)' },
+                      { id: 'mse', label: 'MSE', desc: 'Low-latency (H264, H265, AAC)' },
+                      { id: 'mp4', label: 'MP4', desc: 'Modern MP4 (H264, H265, AAC, FLAC)' },
+                      { id: 'hls', label: 'HLS', desc: 'Legacy HLS (Safari/iOS support)' },
+                      { id: 'mjpeg', label: 'MJPEG', desc: 'Motion JPEG (Fallback lambat)' }
+                    ].map((mode) => {
+                      const isChecked = form.streamType.toLowerCase().includes(mode.id);
                       return (
-                        <label key={mode} className="flex items-center space-x-1.5 text-sm cursor-pointer">
+                        <label key={mode.id} className={cn(
+                          "flex items-start space-x-3 p-3 rounded-md border cursor-pointer transition-colors",
+                          isChecked ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        )}>
                           <input
                             type="checkbox"
-                            className="rounded border-gray-300"
+                            className="rounded border-gray-300 mt-1"
                             checked={isChecked}
                             onChange={(e) => {
                               let current = form.streamType ? form.streamType.toLowerCase().split(",").filter(Boolean) : [];
                               if (e.target.checked) {
-                                if (!current.includes(mode)) current.push(mode);
+                                if (!current.includes(mode.id)) current.push(mode.id);
                               } else {
-                                current = current.filter(m => m !== mode);
+                                current = current.filter(m => m !== mode.id);
                               }
                               setForm({ ...form, streamType: current.join(",") as StreamType });
                             }}
                           />
-                          <span className="uppercase">{mode}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold uppercase tracking-wider">{mode.label}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{mode.desc}</div>
+                          </div>
                         </label>
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">Ceklis beberapa untuk auto-fallback go2rtc. Urutan = prioritas.</p>
                 </div>
 
                 {/* Camera Active */}

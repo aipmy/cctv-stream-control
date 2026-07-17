@@ -1,5 +1,5 @@
 export type Role = "admin" | "teknisi" | "guest" | "internal" | "external";
-export type StreamType = "WebRTC" | "MSE" | "HLS" | "MJPEG" | "webrtc,mse" | "webrtc" | "hls" | "mjpeg" | "webrtc,mse,hls,mjpeg" | "mse";
+export type StreamType = string;
 export type Brand = "Universal" | "Bardi" | "EZVIZ" | "Hikvision";
 export type SourceType = "ONVIF" | "RTSP" | "DVRIP" | "HomeAssistant" | "Custom";
 export type CameraStatus = "online" | "offline" | "starting";
