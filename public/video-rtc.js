@@ -352,9 +352,6 @@ export class VideoRTC extends HTMLElement {
         this.ws.addEventListener('message', ev => {
             if (typeof ev.data === 'string') {
                 const msg = JSON.parse(ev.data);
-                if (msg.type === 'error') {
-                    this.dispatchEvent(new CustomEvent('stream-error', { detail: msg.value }));
-                }
                 for (const mode in this.onmessage) {
                     this.onmessage[mode](msg);
                 }
