@@ -81,14 +81,19 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       if (internalVideo) {
         internalVideo.controls = controls;
         internalVideo.muted = typeof muted === 'boolean' ? muted : true;
-        
-        internalVideo.addEventListener("playing", () => setStatus("playing"));
-        internalVideo.addEventListener("canplay", () => setStatus("playing"));
+        let initialTimeout = setTimeout(() => {
+          setStatus(prev => prev === "connecting" ? "error" : prev);
+        }, 15000);
+
+        const clearInitialTimeout = () => clearTimeout(initialTimeout);
+
+        internalVideo.addEventListener("playing", () => { clearInitialTimeout(); setStatus("playing"); });
+        internalVideo.addEventListener("canplay", () => { clearInitialTimeout(); setStatus("playing"); });
         internalVideo.addEventListener("waiting", () => {
           setStatus(prev => prev === "playing" ? "buffering" : "connecting");
         });
         internalVideo.addEventListener("stalled", () => setStatus("buffering"));
-        internalVideo.addEventListener("error", () => setStatus("error"));
+        internalVideo.addEventListener("error", () => { clearInitialTimeout(); setStatus("error"); });
       } else {
         setTimeout(attachEvents, 100);
       }
