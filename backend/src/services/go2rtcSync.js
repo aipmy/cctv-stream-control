@@ -29,10 +29,20 @@ export async function syncGo2rtc(cameras) {
 
     const currentIds = new Set();
 
-    // 2. Remove old cameras from AST (only those we synced before, keeping user's manual streams)
-    for (const oldId of lastSyncedIds) {
-      if (!cameras.find(c => c.id === oldId)) {
-        streamsNode.delete(oldId);
+    // 2. Remove all unknown or old cameras from AST to keep it clean
+    const activeCameraIds = new Set(cameras.filter(c => c.enabled).map(c => c.id));
+    
+    // We iterate over all keys in the `streams` section and delete them if they aren't in activeCameraIds
+    if (streamsNode && streamsNode.items) {
+      const keysToRemove = [];
+      for (const item of streamsNode.items) {
+        const key = item.key.value;
+        if (!activeCameraIds.has(key)) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const key of keysToRemove) {
+        streamsNode.delete(key);
       }
     }
 
