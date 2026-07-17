@@ -109,13 +109,17 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   }
 
   return (
-    <div className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)} ref={containerRef}>
+    <div className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}>
+      {/* Container managed purely by React for the loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] pointer-events-none transition-opacity duration-300">
           <Loader2 className="h-7 w-7 mb-3 animate-spin text-primary opacity-80" />
           <div className="text-xs font-semibold tracking-widest uppercase text-white/70">Connecting</div>
         </div>
       )}
+      
+      {/* Container managed purely by Vanilla JS for video-rtc */}
+      <div ref={containerRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
