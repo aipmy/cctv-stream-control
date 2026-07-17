@@ -17,25 +17,7 @@ import { CameraLiveView } from "./CameraLiveView";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTranslation, type TranslationKey } from "@/hooks/useTranslation";
-import { SmartDetectionEditor } from "./SmartDetectionEditor";
 
-const STREAM_LINKS = [
-  { id: 'auto', category: 'Web', label: 'stream.html (Auto)', desc: 'browsers: all / codecs: H264, H265*, MJPEG, JPEG, AAC, PCMU, PCMA, OPUS', url: (h: string, id: string) => `http://${h}:1984/stream.html?src=${id}` },
-  { id: 'webrtc', category: 'WebRTC', label: 'stream.html (WebRTC)', desc: 'browsers: all / codecs: H264, PCMU, PCMA, OPUS / +H265 in Safari', url: (h: string, id: string) => `http://${h}:1984/stream.html?src=${id}&mode=webrtc` },
-  { id: 'mse', category: 'MSE', label: 'stream.html (MSE)', desc: 'browsers: Chrome, Firefox, Safari Mac/iPad / codecs: H264, H265*, AAC, PCMA*, PCMU*, PCM* / +OPUS in Chrome, Firefox', url: (h: string, id: string) => `http://${h}:1984/stream.html?src=${id}&mode=mse` },
-  { id: 'mp4_legacy', category: 'MP4', label: 'stream.mp4 (Legacy)', desc: 'browsers: Chrome, Firefox / codecs: H264, H265*, AAC', url: (h: string, id: string) => `http://${h}:1984/stream.mp4?src=${id}` },
-  { id: 'mp4_modern', category: 'MP4', label: 'stream.mp4 (Modern)', desc: 'browsers: Chrome, Firefox / codecs: H264, H265*, AAC, FLAC', url: (h: string, id: string) => `http://${h}:1984/stream.mp4?src=${id}&mp4=flac` },
-  { id: 'mp4_any', category: 'MP4', label: 'stream.mp4 (Any audio)', desc: 'browsers: Chrome / codecs: H264, H265*, AAC, OPUS, MP3, FLAC', url: (h: string, id: string) => `http://${h}:1984/stream.mp4?src=${id}&mp4=all` },
-  { id: 'hls_legacy', category: 'HLS', label: 'stream.m3u8 (Legacy HLS/TS)', desc: 'browsers: Safari all, Chrome Android / codecs: H264', url: (h: string, id: string) => `http://${h}:1984/stream.m3u8?src=${id}` },
-  { id: 'hls_fmp4', category: 'HLS', label: 'stream.m3u8 (Modern HLS/fMP4)', desc: 'browsers: Safari all, Chrome Android / codecs: H264, H265*, AAC, FLAC', url: (h: string, id: string) => `http://${h}:1984/stream.m3u8?src=${id}&mp4=flac` },
-  { id: 'mjpeg', category: 'MJPEG', label: 'stream.mjpeg', desc: 'browsers: all / codecs: MJPEG, JPEG', url: (h: string, id: string) => `http://${h}:1984/stream.mjpeg?src=${id}` },
-  { id: 'rtsp_any', category: 'RTSP', label: 'RTSP (1 Video & 1 Audio)', desc: 'codecs: any', url: (h: string, id: string) => `rtsp://${h}:8554/${id}` },
-  { id: 'rtsp_mp4', category: 'RTSP', label: 'RTSP (For MP4 recording / Frigate)', desc: 'codecs: H264, H265, AAC', url: (h: string, id: string) => `rtsp://${h}:8554/${id}?mp4` },
-  { id: 'frame_mp4', category: 'Snapshot', label: 'frame.mp4', desc: 'Snapshot in MP4 format', url: (h: string, id: string) => `http://${h}:1984/frame.mp4?src=${id}` },
-  { id: 'frame_jpeg', category: 'Snapshot', label: 'frame.jpeg', desc: 'Snapshot in JPEG format', url: (h: string, id: string) => `http://${h}:1984/frame.jpeg?src=${id}` },
-];
 
 interface Props {
   open: boolean;
@@ -96,7 +78,6 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
   const { data: camerasData } = useCamerasQuery();
   const cameras = useMemo(() => camerasData || [], [camerasData]);
   const { addCamera, updateCamera } = useCameraActions();
-  const [selectedLinkId, setSelectedLinkId] = useState('auto');
   const siteOptions = useMemo(() => {
     const all = Array.from(new Set(cameras.map((c) => c.site).filter(Boolean)));
     if (user?.role !== "admin" && Array.isArray(user?.allowedGroups) && user.allowedGroups.length > 0) {
@@ -482,46 +463,51 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
             <TabsContent value="stream" className="flex-1 overflow-y-auto px-1 space-y-4 data-[state=active]:block data-[state=inactive]:hidden">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                {/* Output Format checkboxes */}
-                <div className="md:col-span-2 space-y-3">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Internal Player Format</Label>
-                  <p className="text-[11px] text-muted-foreground mt-1 mb-2">Pilih format streaming yang akan digunakan saat memutar video di dalam browser/aplikasi ini. Urutan ceklis menentukan prioritas (fallback).</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1.5">
-                    {[
-                      { id: 'webrtc', label: 'WebRTC', desc: 'Real-time (H264, PCMU, OPUS)' },
-                      { id: 'mse', label: 'MSE', desc: 'Low-latency (H264, H265, AAC)' },
-                      { id: 'mp4', label: 'MP4', desc: 'Modern MP4 (H264, H265, AAC, FLAC)' },
-                      { id: 'hls', label: 'HLS', desc: 'Legacy HLS (Safari/iOS support)' },
-                      { id: 'mjpeg', label: 'MJPEG', desc: 'Motion JPEG (Fallback lambat)' }
-                    ].map((mode) => {
-                      const isChecked = form.streamType.toLowerCase().includes(mode.id);
-                      return (
-                        <label key={mode.id} className={cn(
-                          "flex items-start space-x-3 p-3 rounded-md border cursor-pointer transition-colors",
-                          isChecked ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                        )}>
-                          <input
-                            type="checkbox"
-                            className="rounded border-gray-300 mt-1"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              let current = form.streamType ? form.streamType.toLowerCase().split(",").filter(Boolean) : [];
-                              if (e.target.checked) {
-                                if (!current.includes(mode.id)) current.push(mode.id);
-                              } else {
-                                current = current.filter(m => m !== mode.id);
-                              }
-                              setForm({ ...form, streamType: current.join(",") as StreamType });
-                            }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold uppercase tracking-wider">{mode.label}</div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{mode.desc}</div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
+                {/* Output Format Dropdown */}
+                <div className="md:col-span-2 space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output Format</Label>
+                  <Select value={form.streamType} onValueChange={(v) => setForm({ ...form, streamType: v as StreamType })}>
+                    <SelectTrigger className="w-full h-auto py-2 px-3 text-left">
+                      <div className="flex-1 truncate">
+                        {(() => {
+                          const val = form.streamType;
+                          if (val === "webrtc,mse,hls,mjpeg") return <div className="font-medium">Auto-select mode</div>;
+                          if (val === "webrtc") return <div className="font-medium">WebRTC stream</div>;
+                          if (val === "mse") return <div className="font-medium">MSE stream</div>;
+                          if (val === "mp4") return <div className="font-medium">MP4 stream</div>;
+                          if (val === "hls") return <div className="font-medium">HLS/fMP4 stream</div>;
+                          if (val === "mjpeg") return <div className="font-medium">MJPEG stream</div>;
+                          return <div className="font-medium">{val}</div>;
+                        })()}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webrtc,mse,hls,mjpeg" className="py-2">
+                        <div className="font-medium">Auto-select mode</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: all / codecs: H264, H265*, MJPEG, JPEG, AAC, PCMU, PCMA, OPUS</div>
+                      </SelectItem>
+                      <SelectItem value="webrtc" className="py-2">
+                        <div className="font-medium">WebRTC stream</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: all / codecs: H264, PCMU, PCMA, OPUS / +H265 in Safari</div>
+                      </SelectItem>
+                      <SelectItem value="mse" className="py-2">
+                        <div className="font-medium">MSE stream</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox, Safari Mac/iPad / codecs: H264, H265*, AAC, PCMA*, PCMU*, PCM*</div>
+                      </SelectItem>
+                      <SelectItem value="mp4" className="py-2">
+                        <div className="font-medium">MP4 stream</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox / codecs: H264, H265*, AAC, FLAC, OPUS, MP3</div>
+                      </SelectItem>
+                      <SelectItem value="hls" className="py-2">
+                        <div className="font-medium">HLS/fMP4 stream</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Safari all, Chrome Android / codecs: H264, H265*, AAC</div>
+                      </SelectItem>
+                      <SelectItem value="mjpeg" className="py-2">
+                        <div className="font-medium">MJPEG stream</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: all / codecs: MJPEG, JPEG</div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Camera Active */}
@@ -739,57 +725,10 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
           {/* ─── URL PREVIEW & PTZ TEST ─── */}
           <div className="mt-4 pt-4 border-t space-y-4 shrink-0">
-            <div className="rounded-md border bg-muted/30 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t("urlPreview")}</div>
-              </div>
-              
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t("urlPreview")}</div>
               <UrlRow icon={<Link2 className="h-3.5 w-3.5" />} label="Source Stream URL" value={streamUrlPreview} tone="primary" />
-              
-              <div className="pt-2 border-t border-border/50">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 block">Go2RTC Export Links</Label>
-                <div className="space-y-2">
-                  <Select value={selectedLinkId} onValueChange={setSelectedLinkId}>
-                    <SelectTrigger className="h-8 text-xs bg-background">
-                      <SelectValue placeholder="Select output format" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {Object.entries(
-                        STREAM_LINKS.reduce((acc, link) => {
-                          if (!acc[link.category]) acc[link.category] = [];
-                          acc[link.category].push(link);
-                          return acc;
-                        }, {} as Record<string, typeof STREAM_LINKS>)
-                      ).map(([category, links]) => (
-                        <SelectGroup key={category}>
-                          <SelectLabel className="text-[10px] uppercase text-muted-foreground">{category}</SelectLabel>
-                          {links.map(link => (
-                            <SelectItem key={link.id} value={link.id} className="text-xs">
-                              {link.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  {(() => {
-                    const activeLink = STREAM_LINKS.find(l => l.id === selectedLinkId);
-                    if (!activeLink) return null;
-                    const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
-                    const id = camera?.id ?? "preview";
-                    const url = activeLink.url(host, id);
-                    return (
-                      <div className="space-y-2">
-                        <div className="text-[10px] text-muted-foreground px-1 bg-background/50 border rounded p-1.5 leading-snug">
-                          {activeLink.desc}
-                        </div>
-                        <UrlRow icon={<Radio className="h-3.5 w-3.5" />} label={`Output: ${activeLink.label}`} value={url} tone="success" />
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
+              <UrlRow icon={<Radio className="h-3.5 w-3.5" />} label={`Restream URL`} value={restreamUrl} tone="success" />
             </div>
 
             {camera && form.sourceType === "ONVIF" && form.enablePTZ && (
