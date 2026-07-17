@@ -23,20 +23,12 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const [posterTs, setPosterTs] = useState(() => Date.now());
 
   useEffect(() => {
     if (onStatusChange) {
       onStatusChange(status);
     }
   }, [status, onStatusChange]);
-
-  // Refresh poster setiap kali status berubah dari playing ke non-playing
-  useEffect(() => {
-    if (status !== "playing") {
-      setPosterTs(Date.now());
-    }
-  }, [status]);
 
   useEffect(() => {
     if (document.querySelector('script[src="/video-rtc.js"]')) {
@@ -119,19 +111,20 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     );
   }
 
-  const isPlaying = status === "playing";
+  // Poster URL: pakai timestamp agar browser selalu ambil gambar baru saat reconnect
+  const posterUrl = `/api/streams/${camera.id}/poster?t=${Math.floor(Date.now() / 5000)}`;
 
   return (
-    <div className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}>
-      {/* Poster layer: <img> terpisah yang selalu visible di belakang, refresh saat disconnect */}
-      <img
-        src={`/api/streams/${camera.id}/poster?t=${posterTs}`}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover z-0"
-        draggable={false}
-      />
-
-      {/* Overlay status connecting/buffering */}
+    <div
+      className={cn("absolute inset-0 overflow-hidden flex items-center justify-center", className)}
+      style={{
+        backgroundColor: '#000',
+        backgroundImage: `url(${posterUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      {/* Container managed purely by React for the loading/status overlay */}
       {(status === "connecting" || status === "buffering") && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/50 backdrop-blur-[1px] pointer-events-none transition-opacity duration-300">
           <Loader2 className="h-7 w-7 mb-3 animate-spin text-primary opacity-80" />
@@ -141,7 +134,6 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         </div>
       )}
 
-      {/* Overlay status error */}
       {status === "error" && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
           <AlertTriangle className="h-7 w-7 mb-3 text-destructive opacity-80" />
@@ -154,14 +146,8 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         </div>
       )}
       
-      {/* Container managed purely by Vanilla JS for video-rtc - z-20 di atas poster & overlay */}
-      <div 
-        ref={containerRef} 
-        className={cn(
-          "absolute inset-0 w-full h-full z-20 transition-opacity duration-500",
-          isPlaying ? "opacity-100" : "opacity-0"
-        )} 
-      />
+      {/* Container managed purely by Vanilla JS for video-rtc */}
+      <div ref={containerRef} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
