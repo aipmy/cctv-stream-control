@@ -139,6 +139,50 @@ app.use("/video-rtc.js", proxyToGo2rtc);
 
 app.use("/api/setup", setupRoutes);
 app.use("/api/auth", authRoutes);
+
+// Poster endpoint harus sebelum requireAuth karena CSS background-image tidak bisa mengirim token
+app.get("/api/streams/:id/poster", async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const thumbnailDir = path.join(config.storageDir, "thumbnails");
+    await fs.promises.mkdir(thumbnailDir, { recursive: true });
+    const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
+
+    // Fire & Forget: ambil frame terbaru dari Go2RTC, timpa file lokal
+    fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`)
+      .then(r => { if (r.ok) return r.arrayBuffer(); throw new Error("fail"); })
+      .then(buf => fs.promises.writeFile(thumbnailPath, Buffer.from(buf)))
+      .catch(() => {});
+
+    // Lazy load: jika file sudah ada, kirim langsung tanpa menunggu Go2RTC
+    if (fs.existsSync(thumbnailPath)) {
+      res.setHeader("Cache-Control", "no-cache");
+      res.type("image/jpeg");
+      return res.sendFile(thumbnailPath);
+    }
+
+    // Pertama kali: tunggu maks 2 detik
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 2000);
+      const r = await fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`, { signal: controller.signal });
+      clearTimeout(tid);
+      if (r.ok) {
+        const buffer = Buffer.from(await r.arrayBuffer());
+        fs.promises.writeFile(thumbnailPath, buffer).catch(() => {});
+        res.setHeader("Cache-Control", "no-cache");
+        res.type("image/jpeg");
+        return res.send(buffer);
+      }
+    } catch (_) {}
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#0f172a"/><text x="400" y="225" font-family="sans-serif" font-size="20" fill="#475569" text-anchor="middle">No Snapshot Available</text></svg>`;
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("image/svg+xml");
+    return res.send(svg);
+  } catch (err) { next(err); }
+});
+
 app.use("/api", requireAuth);
 app.use("/api/cameras", cameraRoutes);
 app.use("/api/users", userRoutes);

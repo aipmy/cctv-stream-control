@@ -129,52 +129,6 @@ function appendQuery(line, query) {
 
 streamRoutes.get("/status", (_req, res) => res.json(streamStatus()));
 
-streamRoutes.get("/:id/poster", async (req, res, next) => {
-  try {
-    const id = req.params.id;
-    const thumbnailDir = path.join(config.storageDir, "thumbnails");
-    await fs.promises.mkdir(thumbnailDir, { recursive: true });
-    const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
-
-    // Latar belakang (Fire & Forget): Ambil frame baru dari Go2RTC dan selalu timpa file lokal
-    fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`)
-      .then(r => {
-        if (r.ok) return r.arrayBuffer();
-        throw new Error("HTTP " + r.status);
-      })
-      .then(buf => fs.promises.writeFile(thumbnailPath, Buffer.from(buf)))
-      .catch(() => {}); // Abaikan error jika kamera offline
-
-    // LAZY LOAD: Jika file sudah ada, langsung kirim ke user tanpa menunggu Go2RTC!
-    if (fs.existsSync(thumbnailPath)) {
-      res.setHeader("Cache-Control", "no-cache");
-      res.type("image/jpeg");
-      return res.sendFile(thumbnailPath);
-    }
-
-    // Jika file belum ada sama sekali, kita coba tunggu maks 2 detik untuk frame pertama
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const go2rtcRes = await fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (go2rtcRes.ok) {
-        const buffer = Buffer.from(await go2rtcRes.arrayBuffer());
-        fs.promises.writeFile(thumbnailPath, buffer).catch(() => {});
-        res.setHeader("Cache-Control", "no-cache");
-        res.type("image/jpeg");
-        return res.send(buffer);
-      }
-    } catch (err) {}
-
-    const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#0f172a"/><text x="400" y="225" font-family="sans-serif" font-size="20" fill="#475569" text-anchor="middle">No Snapshot Available</text></svg>`;
-    res.setHeader("Cache-Control", "no-cache");
-    res.type("image/svg+xml");
-    return res.send(placeholderSvg);
-  } catch (err) { next(err); }
-});
-
 streamRoutes.post("/:id/start", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);
