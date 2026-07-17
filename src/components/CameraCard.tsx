@@ -282,11 +282,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
       <div
         ref={cardRef}
         className={cn("relative aspect-video bg-black overflow-hidden group", !controlsVisible && "cursor-none")}
-        style={{
-          backgroundImage: `url(/api/streams/${camera.id}/poster)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
         onMouseMove={revealControls}
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
