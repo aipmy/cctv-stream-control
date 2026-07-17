@@ -49,7 +49,7 @@ test("controller reports socket reset as warning only after command dispatch", a
     id: "cam-1",
     enabled: true,
     enablePTZ: true,
-    sourceType: "RTSP+ONVIF",
+    sourceType: "ONVIF",
   };
 
   const result = await controller.send(camera, "right", { duration: 200 });
@@ -71,7 +71,7 @@ test("controller does not soften connection failures", async () => {
       id: "cam-1",
       enabled: true,
       enablePTZ: true,
-      sourceType: "RTSP+ONVIF",
+      sourceType: "ONVIF",
     }, "left"),
     /socket hang up/,
   );

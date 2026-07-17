@@ -19,10 +19,10 @@ function normalizeOnvifError(error, camera) {
   const raw = redactError(error);
   const lower = raw.toLowerCase();
   if (lower.includes("econnrefused")) {
-    return new Error(`ONVIF ditolak oleh kamera. Cek port ${camera.onvifPort || 80}.`);
+    return new Error(`ONVIF ditolak oleh kamera. Cek port ${camera.onvifPort || camera.port || 80}.`);
   }
   if (lower.includes("timeout") || lower.includes("etimedout")) {
-    return new Error(`ONVIF timeout ke ${camera.ip}:${camera.onvifPort || 80}.`);
+    return new Error(`ONVIF timeout ke ${camera.ip}:${camera.onvifPort || camera.port || 80}.`);
   }
   if (lower.includes("401") || lower.includes("unauthorized") || lower.includes("not authorized")) {
     return new Error("ONVIF login gagal. Cek username, password, dan permission PTZ.");

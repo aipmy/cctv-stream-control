@@ -11,7 +11,7 @@ function cameraOptions(camera, extra = {}) {
     hostname: camera.ip,
     username: camera.username || "admin",
     password: camera.password || "",
-    port: Number(camera.onvifPort || 80),
+    port: Number(camera.onvifPort || camera.port || 80),
     timeout: Math.max(2500, Math.min(15000, Number(process.env.PTZ_SOCKET_TIMEOUT_MS || 5000))),
     preserveAddress: true,
     ...extra,
@@ -121,7 +121,7 @@ function connectionKey(camera) {
   return [
     camera.id,
     camera.ip,
-    camera.onvifPort || 80,
+    camera.onvifPort || camera.port || 80,
     camera.username || "admin",
     camera.password || "",
   ].join(":");
