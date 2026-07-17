@@ -728,7 +728,15 @@ export function SmartDetectionEditor({
         />
         
         {!imgLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-slate-400 gap-2 z-0">
+          <div 
+            className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 text-slate-300 gap-2 z-0"
+            style={{
+              backgroundImage: `url(/api/frame.jpeg?src=${cameraId})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundBlendMode: 'overlay'
+            }}
+          >
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-primary" />
             <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Kamera...</span>
           </div>

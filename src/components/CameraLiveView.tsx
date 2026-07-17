@@ -131,7 +131,14 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   }
 
   return (
-    <div className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}>
+    <div 
+      className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}
+      style={{
+        backgroundImage: `url(/api/frame.jpeg?src=${camera.id})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
       {/* Container managed purely by React for the loading/status overlay */}
       {(status === "connecting" || status === "buffering") && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] pointer-events-none transition-opacity duration-300">
