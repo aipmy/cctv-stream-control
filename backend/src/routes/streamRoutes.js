@@ -136,6 +136,23 @@ streamRoutes.get("/:id/poster", async (req, res, next) => {
     await fs.promises.mkdir(thumbnailDir, { recursive: true });
     const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
 
+    // Latar belakang (Fire & Forget): Ambil frame baru dari Go2RTC dan selalu timpa file lokal
+    fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`)
+      .then(r => {
+        if (r.ok) return r.arrayBuffer();
+        throw new Error("HTTP " + r.status);
+      })
+      .then(buf => fs.promises.writeFile(thumbnailPath, Buffer.from(buf)))
+      .catch(() => {}); // Abaikan error jika kamera offline
+
+    // LAZY LOAD: Jika file sudah ada, langsung kirim ke user tanpa menunggu Go2RTC!
+    if (fs.existsSync(thumbnailPath)) {
+      res.setHeader("Cache-Control", "no-cache");
+      res.type("image/jpeg");
+      return res.sendFile(thumbnailPath);
+    }
+
+    // Jika file belum ada sama sekali, kita coba tunggu maks 2 detik untuk frame pertama
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -144,21 +161,12 @@ streamRoutes.get("/:id/poster", async (req, res, next) => {
 
       if (go2rtcRes.ok) {
         const buffer = Buffer.from(await go2rtcRes.arrayBuffer());
-        // Simpan snapshot ke disk (.storage/thumbnails) agar bisa di-fallback
-        fs.promises.writeFile(thumbnailPath, buffer).catch(err => console.error(`[Poster] Gagal menyimpan thumbnail untuk ${id}:`, err.message));
+        fs.promises.writeFile(thumbnailPath, buffer).catch(() => {});
         res.setHeader("Cache-Control", "no-cache");
         res.type("image/jpeg");
         return res.send(buffer);
       }
-    } catch (err) {
-      // Timeout atau error dari go2rtc, kita akan fallback ke file disk
-    }
-
-    if (fs.existsSync(thumbnailPath)) {
-      res.setHeader("Cache-Control", "no-cache");
-      res.type("image/jpeg");
-      return res.sendFile(thumbnailPath);
-    }
+    } catch (err) {}
 
     res.status(404).json({ error: "Poster tidak ditemukan" });
   } catch (err) { next(err); }
