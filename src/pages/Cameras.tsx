@@ -285,7 +285,7 @@ export default function Cameras() {
                       <div className="text-xs text-muted-foreground space-y-1.5 pt-1 bg-muted/20 p-4 rounded-xl border border-border/40">
                         <div className="font-semibold text-foreground">{t("cameraManagementPreviewTitle")}</div>
                         <div>{t("cameraManagementPreviewHelp")}</div>
-                        <div>Stream: <span className="font-mono text-foreground/80">{c.streamType}</span> · HLS Mode: <span className="font-mono text-foreground/80">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono text-foreground/80">{c.streamQuality || "Auto"}</span></div>
+                        <div>Source: <span className="font-mono text-foreground/80">{c.sourceType}</span> · Stream: <span className="font-mono text-foreground/80">{c.streamType}</span></div>
                         <div>Audio: <span className="font-mono text-foreground/80">{c.audioMode}</span> · PTZ: <span className="font-mono text-foreground/80">{c.enablePTZ ? t("active") : t("inactive")}</span></div>
                         <div>Status: <span className="font-mono text-foreground/80">{c.status}</span> · Viewer: <span className="font-mono text-foreground/80">{c.viewerCount || 0}</span></div>
                         <div>Pull CCTV: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span> · Output viewer: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.bandwidthKbps || 0)}</span></div>
@@ -411,7 +411,7 @@ export default function Cameras() {
                   />
                   <div className="text-[11px] text-muted-foreground space-y-1.5 bg-muted/20 p-3 rounded-lg border">
                     <div className="font-semibold text-foreground">{t("cameraManagementPreviewTitle")}</div>
-                    <div>Stream: <span className="font-mono text-foreground/80">{c.streamType}</span> · HLS: <span className="font-mono text-foreground/80">{c.hlsMode || "copy"}</span> · Kualitas: <span className="font-mono text-foreground/80">{c.streamQuality || "Auto"}</span></div>
+                    <div>Source: <span className="font-mono text-foreground/80">{c.sourceType}</span> · Stream: <span className="font-mono text-foreground/80">{c.streamType}</span></div>
                     <div>PTZ: <span className="font-mono text-foreground/80">{c.enablePTZ ? t("active") : t("inactive")}</span> · Audio: <span className="font-mono text-foreground/80">{c.audioMode}</span></div>
                     <div>Pull CCTV: <span className="font-mono text-foreground/80">{formatByteRateFromKbps(c.pullBandwidthKbps || 0)}</span></div>
                   </div>

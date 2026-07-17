@@ -7,18 +7,16 @@ export const statRoutes = Router();
 
 function enrichCameras(cameras) {
   return cameras.map((camera) => {
-    const m = streamMetricsFor(camera.id, camera.streamType);
-    const runtimeStatus = camera.enabled ? streamRuntimeStatusFor(camera.id) : null;
     return {
       ...camera,
-      status: !camera.enabled ? "offline" : runtimeStatus || camera.status || "offline",
-      viewerCount: m.viewers,
-      bandwidthKbps: m.bandwidthKbps,
-      pullBandwidthKbps: m.cctvPullKbps,
-      outBytesPerSec: m.outBytesPerSec || 0,
-      pullBytesPerSec: m.pullBytesPerSec || 0,
-      latencyMs: m.latencyMs,
-      activeViewers: m.activeViewers || [],
+      status: !camera.enabled ? "offline" : camera.status || "offline",
+      viewerCount: camera.viewerCount || 0,
+      bandwidthKbps: camera.bandwidthKbps || 0,
+      pullBandwidthKbps: camera.pullBandwidthKbps || 0,
+      outBytesPerSec: (camera.bandwidthKbps || 0) * 1000 / 8,
+      pullBytesPerSec: (camera.pullBandwidthKbps || 0) * 1000 / 8,
+      latencyMs: camera.latencyMs || 0,
+      activeViewers: camera.activeViewers || [],
     };
   });
 }

@@ -7,7 +7,7 @@ import jpeg from "jpeg-js";
 import { rgbaToGray, detectMotion } from "../core/motionEngine.js";
 import { JsonStore } from "../core/jsonStore.js";
 import { getCamera, listCameras } from "./cameraService.js";
-import { buildSourceUrl } from "../core/cctv.js";
+
 import { auditRequest } from "../modules/audit/auditService.js";
 
 const eventStore = new JsonStore(path.join(config.dataDir, "events.json"), []);

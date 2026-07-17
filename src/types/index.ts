@@ -1,16 +1,23 @@
 export type Role = "admin" | "teknisi" | "guest" | "internal" | "external";
-export type StreamType = "HLS Stable" | "HLS Low Latency" | "MJPEG";
-export type RtspTransport = "tcp" | "udp" | "auto";
-export type HlsMode = "copy" | "transcode";
+export type StreamType = "WebRTC" | "MSE" | "HLS" | "MJPEG" | "webrtc,mse" | "webrtc" | "hls" | "mjpeg" | "webrtc,mse,hls,mjpeg" | "mse";
 export type Brand = "Universal" | "Bardi" | "EZVIZ" | "Hikvision";
-export type SourceType = "RTSP" | "RTSP+ONVIF" | "MJPEG" | "HLS";
+export type SourceType = "ONVIF" | "RTSP" | "DVRIP" | "HomeAssistant" | "Custom";
 export type CameraStatus = "online" | "offline" | "starting";
 
 export const SOURCE_SUPPORTS_PTZ: Record<SourceType, boolean> = {
+  ONVIF: true,
   RTSP: false,
-  "RTSP+ONVIF": true,
-  MJPEG: false,
-  HLS: false,
+  DVRIP: false,
+  HomeAssistant: false,
+  Custom: true,
+};
+
+export const DEFAULT_PORTS: Record<SourceType, number> = {
+  ONVIF: 80,
+  RTSP: 554,
+  DVRIP: 34567,
+  HomeAssistant: 0,
+  Custom: 0,
 };
 
 export interface Camera {
@@ -18,22 +25,21 @@ export interface Camera {
   name: string;
   site: string;
   ip: string;
+  port: number;
   brand: Brand;
-  /** Runtime status. Jangan diisi manual dari form; backend update dari probe/stream. */
+  /** Runtime status. Backend update dari probe/stream. */
   status: CameraStatus;
-  /** Konfigurasi aktif/nonaktif kamera. Kamera disabled tidak akan start stream/FFmpeg. */
+  /** Konfigurasi aktif/nonaktif kamera. */
   enabled: boolean;
   sourceType: SourceType;
+  /** Output format untuk go2rtc video-rtc player */
   streamType: StreamType;
-  /** Transport RTSP untuk FFmpeg: tcp paling stabil, udp lebih rendah latency, auto mengikuti default FFmpeg. */
-  rtspTransport?: RtspTransport;
-  /** copy = ringan sesuai command manual; transcode = lebih kompatibel browser tapi CPU lebih berat. */
-  hlsMode?: HlsMode;
-  rtspPort?: number;
-  onvifPort?: number;
-  httpPort?: number;
-  sourcePath?: string;
-  rtspUrl: string; // computed / cached full source URL
+  /** Final go2rtc stream URL (e.g. onvif://admin:pass@ip:port#audio=opus) */
+  streamUrl: string;
+  /** Hanya untuk RTSP: path setelah host:port */
+  streamPath?: string;
+  /** Hanya untuk Custom: raw URL go2rtc */
+  customUrl?: string;
   username?: string;
   password?: string;
   hasPassword: boolean;
@@ -47,8 +53,6 @@ export interface Camera {
   outBytesPerSec?: number;
   pullBytesPerSec?: number;
   latencyMs: number;
-  qualityProfile: "Low" | "Medium" | "High" | "4K";
-  streamQuality: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   errorHistory?: Array<{ timestamp: string; message: string }>;
   enableRecording?: boolean;
   enableNotifications?: boolean;
@@ -57,6 +61,7 @@ export interface Camera {
   motionArea?: MotionArea | null;
   excludeAreas?: MotionArea[] | null;
   detectionModes?: string[] | null;
+  /** "Auto" = ikuti stream output, atau resolusi manual */
   detectResolution?: "Auto" | "1080p" | "720p" | "480p" | "360p" | "144p";
   recordingMode?: string;
   recordMode?: "copy" | "transcode" | "";

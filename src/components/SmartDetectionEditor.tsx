@@ -76,19 +76,66 @@ export function SmartDetectionEditor({
   useEffect(() => { showPixelMotionRef.current = showPixelMotion; }, [showPixelMotion]);
   useEffect(() => { aiSensitivityRef.current = aiSensitivity; }, [aiSensitivity]);
 
-  // Build MJPEG src URL
-  const mjpegSrc = useMemo(() => {
-    const token = localStorage.getItem("cctv-lite-token") || "";
-    const base = (typeof window !== "undefined" && ["5173", "5174", "8080"].includes(window.location.port))
-      ? `${window.location.protocol}//${window.location.hostname}:4200`
-      : "";
-    return `${base}/api/streams/${cameraId}/video.mjpg?token=${encodeURIComponent(token)}&t=${Date.now()}`;
-  }, [cameraId]);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  useEffect(() => {
+    const loadGo2RTC = async () => {
+      if (customElements.get("video-rtc")) {
+        setScriptLoaded(true);
+        return;
+      }
+      try {
+        const importRemote = new Function('url', 'return import(url)');
+        const go2rtcHost = window.location.hostname;
+        const module = await importRemote(`http://${go2rtcHost}:1984/video-rtc.js`);
+        if (!customElements.get("video-rtc")) {
+          customElements.define("video-rtc", module.VideoRTC);
+        }
+        setScriptLoaded(true);
+      } catch (e) {
+        console.error("Failed to load video-rtc.js", e);
+      }
+    };
+    loadGo2RTC();
+  }, []);
+
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!scriptLoaded || !cameraId || !cameraEnabled || !videoContainerRef.current) return;
+    
+    videoContainerRef.current.innerHTML = "";
+    const go2rtcHost = window.location.hostname;
+    const src = `http://${go2rtcHost}:1984/api/ws?src=${encodeURIComponent(cameraId)}`;
+    
+    const videoRtc = document.createElement("video-rtc") as any;
+    videoRtc.setAttribute("mode", "webrtc,mse");
+    videoRtc.setAttribute("background", "true");
+    videoRtc.volume = 0;
+    videoRtc.muted = true;
+    videoRtc.setAttribute("muted", "true");
+    videoRtc.style.display = "block";
+    videoRtc.style.width = "100%";
+    videoRtc.style.height = "100%";
+    videoRtc.style.objectFit = "contain";
+    
+    videoContainerRef.current.appendChild(videoRtc);
+    videoRtc.src = src;
+    
+    // Check periodically if the video is ready to remove the loading spinner
+    const interval = setInterval(() => {
+       const internalVideo = videoRtc.querySelector("video");
+       if (internalVideo && internalVideo.readyState >= 2) { // HAVE_CURRENT_DATA
+         setImgLoaded(true);
+         clearInterval(interval);
+       }
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [scriptLoaded, cameraId, cameraEnabled]);
 
   // Reset image loaded status on stream URL change
   useEffect(() => {
     setImgLoaded(false);
-  }, [mjpegSrc]);
+  }, [cameraId]);
 
   // SSE for motion events
   useEffect(() => {
@@ -146,13 +193,13 @@ export function SmartDetectionEditor({
     let raf: number;
     const draw = () => {
       const canvas = canvasRef.current;
-      const img = imgRef.current;
-      if (!canvas || !img) {
+      const container = videoContainerRef.current;
+      if (!canvas || !container) {
         raf = requestAnimationFrame(draw);
         return;
       }
 
-      const rect = img.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
 
@@ -667,19 +714,15 @@ export function SmartDetectionEditor({
 
       {/* ══════ Editor & Live Preview Stage ══════ */}
       <div className="relative w-full aspect-video border bg-slate-950 rounded-lg overflow-hidden border-slate-800 select-none">
-        <img
-          ref={imgRef}
-          src={mjpegSrc}
-          alt="Live MJPEG"
-          className="w-full h-full object-contain block"
-          crossOrigin="anonymous"
-          onLoad={() => setImgLoaded(true)}
+        <div 
+          ref={videoContainerRef} 
+          className="w-full h-full block" 
         />
         
         {!imgLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-slate-400 gap-2 z-0">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-primary" />
-            <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Stream MJPEG...</span>
+            <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Stream RTC...</span>
           </div>
         )}
 

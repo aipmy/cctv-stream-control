@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Go2RTC Stream</title>
+  <style>
+    body { background: #111; color: white; font-family: sans-serif; padding: 20px; }
+    #status { margin: 10px 0; padding: 10px; background: #222; border-radius: 4px; white-space: pre-wrap; }
+    video-rtc { display: block; width: 640px; height: 480px; background: #000; border: 1px solid #333; }
+  </style>
+</head>
+<body>
+  <h2>Test Go2RTC Stream</h2>
+  <div id="status">Loading...</div>
+  <div id="player"></div>
+
+  <script type="module">
+    const status = document.getElementById('status');
+    const player = document.getElementById('player');
+
+    try {
+      status.textContent = '1. Importing video-rtc.js from go2rtc...';
+      const module = await import('http://localhost:1984/video-rtc.js');
+      status.textContent = '2. Module loaded. Exports: ' + Object.keys(module).join(', ');
+
+      if (!customElements.get('video-rtc')) {
+        customElements.define('video-rtc', module.VideoRTC);
+      }
+      status.textContent += '\n3. Custom element registered.';
+
+      // Create element and append to DOM FIRST
+      const el = document.createElement('video-rtc');
+      el.setAttribute('mode', 'mse,webrtc,hls,mjpeg');
+      el.setAttribute('background', 'true');
+      player.appendChild(el);
+      status.textContent += '\n4. Element appended to DOM.';
+
+      // Set src as JS property (NOT attribute!) AFTER appending
+      // VideoRTC has no observedAttributes, so setAttribute won't trigger the setter
+      el.src = 'http://localhost:1984/api/ws?src=kost_livingroom';
+      status.textContent += '\n5. src property set. Stream should start connecting...';
+    } catch (e) {
+      status.textContent = 'ERROR: ' + e.message + '\n' + e.stack;
+      console.error(e);
+    }
+  </script>
+</body>
+</html>

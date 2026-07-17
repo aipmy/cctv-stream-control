@@ -15,7 +15,7 @@ test("public camera replaces password with hasPassword metadata", () => {
 
   assert.equal(result.password, undefined);
   assert.equal(result.hasPassword, true);
-  assert.doesNotMatch(result.rtspUrl, /camera-secret/);
+  assert.doesNotMatch(result.streamUrl, /camera-secret/);
 });
 
 test("camera password update semantics preserve, replace, and clear explicitly", () => {

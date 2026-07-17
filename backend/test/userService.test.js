@@ -107,6 +107,6 @@ test("users can change their own password only with the current password", async
   );
   assert.equal(changed.username, "admin");
   assert.equal(changed.password, undefined);
-  assert.equal((await service.login("admin", "secret-one")).ok, false);
+  await assert.rejects(service.login("admin", "secret-one"), (err) => err?.status === 401);
   assert.equal((await service.login("admin", "secret-two")).ok, true);
 });

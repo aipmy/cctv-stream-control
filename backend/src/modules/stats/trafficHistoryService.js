@@ -33,7 +33,7 @@ function emptyTraffic() {
 
 function sample() {
   const operation = sampleLock.then(async () => {
-    const point = sampleTrafficRates(metricsProvider());
+    const point = sampleTrafficRates(await metricsProvider());
     await store.add(point);
     return point;
   });

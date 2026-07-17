@@ -6,7 +6,7 @@ import https from "node:https";
 import { spawn } from "node:child_process";
 import { URL } from "node:url";
 import { config } from "../core/config.js";
-import { buildSourceUrl } from "../core/cctv.js";
+
 import { getCamera, markCameraStatus, logCameraError } from "../services/cameraService.js";
 import { recordTraffic } from "../core/traffic.js";
 import {
@@ -274,8 +274,8 @@ function logLifecycle(session, message) {
   writeDiagnosticLog(session, message);
 }
 
-export function isChildAlive(child) {
-  return child && child.exitCode === null && child.signalCode === null;
+export function isChildAlive(session) {
+  return session && session.status !== "stopped" && session.status !== "error";
 }
 
 function scheduleHlsIdleCleanup() {
@@ -283,7 +283,7 @@ function scheduleHlsIdleCleanup() {
   const timer = setInterval(() => {
     const now = Date.now();
     for (const [id, session] of hlsSessions.entries()) {
-      const alive = isChildAlive(session.child);
+      const alive = isChildAlive(session);
       if (!alive) {
         const closedAt = session.closedAt ? new Date(session.closedAt).getTime() : 0;
         if (closedAt && now - closedAt > config.streamErrorRetentionMs) hlsSessions.delete(id);
@@ -292,10 +292,10 @@ function scheduleHlsIdleCleanup() {
       
       // Watchdog: Detect frozen stream (no frames for 45s)
       if (session.lastFrameAt && now - session.lastFrameAt > 45000) {
-        logLifecycle(session, `watchdog timeout: no frames received for 45s, stream appears stuck. Killing ffmpeg.`);
+        logLifecycle(session, `watchdog timeout: no frames received for 45s, stream appears stuck.`);
         session.status = "error";
         session.rawError = "Stream frozen (Watchdog timeout: no frames received)";
-        session.child.kill("SIGKILL");
+        if (session.pollTimer) clearInterval(session.pollTimer);
         continue;
       }
 
@@ -305,8 +305,8 @@ function scheduleHlsIdleCleanup() {
       }
       if (session.lastRequestAt && now - session.lastRequestAt > config.streamIdleMs) {
         session.status = "idle-timeout";
-        logLifecycle(session, `idle timeout ${config.streamIdleMs}ms, stopping ffmpeg`);
-        session.child.kill("SIGTERM");
+        logLifecycle(session, `idle timeout ${config.streamIdleMs}ms, stopping polling`);
+        if (session.pollTimer) clearInterval(session.pollTimer);
       }
     }
   }, interval);
@@ -359,17 +359,9 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
   const startPromise = (async () => {
     const existing = hlsSessions.get(id);
     if (existing) {
-      if (isChildAlive(existing.child)) {
-        if (existing.output === output) {
-          existing.lastRequestAt = Date.now();
-          return existing;
-        }
-        await stopHls(id);
-      } else {
-        const closedAtMs = existing.closedAt ? new Date(existing.closedAt).getTime() : 0;
-        if (existing.status === "error" && Date.now() - closedAtMs < 10000) {
-          return existing;
-        }
+      if (existing.status !== "stopped" && existing.status !== "error") {
+        existing.lastRequestAt = Date.now();
+        return existing;
       }
     }
 
@@ -381,45 +373,10 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       throw err;
     }
 
-    const dir = streamDir(id, output);
-    let recordDir = null;
-
-    if (camera.enableRecording) {
-      // Always separate live stream (goes to /tmp) from recording (goes to HDD)
-      const needsSeparateRecordOutput = true;
-
-      if (needsSeparateRecordOutput) {
-        recordDir = path.join(config.storageDir, "record_hls", id);
-        await fs.mkdir(recordDir, { recursive: true });
-        await fs.unlink(path.join(recordDir, "index.m3u8")).catch(() => {});
-      } else {
-        const oldRecordDir = path.join(config.storageDir, "record_hls", id);
-        await fs.rm(oldRecordDir, { recursive: true, force: true }).catch(() => {});
-      }
-
-      await fs.mkdir(dir, { recursive: true });
-      await fs.unlink(path.join(dir, "index.m3u8")).catch(() => {});
-    } else {
-      await cleanDir(dir);
-    }
-    
-    const audioFallback = audioFailures.has(id);
-    const args = buildHlsArgs({ camera, output, dir, recordDir, options: config, audioFallback });
-
-    const hasSmartFeatures = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
-
-    const child = spawn(config.ffmpegBin, args, { stdio: ["ignore", "pipe", "pipe"] });
     const session = {
       id,
       key: id,
       output,
-      hlsMode: normalizeHlsMode(camera.hlsMode, config),
-      rtspTransport: normalizeRtspTransport(camera.rtspTransport, config),
-      rtspTimeoutOption: normalizeRtspTimeoutOption(camera.rtspTimeoutOption, config),
-      dir,
-      playlist: path.join(dir, "index.m3u8"),
-      child,
-      pid: child.pid,
       startedAt: nowIso(),
       status: "starting",
       rawError: "",
@@ -427,124 +384,124 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       keepAlive: Boolean(camera.enableRecording || camera.enableNotifications),
       lastFrame: null,
       lastFrameAt: Date.now(),
+      pollTimer: null
     };
     hlsSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
 
-    logLifecycle(session, `spawn: ${config.ffmpegBin} ${maskArgs(args).join(" ")}`);
-
-    const parse = extractJpegs();
-    child.stdout.on("data", (chunk) => {
-      recordCameraTraffic(id, "pull", chunk.length);
-      parse(chunk, (frame) => {
+    logLifecycle(session, `start polling go2rtc for camera: ${id}`);
+    
+    const go2rtcUrl = `http://127.0.0.1:1984/api/frame.jpeg?src=${id}`;
+    const fps = camera.detectFps || 6;
+    const intervalMs = Math.max(200, 1000 / fps);
+    
+    session.pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(go2rtcUrl);
+        if (!res.ok) return;
+        const arrayBuffer = await res.arrayBuffer();
+        const frame = Buffer.from(arrayBuffer);
+        
         session.lastFrame = frame;
         session.lastFrameAt = Date.now();
+        session.status = "running";
         
-        // Feed frame to pixel-diff motion engine (non-blocking)
+        // Feed frame to pixel-diff motion engine
         const hasSmart = Boolean(camera.enableSmartDetection ?? (camera.enableRecording || camera.enableNotifications));
         const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
         const hasAiListeners = motionEmitter.listenerCount(`ai-motion-${id}`) > 0;
         
+        if (!hasSmart && !hasListeners && !hasAiListeners && !session.keepAlive) {
+           console.log(`[Motion Detection] Stopping idle AI polling for ${id}`);
+           clearInterval(session.pollTimer);
+           hlsSessions.delete(id);
+           return;
+        }
+
         if (hasSmart || hasListeners || hasAiListeners) {
-          try {
-            const nowMs = Date.now();
-            let pixelMotionDetected = false;
+          const nowMs = Date.now();
+          let pixelMotionDetected = false;
 
-            // 1. Basic Motion Engine (runs every 250ms for smooth UI tracking)
-            if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 250) {
-              session.lastMotionProcess = nowMs;
-              const engine = getMotionEngine(id);
-              const result = engine.processFrame(frame, {
-                sensitivity: camera.motionSensitivity ?? 50,
-                excludeAreas: camera.excludeAreas || [],
-              });
-              pixelMotionDetected = Boolean(result && result.motion);
-              
-              // If basic motion detected something, trigger fallback (especially for 'pixel' mode)
-              if (pixelMotionDetected && hasSmart) {
-                const pixelBoxes = result.boxes.map(b => ({
-                  ...b,
-                  frameWidth: result.width,
-                  frameHeight: result.height
-                }));
-                void handleMotionDetected(camera, null, pixelBoxes, frame); // Pass null so it relies purely on pixel mode
-              }
+          if (!session.lastMotionProcess || nowMs - session.lastMotionProcess > 250) {
+            session.lastMotionProcess = nowMs;
+            const engine = getMotionEngine(id);
+            const result = engine.processFrame(frame, {
+              sensitivity: camera.motionSensitivity ?? 50,
+              excludeAreas: camera.excludeAreas || [],
+            });
+            pixelMotionDetected = Boolean(result && result.motion);
+            
+            if (pixelMotionDetected && hasSmart) {
+              const pixelBoxes = result.boxes.map(b => ({
+                ...b,
+                frameWidth: result.width,
+                frameHeight: result.height
+              }));
+              void handleMotionDetected(camera, null, pixelBoxes, frame);
             }
+          }
 
-            // 2. Continuous AI Engine (runs independently)
-            // session.aiBusy lock prevents worker queue buildup
-            const modes = camera.detectionModes || ["pixel", "human", "pet"];
-            const hasAiModes = modes.some(m => ["human", "pet", "object", "vehicle"].includes(m));
-            const needsAi = (hasSmart && hasAiModes) || hasAiListeners;
+          const modes = camera.detectionModes || ["pixel", "human", "pet"];
+          const hasAiModes = modes.some(m => ["human", "pet", "object", "vehicle"].includes(m));
+          const needsAi = (hasSmart && hasAiModes) || hasAiListeners;
 
-            const aiIntervalMs = Math.max(200, 1000 / (camera.detectFps || 1));
-            if (needsAi && !session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
-              session.aiBusy = true;
-              
-              
-              import("../core/aiDetector.js").then(ai => {
-                const threshold = (camera.aiSensitivity ?? 50) / 100;
-                ai.detectObjects(frame, threshold).then(predictions => {
-                  session.aiBusy = false;
-                  session.lastAiProcess = Date.now();
-                  
-                  if (predictions === null) return; // Frame was dropped, do not wipe previous UI boxes
-                  
-                  // Filter predictions by camera detection modes
-                  const modes = camera.detectionModes || ["pixel", "human", "pet"];
-                  const PERSON_CLASSES = ["person"];
-                  const PET_CLASSES = ["cat", "dog", "bird", "horse", "sheep", "cow"];
-                  const VEHICLE_CLASSES = ["car", "motorcycle", "bus", "truck", "bicycle"];
-                  
-                  const filtered = (predictions || []).filter(p => {
-                    if (modes.includes("human") && PERSON_CLASSES.includes(p.class)) return true;
-                    if (modes.includes("pet") && PET_CLASSES.includes(p.class)) return true;
-                    if (modes.includes("object") && !PERSON_CLASSES.includes(p.class) && !PET_CLASSES.includes(p.class)) return true;
-                    if (modes.includes("vehicle") && VEHICLE_CLASSES.includes(p.class)) return true;
-                    return false;
-                  });
-                  
-                  let finalPredictions = filtered;
-                  const now = Date.now();
-                  
-                  if (filtered.length > 0) {
-                    session.lastAiPredictions = filtered;
-                    session.lastAiPredictionTime = now;
-                  } else if (session.lastAiPredictions && now - session.lastAiPredictionTime < 2000) {
-                    // Temporal smoothing: Keep the box for 2 seconds if the AI momentarily drops it
-                    finalPredictions = session.lastAiPredictions;
-                  } else {
-                    session.lastAiPredictions = null;
-                  }
-                  
-                  // Emit filtered AI results (>= 10%) to frontend via SSE so they appear in live view
-                  motionEmitter.emit(`ai-motion-${id}`, {
-                    ts: new Date().toISOString(),
-                    predictions: finalPredictions
-                  });
-
-                  // Filter again strictly for events (must meet camera's AI Sensitivity setting)
-                  const eventFiltered = finalPredictions.filter(p => p.score >= threshold);
-
-                  // If AI found matching objects that meet the sensitivity threshold, trigger recording/notification
-                  if (eventFiltered.length > 0 && hasSmart) {
-                    void handleMotionDetected(camera, eventFiltered, null, frame);
-                  }
-                }).catch(err => {
-                  session.aiBusy = false;
-                  session.lastAiProcess = Date.now();
-                  console.error("[AI Engine Error]", err);
+          const aiIntervalMs = Math.max(200, 1000 / (camera.detectFps || 1));
+          if (needsAi && !session.aiBusy && (!session.lastAiProcess || nowMs - session.lastAiProcess > aiIntervalMs)) {
+            session.aiBusy = true;
+            
+            import("../core/aiDetector.js").then(ai => {
+              const threshold = (camera.aiSensitivity ?? 50) / 100;
+              ai.detectObjects(frame, threshold).then(predictions => {
+                session.aiBusy = false;
+                session.lastAiProcess = Date.now();
+                
+                if (predictions === null) return;
+                
+                const PERSON_CLASSES = ["person"];
+                const PET_CLASSES = ["cat", "dog", "bird", "horse", "sheep", "cow"];
+                const VEHICLE_CLASSES = ["car", "motorcycle", "bus", "truck", "bicycle"];
+                
+                const filtered = (predictions || []).filter(p => {
+                  if (modes.includes("human") && PERSON_CLASSES.includes(p.class)) return true;
+                  if (modes.includes("pet") && PET_CLASSES.includes(p.class)) return true;
+                  if (modes.includes("object") && !PERSON_CLASSES.includes(p.class) && !PET_CLASSES.includes(p.class)) return true;
+                  if (modes.includes("vehicle") && VEHICLE_CLASSES.includes(p.class)) return true;
+                  return false;
                 });
+                
+                let finalPredictions = filtered;
+                const now = Date.now();
+                
+                if (filtered.length > 0) {
+                  session.lastAiPredictions = filtered;
+                  session.lastAiPredictionTime = now;
+                } else if (session.lastAiPredictions && now - session.lastAiPredictionTime < 2000) {
+                  finalPredictions = session.lastAiPredictions;
+                } else {
+                  session.lastAiPredictions = null;
+                }
+                
+                motionEmitter.emit(`ai-motion-${id}`, {
+                  ts: new Date().toISOString(),
+                  predictions: finalPredictions
+                });
+
+                const eventFiltered = finalPredictions.filter(p => p.score >= threshold);
+                if (eventFiltered.length > 0 && hasSmart) {
+                  void handleMotionDetected(camera, eventFiltered, null, frame);
+                }
               }).catch(err => {
                 session.aiBusy = false;
                 session.lastAiProcess = Date.now();
-                console.error("[AI Load Error]", err);
               });
-            }
-          } catch (e) { /* ignore */ }
+            }).catch(err => {
+              session.aiBusy = false;
+              session.lastAiProcess = Date.now();
+            });
+          }
         }
 
-        // Feed frame to any registered MJPEG clients
+        // Feed to MJPEG clients if any
         const mjpeg = mjpegSessions.get(id);
         if (mjpeg) {
           mjpeg.status = "running";
@@ -555,44 +512,11 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             writeMjpegFrame(id, client, frame);
           }
         }
-      });
-    });
+      } catch (err) {
+        // Silently ignore polling errors
+      }
+    }, intervalMs);
 
-    child.stderr.on("data", (chunk) => {
-      writeFfmpegLog(session, chunk);
-    });
-    child.on("spawn", () => {
-      session.status = "starting";
-      session.pid = child.pid;
-    });
-    child.on("close", async (code, signal) => {
-      const wasRequestedStop = session.status === "stopped" || session.status === "idle-timeout";
-      if (!wasRequestedStop) {
-        session.status = signal === "SIGTERM" ? "stopped" : code === 0 ? "ended" : "error";
-      } else if (session.status === "idle-timeout" && signal === "SIGTERM") {
-        session.status = "stopped";
-      }
-      session.exitCode = code;
-      session.signalCode = signal;
-      session.closedAt = nowIso();
-      logLifecycle(session, `closed: code=${code} signal=${signal || "-"}`);
-      if (!wasRequestedStop && code !== 0 && signal !== "SIGTERM") {
-        if (camera.audioMode === "Auto" && !audioFailures.has(id)) {
-          audioFailures.add(id);
-          session.rawError += "\n[Audio Fallback] FFmpeg crashed. Mematikan audio untuk percobaan berikutnya.";
-        }
-        await markCameraStatus(id, { status: "offline" });
-        await logCameraError(id, `Stream stopped unexpectedly (Code: ${code}, Signal: ${signal})`);
-      }
-    });
-    child.on("error", async (err) => {
-      session.status = "error";
-      session.rawError = err.message;
-      session.closedAt = nowIso();
-      logLifecycle(session, `spawn error: ${err.message}`);
-      await markCameraStatus(id, { status: "offline" });
-      await logCameraError(id, `Spawn error: ${err.message}`);
-    });
     return session;
   })().finally(() => hlsStartLocks.delete(id));
 
@@ -604,22 +528,8 @@ export async function stopHls(id, _output) {
   const stopped = [];
   const stopOne = async (cameraId, session) => {
     if (!session) return;
-    if (isChildAlive(session.child)) {
-      await new Promise((resolve) => {
-        let exited = false;
-        session.child.once("close", () => {
-          exited = true;
-          resolve();
-        });
-        session.child.kill("SIGTERM");
-        setTimeout(() => {
-          if (!exited && isChildAlive(session.child)) {
-            console.log(`[StreamManager] Process ${session.pid} (Camera: ${cameraId}) did not exit on SIGTERM. Sending SIGKILL...`);
-            session.child.kill("SIGKILL");
-          }
-          resolve();
-        }, 2000);
-      });
+    if (session.pollTimer) {
+      clearInterval(session.pollTimer);
     }
     session.status = "stopped";
     session.closedAt = nowIso();
@@ -666,7 +576,7 @@ export function getHlsFilePath(id, output, filename) {
 }
 
 function proxyHttpMjpeg(id, camera, res) {
-  const source = buildSourceUrl(camera);
+  const source = camera.streamUrl;
   const url = new URL(source);
   const client = url.protocol === "https:" ? https : http;
   let firstByte = false;

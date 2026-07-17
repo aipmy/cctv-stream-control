@@ -1,99 +1,154 @@
 export const DEFAULT_PORTS = {
-  RTSP: { primary: 554 },
-  "RTSP+ONVIF": { primary: 554, onvif: 80 },
-  MJPEG: { primary: 80 },
-  HLS: { primary: 443 },
+  ONVIF: 80,
+  RTSP: 554,
+  DVRIP: 34567,
+  HomeAssistant: 0,
+  Custom: 0,
 };
 
-export function defaultPath(sourceType) {
-  switch (sourceType) {
-    case "RTSP":
-    case "RTSP+ONVIF":
-      return "/Streaming/Channels/101";
-    case "MJPEG":
-      return "/mjpg/video.mjpg";
-    case "HLS":
-      return "/live/index.m3u8";
-    default:
-      return "/";
-  }
-}
-
-export function normalizePath(p) {
-  if (!p) return "/";
-  return p.startsWith("/") ? p : `/${p}`;
-}
-
-export function buildSourceUrl(camera, opts = {}) {
+export function buildStreamUrl(camera, opts = {}) {
   const includeAuth = opts.includeAuth !== false;
   const maskPassword = Boolean(opts.maskPassword);
-  const sourceType = camera.sourceType || "RTSP";
-  const path = normalizePath(camera.sourcePath || defaultPath(sourceType));
+  const sourceType = camera.sourceType || "ONVIF";
+  const host = camera.ip || "0.0.0.0";
+  const port = Number(camera.port || DEFAULT_PORTS[sourceType] || 80);
   const username = camera.username || "";
   const auth = includeAuth && username
     ? `${encodeURIComponent(username)}:${maskPassword ? "••••••" : encodeURIComponent(camera.password || "")}@`
     : "";
-  const host = camera.ip || "0.0.0.0";
 
-  if (sourceType === "RTSP" || sourceType === "RTSP+ONVIF") {
-    const port = Number(camera.rtspPort || DEFAULT_PORTS[sourceType].primary);
-    return `rtsp://${auth}${host}:${port}${path}`;
+  switch (sourceType) {
+    case "ONVIF": {
+      let url = `onvif://${auth}${host}:${port}`;
+      if (camera.audioMode === "Enable" || camera.audioMode === "Auto") {
+        url += "#backchannel=1#audio=opus";
+      }
+      return url;
+    }
+    case "RTSP": {
+      const path = camera.streamPath || "/Streaming/Channels/101";
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return `rtsp://${auth}${host}:${port}${normalizedPath}`;
+    }
+    case "DVRIP": {
+      return `dvrip://${auth}${host}:${port}`;
+    }
+    case "HomeAssistant": {
+      return `homeassistant://${auth}${host}`;
+    }
+    case "Custom": {
+      return camera.customUrl || "";
+    }
+    default: {
+      return `rtsp://${auth}${host}:${port}`;
+    }
   }
-  if (sourceType === "MJPEG") {
-    const port = Number(camera.httpPort || DEFAULT_PORTS.MJPEG.primary);
-    return `http://${auth}${host}:${port}${path}`;
-  }
-  const port = Number(camera.httpPort || DEFAULT_PORTS.HLS.primary);
-  const proto = port === 443 ? "https" : "http";
-  return `${proto}://${auth}${host}:${port}${path}`;
 }
 
 export function buildOnvifUrl(camera) {
-  const port = Number(camera.onvifPort || 80);
+  const port = Number(camera.port || 80);
   return `http://${camera.ip || "0.0.0.0"}:${port}/onvif/device_service`;
+}
+
+/**
+ * Migrate old sourceType to new sourceType.
+ */
+function migrateSourceType(oldType) {
+  switch (oldType) {
+    case "RTSP+ONVIF": return "ONVIF";
+    case "RTSP": return "RTSP";
+    case "MJPEG": return "Custom";
+    case "HLS": return "Custom";
+    case "GO2RTC": return "Custom";
+    case "ONVIF": return "ONVIF";
+    case "DVRIP": return "DVRIP";
+    case "HomeAssistant": return "HomeAssistant";
+    case "Custom": return "Custom";
+    default: return "ONVIF";
+  }
+}
+
+/**
+ * Determine port from old camera data during migration.
+ */
+function migratePort(camera) {
+  const st = camera.sourceType;
+  if (st === "RTSP+ONVIF" || st === "ONVIF") {
+    return Number(camera.onvifPort || camera.port || 80);
+  }
+  if (st === "RTSP") {
+    return Number(camera.rtspPort || camera.port || 554);
+  }
+  if (st === "DVRIP") {
+    return Number(camera.port || 34567);
+  }
+  return Number(camera.httpPort || camera.port || 80);
 }
 
 export function normalizeCamera(input, existing = {}) {
   const id = existing.id || input.id || `cam_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const sourceType = input.sourceType || existing.sourceType || "RTSP+ONVIF";
   const now = new Date().toISOString();
+
+  // Migrate sourceType from old schema
+  const rawSourceType = input.sourceType || existing.sourceType || "ONVIF";
+  const sourceType = migrateSourceType(rawSourceType);
+
+  // Migrate port from old schema
+  const port = input.port !== undefined
+    ? Number(input.port)
+    : existing.port !== undefined
+      ? Number(existing.port)
+      : migratePort({ ...existing, ...input, sourceType: rawSourceType });
+
   const password = input.clearPassword === true
     ? ""
     : typeof input.password === "string" && input.password.length > 0
       ? input.password
       : existing.password ?? "";
+
+  // For Custom sourceType, use customUrl; for old GO2RTC/MJPEG/HLS migrations, use sourcePath
+  let customUrl = input.customUrl ?? existing.customUrl ?? "";
+  if (!customUrl && sourceType === "Custom") {
+    // Migrate from old schema: sourcePath or rtspUrl might contain the custom URL
+    customUrl = input.sourcePath ?? existing.sourcePath ?? existing.rtspUrl ?? "";
+  }
+
+  // For RTSP, keep streamPath
+  let streamPath = input.streamPath ?? existing.streamPath ?? "";
+  if (!streamPath && sourceType === "RTSP") {
+    streamPath = input.sourcePath ?? existing.sourcePath ?? "/Streaming/Channels/101";
+  }
+
   const camera = {
     id,
     name: String(input.name ?? existing.name ?? "Camera Baru").trim(),
     site: String(input.site ?? existing.site ?? "Default").trim(),
     ip: String(input.ip ?? existing.ip ?? "").trim(),
+    port,
     brand: input.brand || existing.brand || "Universal",
     enabled: Boolean(input.enabled ?? existing.enabled ?? true),
-    status: ["online", "offline", "starting"].includes(String(input.status ?? existing.status ?? "offline")) ? String(input.status ?? existing.status ?? "offline") : "offline",
+    status: ["online", "offline", "starting"].includes(String(input.status ?? existing.status ?? "offline"))
+      ? String(input.status ?? existing.status ?? "offline")
+      : "offline",
     sourceType,
-    streamType: input.streamType || existing.streamType || "HLS Stable",
-    streamQuality: input.streamQuality || existing.streamQuality || "Auto",
-    rtspTransport: ["tcp", "udp", "auto"].includes(String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase())
-      ? String(input.rtspTransport ?? existing.rtspTransport ?? "tcp").toLowerCase()
-      : "tcp",
-    hlsMode: String(input.hlsMode ?? existing.hlsMode ?? "copy").toLowerCase() === "transcode" ? "transcode" : "copy",
-    rtspPort: Number(input.rtspPort ?? existing.rtspPort ?? DEFAULT_PORTS[sourceType]?.primary ?? 554),
-    onvifPort: Number(input.onvifPort ?? existing.onvifPort ?? 80),
-    httpPort: Number(input.httpPort ?? existing.httpPort ?? (sourceType === "HLS" ? 443 : 80)),
-    sourcePath: normalizePath(input.sourcePath ?? existing.sourcePath ?? defaultPath(sourceType)),
+    streamType: input.streamType || existing.streamType || "mse",
+    streamPath: sourceType === "RTSP" ? streamPath : undefined,
+    customUrl: sourceType === "Custom" ? customUrl : undefined,
     username: input.username ?? existing.username ?? "",
     password,
     audioMode: ["Auto", "Enable", "Disable"].includes(input.audioMode ?? existing.audioMode)
       ? (input.audioMode ?? existing.audioMode)
       : (input.enableAudio ?? existing.enableAudio) ? "Enable" : "Auto",
-    enableAudio: Boolean(input.enableAudio ?? existing.enableAudio ?? (input.audioMode ?? existing.audioMode) !== "Disable"),
     enablePTZ: Boolean(input.enablePTZ ?? existing.enablePTZ ?? false),
     enableRecording: Boolean(input.enableRecording ?? existing.enableRecording ?? false),
     enableNotifications: Boolean(input.enableNotifications ?? existing.enableNotifications ?? false),
+    enableSmartDetection: input.enableSmartDetection ?? existing.enableSmartDetection ?? undefined,
     enableSoundDetection: Boolean(input.enableSoundDetection ?? existing.enableSoundDetection ?? false),
     motionSensitivity: input.motionSensitivity !== undefined
-      ? (isNaN(input.motionSensitivity) ? (String(input.motionSensitivity).toLowerCase() === "high" ? 80 : String(input.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(input.motionSensitivity))
-      : (existing.motionSensitivity !== undefined ? (isNaN(existing.motionSensitivity) ? (String(existing.motionSensitivity).toLowerCase() === "high" ? 80 : String(existing.motionSensitivity).toLowerCase() === "low" ? 20 : 50) : Number(existing.motionSensitivity)) : 50),
+      ? Number(input.motionSensitivity)
+      : existing.motionSensitivity !== undefined
+        ? Number(existing.motionSensitivity)
+        : 50,
     detectResolution: ["Auto", "1080p", "720p", "480p", "360p", "144p"].includes(input.detectResolution || existing.detectResolution)
       ? (input.detectResolution || existing.detectResolution)
       : "480p",
@@ -103,10 +158,6 @@ export function normalizeCamera(input, existing = {}) {
     recordResolution: ["Auto", "1080p", "720p", "480p", "360p", "144p"].includes(input.recordResolution || existing.recordResolution)
       ? (input.recordResolution || existing.recordResolution)
       : "Auto",
-    preMotionSeconds: Number(input.preMotionSeconds ?? existing.preMotionSeconds ?? 15),
-    postMotionSeconds: Number(input.postMotionSeconds ?? existing.postMotionSeconds ?? 15),
-    segmentDuration: Number(input.segmentDuration ?? existing.segmentDuration ?? 5),
-    enableAudioRecording: Boolean(input.enableAudioRecording ?? existing.enableAudioRecording ?? true),
     motionArea: input.motionArea !== undefined
       ? (input.motionArea && typeof input.motionArea === "object"
         ? {
@@ -121,7 +172,6 @@ export function normalizeCamera(input, existing = {}) {
     viewerCount: Number(input.viewerCount ?? existing.viewerCount ?? 0),
     bandwidthKbps: Number(input.bandwidthKbps ?? existing.bandwidthKbps ?? 0),
     latencyMs: Number(input.latencyMs ?? existing.latencyMs ?? 0),
-    qualityProfile: input.qualityProfile || existing.qualityProfile || "Medium",
     errorHistory: Array.isArray(input.errorHistory) ? input.errorHistory : Array.isArray(existing.errorHistory) ? existing.errorHistory : [],
     excludeAreas: Array.isArray(input.excludeAreas)
       ? input.excludeAreas.map((area) => {
@@ -159,8 +209,11 @@ export function normalizeCamera(input, existing = {}) {
         ? Number(existing.aiSensitivity)
         : 50,
   };
+
   if (!camera.enabled) camera.status = "offline";
-  camera.rtspUrl = buildSourceUrl(camera);
+
+  // Build the final go2rtc stream URL
+  camera.streamUrl = buildStreamUrl(camera);
   return camera;
 }
 
@@ -169,6 +222,6 @@ export function publicCamera(camera) {
   return {
     ...safe,
     hasPassword: Boolean(password),
-    rtspUrl: buildSourceUrl(camera, { maskPassword: true }),
+    streamUrl: buildStreamUrl(camera, { maskPassword: true }),
   };
 }

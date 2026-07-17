@@ -51,7 +51,7 @@ export function CameraPlayerModal({ camera, open, onOpenChange }: Props) {
                 <Badge variant="outline" className="bg-black/50 text-white border-white/20 text-[10px]">{stream}</Badge>
               </div>
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white/85 font-mono z-10 pointer-events-none">
-                <span>{camera.brand} · {camera.qualityProfile}</span>
+                <span>{camera.brand} · {camera.sourceType}</span>
                 <span>{now.toLocaleString("id-ID", { hour12: false })}</span>
               </div>
             </>
@@ -62,7 +62,7 @@ export function CameraPlayerModal({ camera, open, onOpenChange }: Props) {
           <Metric icon={<UsersIcon className="h-3.5 w-3.5" />} label="Viewers" value={Math.max(camera.viewerCount, 0) + 1} />
           <Metric icon={<Gauge className="h-3.5 w-3.5" />} label="Bandwidth" value={`${(bandwidth / 1000).toFixed(2)} Mbps`} />
           <Metric icon={<Timer className="h-3.5 w-3.5" />} label="Latency" value={`${latency} ms`} tone={latency < 800 ? "success" : latency < 1300 ? "warning" : "default"} />
-          <Metric icon={<Signal className="h-3.5 w-3.5" />} label="Kualitas" value={camera.qualityProfile} />
+          <Metric icon={<Signal className="h-3.5 w-3.5" />} label="Source" value={camera.sourceType} />
           <Metric icon={<Cctv className="h-3.5 w-3.5" />} label="Output" value={stream} />
         </div>
       </DialogContent>

@@ -24,6 +24,15 @@ export async function requireAuth(req, res, next) {
       permissions: dbUser.permissions || {},
     };
     req.authToken = token;
+    
+    // Track IP for Go2RTC viewer mapping
+    const clientIp = req.ip || req.connection?.remoteAddress;
+    if (clientIp) {
+      import("../core/userTracker.js").then(({ recordUserIp }) => {
+        recordUserIp(clientIp, dbUser.username);
+      }).catch(() => {}); // ignore import error
+    }
+
     return next();
   } catch (err) {
     next(err);

@@ -10,7 +10,7 @@ import { setupRoutes } from "./routes/setupRoutes.js";
 import { cameraRoutes } from "./routes/cameraRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
 import { streamRoutes } from "./routes/streamRoutes.js";
-import { stopAllStreams, streamSystemMetrics } from "./stream/streamManager.js";
+import { stopAllStreams } from "./stream/streamManager.js";
 import { statRoutes } from "./routes/statRoutes.js";
 import { systemRoutes } from "./routes/systemRoutes.js";
 import { auditRoutes } from "./routes/auditRoutes.js";
@@ -23,6 +23,8 @@ import { redactError, sanitizeRequestUrl } from "./core/redact.js";
 import { startTrafficHistory, stopTrafficHistory } from "./modules/stats/trafficHistoryService.js";
 import { closeAudit, initializeAudit } from "./modules/audit/auditService.js";
 import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
+import { listCameras } from "./services/cameraService.js";
+import { syncGo2rtc } from "./services/go2rtcSync.js";
 
 const app = express();
 app.set("trust proxy", true);
@@ -98,9 +100,11 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: message });
 });
 
+import { getGlobalMetrics } from "./services/cameraService.js";
+
 await initializeAudit();
 await initializeBlacklist();
-await startTrafficHistory(() => streamSystemMetrics());
+await startTrafficHistory(() => getGlobalMetrics());
 
 // Start automatic storage cleanup task (runs every 2 minutes)
 void runStorageCleanup();
@@ -108,6 +112,10 @@ const cleanupInterval = setInterval(() => void runStorageCleanup(), 2 * 60 * 100
 
 // Start background motion detection worker
 startMotionDetectionWorker();
+
+// Initial sync to go2rtc
+const initialCameras = await listCameras({ revealSecret: true });
+await syncGo2rtc(initialCameras);
 
 const server = app.listen(config.port, config.host, () => {
   console.log(`CCTV Monitoring Lite backend running on http://${config.host}:${config.port}`);

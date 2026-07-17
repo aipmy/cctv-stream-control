@@ -46,6 +46,13 @@ streamRoutes.get("/:id/events", async (req, res) => {
   });
   res.write("data: {\"connected\":true}\n\n");
 
+  // Wake up the AI backend loop if it's not running
+  try {
+    await startHls(id);
+  } catch (err) {
+    console.error(`[SSE] Failed to wake up AI backend for ${id}:`, err.message);
+  }
+
   const eventName = `motion-${id}`;
   const aiEventName = `ai-motion-${id}`;
   

@@ -6,7 +6,9 @@ import { URL } from "node:url";
 import path from "node:path";
 import { JsonStore } from "../core/jsonStore.js";
 import { config } from "../core/config.js";
-import { buildSourceUrl, normalizeCamera, publicCamera } from "../core/cctv.js";
+import { getUsernameByIp } from "../core/userTracker.js";
+import { normalizeCamera, publicCamera } from "../core/cctv.js";
+import { syncGo2rtc } from "./go2rtcSync.js";
 
 const store = new JsonStore(path.join(config.dataDir, "cameras.json"), []);
 
@@ -28,6 +30,7 @@ export async function createCamera(payload, { revealSecret = false } = {}) {
     created = normalizeCamera({ ...payload, id: undefined });
     return [...cameras, created].sort((a, b) => a.site.localeCompare(b.site) || a.name.localeCompare(b.name));
   });
+  syncGo2rtc(await store.read()).catch(e => console.error("Sync failed:", e));
   return revealSecret ? created : publicCamera(created);
 }
 
@@ -38,6 +41,7 @@ export async function updateCamera(id, payload, { revealSecret = false } = {}) {
     updated = normalizeCamera(payload, camera);
     return updated;
   }).sort((a, b) => a.site.localeCompare(b.site) || a.name.localeCompare(b.name)));
+  if (updated) syncGo2rtc(await store.read()).catch(e => console.error("Sync failed:", e));
   return updated ? (revealSecret ? updated : publicCamera(updated)) : null;
 }
 
@@ -47,6 +51,7 @@ export async function deleteCamera(id) {
     deleted = cameras.some((c) => c.id === id);
     return cameras.filter((c) => c.id !== id);
   });
+  if (deleted) syncGo2rtc(await store.read()).catch(e => console.error("Sync failed:", e));
   return deleted;
 }
 
@@ -62,6 +67,7 @@ export async function replaceCameras(payload, { mode = "replace" } = {}) {
     result = Array.from(dedup.values()).sort((a, b) => a.site.localeCompare(b.site) || a.name.localeCompare(b.name));
     return result;
   });
+  syncGo2rtc(result).catch(e => console.error("Sync failed:", e));
   return result.map(publicCamera);
 }
 
@@ -123,7 +129,7 @@ function httpProbe(urlString, timeoutMs = 1800) {
 
 function ffprobeCamera(camera, timeoutMs = 4000) {
   return new Promise((resolve) => {
-    const source = buildSourceUrl(camera);
+    const source = camera.streamUrl;
     const transport = ["tcp", "udp", "auto"].includes(String(camera.rtspTransport || "tcp")) ? String(camera.rtspTransport || "tcp") : "tcp";
     const args = [
       "-v", "error",
@@ -168,7 +174,7 @@ export async function probeCamera(id, { deep = false } = {}) {
   } else if (camera.sourceType === "RTSP" || camera.sourceType === "RTSP+ONVIF") {
     probe = await tcpProbe(camera.ip, camera.rtspPort || 554);
   } else {
-    probe = await httpProbe(buildSourceUrl(camera));
+    probe = await httpProbe(camera.streamUrl);
   }
   const patch = probe.ok
     ? { status: "online", lastSeen: new Date().toISOString() }
@@ -183,7 +189,7 @@ export async function probeTransientCamera(payload) {
   if (tempCamera.sourceType === "RTSP" || tempCamera.sourceType === "RTSP+ONVIF") {
     probe = await ffprobeCamera(tempCamera);
   } else {
-    probe = await httpProbe(buildSourceUrl(tempCamera));
+    probe = await httpProbe(tempCamera.streamUrl);
   }
   return { camera: publicCamera(tempCamera), probe };
 }
@@ -196,4 +202,111 @@ export async function probeAll({ deep = false } = {}) {
     results.push(await probeCamera(camera.id, { deep }));
   }
   return results;
+}
+
+// Poll go2rtc for viewer counts, status, and bandwidth
+let lastBytes = {};
+setInterval(async () => {
+  try {
+    const res = await fetch("http://127.0.0.1:1984/api/streams");
+    if (!res.ok) return;
+    const streams = await res.json();
+    const now = Date.now();
+    
+    await store.update((cameras) => {
+      let changed = false;
+      for (const cam of cameras) {
+        const streamData = streams[cam.id];
+        
+        let newViewers = 0;
+        let pullBytes = 0;
+        let outBytes = 0;
+
+        let activeViewers = [];
+
+        if (streamData) {
+          if (streamData.consumers) {
+            newViewers = streamData.consumers.length;
+            outBytes = streamData.consumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
+            
+            activeViewers = streamData.consumers.map(c => {
+              const username = getUsernameByIp(c.remote_addr) || "go2rtc_client";
+              return {
+                id: String(c.id),
+                username,
+                ip: c.remote_addr || "Unknown IP",
+                userAgent: c.user_agent || "Unknown Browser",
+                output: c.format_name || "unknown",
+                lastSeenAgoSeconds: 0
+              };
+            });
+          }
+          if (streamData.producers) {
+            pullBytes = streamData.producers.reduce((acc, p) => acc + (p.bytes_recv || 0), 0);
+          }
+        }
+        
+        // If it's actively streaming (has producers or consumers), we know it is online
+        const isOnline = !!streamData && ((streamData.producers && streamData.producers.length > 0) || newViewers > 0);
+        
+        if (cam.viewerCount !== newViewers || JSON.stringify(cam.activeViewers) !== JSON.stringify(activeViewers)) {
+          cam.viewerCount = newViewers;
+          cam.activeViewers = activeViewers;
+          changed = true;
+        }
+        
+        if (isOnline && cam.status !== "online") {
+          cam.status = "online";
+          cam.lastSeen = new Date().toISOString();
+          changed = true;
+        }
+
+        // Calculate bandwidth
+        const last = lastBytes[cam.id];
+        if (last) {
+          const dt = (now - last.time) / 1000;
+          if (dt > 0) {
+             const pullDiff = Math.max(0, pullBytes - last.pull);
+             const outDiff = Math.max(0, outBytes - last.out);
+             const pullKbps = (pullDiff * 8) / 1000 / dt;
+             const outKbps = (outDiff * 8) / 1000 / dt;
+             
+             if (Math.abs((cam.pullBandwidthKbps || 0) - pullKbps) > 5 || Math.abs((cam.bandwidthKbps || 0) - outKbps) > 5) {
+               cam.pullBandwidthKbps = Math.round(pullKbps);
+               cam.bandwidthKbps = Math.round(outKbps);
+               changed = true;
+             }
+          }
+        }
+        
+        lastBytes[cam.id] = { pull: pullBytes, out: outBytes, time: now };
+      }
+      return changed ? cameras : cameras;
+    });
+  } catch (err) {
+    // silently ignore fetch errors if go2rtc is down
+  }
+}, 3000);
+
+export async function getGlobalMetrics() {
+  const cameras = await store.read();
+  let cctvPullKbps = 0;
+  let cctvOutKbps = 0;
+  let viewers = 0;
+  let activeCameras = 0;
+
+  for (const c of cameras) {
+    if (c.viewerCount > 0) activeCameras++;
+    viewers += (c.viewerCount || 0);
+    cctvPullKbps += (c.pullBandwidthKbps || 0);
+    cctvOutKbps += (c.bandwidthKbps || 0);
+  }
+
+  return {
+    cctvPullKbps,
+    cctvOutKbps,
+    viewers,
+    activeCameras,
+    activeProcesses: 0
+  };
 }

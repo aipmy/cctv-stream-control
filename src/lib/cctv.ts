@@ -1,75 +1,61 @@
 import type { Camera, SourceType, StreamType } from "@/types";
+import { DEFAULT_PORTS } from "@/types";
 
-export const DEFAULT_PORTS: Record<SourceType, { primary: number; onvif?: number }> = {
-  RTSP: { primary: 554 },
-  "RTSP+ONVIF": { primary: 554, onvif: 80 },
-  MJPEG: { primary: 80 },
-  HLS: { primary: 443 },
-};
+export { DEFAULT_PORTS };
 
-export function defaultPath(sourceType: SourceType): string {
-  switch (sourceType) {
-    case "RTSP":
-    case "RTSP+ONVIF":
-      return "/Streaming/Channels/101";
-    case "MJPEG":
-      return "/mjpg/video.mjpg";
-    case "HLS":
-      return "/live/index.m3u8";
-  }
-}
-
-export function normalizePath(p?: string): string {
-  if (!p) return "/";
-  return p.startsWith("/") ? p : `/${p}`;
-}
-
-interface UrlOpts {
-  maskPassword?: boolean;
-  includeAuth?: boolean;
-}
-
-export function buildSourceUrl(
-  c: Pick<Camera, "ip" | "sourceType" | "rtspPort" | "httpPort" | "sourcePath" | "username"> & {
+/**
+ * Build the final go2rtc stream URL from camera config.
+ */
+export function buildStreamUrl(
+  c: Pick<Camera, "ip" | "sourceType" | "port" | "username" | "audioMode"> & {
     password?: string;
+    streamPath?: string;
+    customUrl?: string;
   },
-  opts: UrlOpts = {}
+  opts: { maskPassword?: boolean; includeAuth?: boolean } = {}
 ): string {
   const { maskPassword = false, includeAuth = true } = opts;
-  const path = normalizePath(c.sourcePath);
+  const host = c.ip || "0.0.0.0";
+  const port = c.port || DEFAULT_PORTS[c.sourceType] || 80;
   const auth =
     includeAuth && c.username
       ? `${c.username}:${maskPassword ? "••••••" : encodeURIComponent(c.password || "")}@`
       : "";
-  const host = c.ip || "0.0.0.0";
 
   switch (c.sourceType) {
-    case "RTSP":
-    case "RTSP+ONVIF": {
-      const port = c.rtspPort ?? DEFAULT_PORTS[c.sourceType].primary;
-      return `rtsp://${auth}${host}:${port}${path}`;
+    case "ONVIF": {
+      let url = `onvif://${auth}${host}:${port}`;
+      if (c.audioMode === "Enable" || c.audioMode === "Auto") {
+        url += "#backchannel=1#audio=opus";
+      }
+      return url;
     }
-    case "MJPEG": {
-      const port = c.httpPort ?? DEFAULT_PORTS.MJPEG.primary;
-      return `http://${auth}${host}:${port}${path}`;
+    case "RTSP": {
+      const path = c.streamPath || "/Streaming/Channels/101";
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return `rtsp://${auth}${host}:${port}${normalizedPath}`;
     }
-    case "HLS": {
-      const port = c.httpPort ?? DEFAULT_PORTS.HLS.primary;
-      const proto = port === 443 ? "https" : "http";
-      return `${proto}://${auth}${host}:${port}${path}`;
+    case "DVRIP": {
+      return `dvrip://${auth}${host}:${port}`;
+    }
+    case "HomeAssistant": {
+      return `homeassistant://${auth}${host}`;
+    }
+    case "Custom": {
+      return c.customUrl || "";
     }
   }
 }
 
-export function buildOnvifUrl(c: Pick<Camera, "ip" | "onvifPort">): string {
-  const port = c.onvifPort ?? 80;
+export function buildOnvifUrl(c: Pick<Camera, "ip" | "port">): string {
+  const port = c.port ?? 80;
   return `http://${c.ip || "0.0.0.0"}:${port}/onvif/device_service`;
 }
 
 export function buildRestreamUrl(c: Pick<Camera, "id" | "streamType">, origin?: string): string {
   const defaultOrigin = typeof window === "undefined"
     ? "http://localhost:4200"
-    : ["5173", "5174", "8080"].includes(window.location.port)
+    : ["5173", "5174", "8080", "8081"].includes(window.location.port)
       ? `${window.location.protocol}//${window.location.hostname}:4200`
       : window.location.origin;
   const base = `${origin ?? defaultOrigin}/api/streams/${c.id}`;
@@ -78,4 +64,13 @@ export function buildRestreamUrl(c: Pick<Camera, "id" | "streamType">, origin?: 
 
 export function restreamLabel(s: StreamType): string {
   return s === "MJPEG" ? "MJPEG Proxy" : s;
+}
+
+export function defaultPath(sourceType: SourceType): string {
+  switch (sourceType) {
+    case "RTSP":
+      return "/Streaming/Channels/101";
+    default:
+      return "";
+  }
 }
