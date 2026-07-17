@@ -181,6 +181,10 @@ server.on("upgrade", (req, socket, head) => {
     }
     rawReq += "\r\n";
     
+    console.log("--- RAW WS REQUEST TO GO2RTC ---");
+    console.log(rawReq);
+    console.log("--------------------------------");
+    
     proxySocket.write(rawReq);
     if (head && head.length) proxySocket.write(head);
     
