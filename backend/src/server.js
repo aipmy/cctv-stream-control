@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import Jimp from "jimp";
+import { Jimp } from "jimp";
 import net from "node:net";
 import http from "node:http";
 import express from "express";
