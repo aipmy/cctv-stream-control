@@ -80,7 +80,8 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     containerRef.current.appendChild(videoRtc);
     videoRtc.addEventListener("stream-error", (e: any) => {
       console.warn("Go2RTC Backend Error:", e.detail);
-      setErrorMsg(e.detail);
+      const msg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
+      setErrorMsg(msg || "Unknown backend error");
       setStatus("error");
     });
     videoRtc.src = src;
@@ -96,7 +97,13 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
           setStatus(prev => prev === "playing" ? "buffering" : "connecting");
         });
         internalVideo.addEventListener("stalled", () => setStatus("buffering"));
-        internalVideo.addEventListener("error", () => setStatus("error"));
+        internalVideo.addEventListener("error", () => {
+          const err = internalVideo.error;
+          if (err) {
+            setErrorMsg(`Stream Error [${err.code}]: ${err.message || "Network or decoding failed"}`);
+          }
+          setStatus("error");
+        });
       } else {
         setTimeout(attachEvents, 100);
       }
