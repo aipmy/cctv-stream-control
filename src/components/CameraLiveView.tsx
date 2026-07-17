@@ -1,5 +1,5 @@
 import { AlertTriangle, PowerOff, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import type { Camera, StreamType } from "@/types";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -152,8 +152,10 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     );
   }
 
-  // Poster URL: pakai timestamp agar browser selalu ambil gambar baru saat reconnect
-  const posterUrl = `/api/streams/${camera.id}/poster?t=${Math.floor(Date.now() / 5000)}`;
+  // Poster URL: di-memoize agar tidak berganti dan berkedip saat komponen re-render (misal status berubah)
+  const posterUrl = useMemo(() => {
+    return `/api/streams/${camera.id}/poster?t=${Math.floor(Date.now() / 5000)}`;
+  }, [camera.id]);
 
   return (
     <div
