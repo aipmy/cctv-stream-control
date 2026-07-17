@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import http from "node:http";
 import express from "express";
 import cors from "cors";
@@ -158,41 +159,41 @@ const server = app.listen(config.port, config.host, () => {
 
 // ─── go2rtc WebSocket upgrade handler ──────────────────────────────
 // Handle HTTP→WS upgrade for /api/ws paths by piping raw sockets to go2rtc.
+
 server.on("upgrade", (req, socket, head) => {
   if (!req.url.startsWith("/api/ws")) return;
 
-  const proxyReq = http.request({
-    hostname: GO2RTC_HOST,
-    port: GO2RTC_PORT,
-    path: req.url,
-    method: req.method,
-    headers: { 
-      ...req.headers, 
-      host: `${GO2RTC_HOST}:${GO2RTC_PORT}`,
-      connection: "upgrade",
-      upgrade: "websocket"
-    },
-  });
-
-  proxyReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
-    socket.write(
-      `HTTP/1.1 101 Switching Protocols\r\n` +
-      Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") +
-      "\r\n\r\n"
-    );
-    if (proxyHead && proxyHead.length) socket.write(proxyHead);
+  const proxySocket = net.connect(GO2RTC_PORT, GO2RTC_HOST, () => {
+    // Build raw HTTP request to bypass Node's http module stripping hop-by-hop headers
+    let rawReq = `${req.method} ${req.url} HTTP/1.1\r\n`;
+    
+    const headers = { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` };
+    // Force explicitly to ensure Gorilla WS accepts it
+    headers.connection = "Upgrade";
+    headers.upgrade = "websocket";
+    
+    for (const [key, value] of Object.entries(headers)) {
+      if (Array.isArray(value)) {
+        value.forEach(v => { rawReq += `${key}: ${v}\r\n`; });
+      } else {
+        rawReq += `${key}: ${value}\r\n`;
+      }
+    }
+    rawReq += "\r\n";
+    
+    proxySocket.write(rawReq);
+    if (head && head.length) proxySocket.write(head);
+    
     proxySocket.pipe(socket);
     socket.pipe(proxySocket);
   });
 
-  proxyReq.on("error", (err) => {
-    console.error("[go2rtc proxy] WS upgrade error:", err.message);
+  proxySocket.on("error", (err) => {
+    console.error("[go2rtc proxy] Raw WS error:", err.message);
     socket.destroy();
   });
 
-  socket.on("error", () => proxyReq.destroy());
-
-  proxyReq.end();
+  socket.on("error", () => proxySocket.destroy());
 });
 
 
