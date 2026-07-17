@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import http from "node:http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -23,14 +24,14 @@ import { redactError, sanitizeRequestUrl } from "./core/redact.js";
 import { startTrafficHistory, stopTrafficHistory } from "./modules/stats/trafficHistoryService.js";
 import { closeAudit, initializeAudit } from "./modules/audit/auditService.js";
 import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
-import { listCameras } from "./services/cameraService.js";
+import { listCameras, getGlobalMetrics } from "./services/cameraService.js";
 import { syncGo2rtc } from "./services/go2rtcSync.js";
-import { createProxyMiddleware } from "http-proxy-middleware";
+
+const GO2RTC_HOST = "127.0.0.1";
+const GO2RTC_PORT = 1984;
 
 const app = express();
 app.set("trust proxy", true);
-
-
 app.disable("x-powered-by");
 
 const corsOptions = {
@@ -75,17 +76,29 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, name: "CCTV Monitoring Lite Backend", port: config.port, auth: config.requireAuth, time: new Date().toISOString() });
 });
 
-// go2rtc proxy — MUST be registered BEFORE requireAuth so WebSocket
-// connections from video-rtc.js are not blocked by authentication.
-const go2rtcProxy = createProxyMiddleware({
-  target: "http://127.0.0.1:1984",
-  changeOrigin: true,
-  ws: true,
-  logLevel: "error",
-});
+// ─── go2rtc HTTP proxy (BEFORE auth) ───────────────────────────────
+// Proxy /api/ws and /video-rtc.js to go2rtc running on port 1984.
+// Uses native http.request — http-proxy-middleware v3 silently fails with ESM.
+function proxyToGo2rtc(req, res) {
+  const proxyReq = http.request({
+    hostname: GO2RTC_HOST,
+    port: GO2RTC_PORT,
+    path: req.originalUrl,
+    method: req.method,
+    headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
+  }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+  proxyReq.on("error", (err) => {
+    console.error("[go2rtc proxy] HTTP error:", err.message);
+    if (!res.headersSent) res.status(502).json({ error: "go2rtc unavailable" });
+  });
+  req.pipe(proxyReq, { end: true });
+}
 
-app.use("/api/ws", go2rtcProxy);
-app.use("/video-rtc.js", go2rtcProxy);
+app.use("/api/ws", proxyToGo2rtc);
+app.use("/video-rtc.js", proxyToGo2rtc);
 
 app.use("/api/setup", setupRoutes);
 app.use("/api/auth", authRoutes);
@@ -113,8 +126,6 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: message });
 });
 
-import { getGlobalMetrics } from "./services/cameraService.js";
-
 await initializeAudit();
 await initializeBlacklist();
 await startTrafficHistory(() => getGlobalMetrics());
@@ -138,7 +149,39 @@ const server = app.listen(config.port, config.host, () => {
   console.log(`Storage dir: ${config.storageDir}`);
 });
 
-server.on("upgrade", go2rtcProxy.upgrade);
+// ─── go2rtc WebSocket upgrade handler ──────────────────────────────
+// Handle HTTP→WS upgrade for /api/ws paths by piping raw sockets to go2rtc.
+server.on("upgrade", (req, socket, head) => {
+  if (!req.url.startsWith("/api/ws")) return;
+
+  const proxyReq = http.request({
+    hostname: GO2RTC_HOST,
+    port: GO2RTC_PORT,
+    path: req.url,
+    method: req.method,
+    headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
+  });
+
+  proxyReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
+    socket.write(
+      `HTTP/1.1 101 Switching Protocols\r\n` +
+      Object.entries(proxyRes.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") +
+      "\r\n\r\n"
+    );
+    if (proxyHead && proxyHead.length) socket.write(proxyHead);
+    proxySocket.pipe(socket);
+    socket.pipe(proxySocket);
+  });
+
+  proxyReq.on("error", (err) => {
+    console.error("[go2rtc proxy] WS upgrade error:", err.message);
+    socket.destroy();
+  });
+
+  socket.on("error", () => proxyReq.destroy());
+
+  proxyReq.end();
+});
 
 
 async function shutdown(signal) {
