@@ -129,6 +129,41 @@ function appendQuery(line, query) {
 
 streamRoutes.get("/status", (_req, res) => res.json(streamStatus()));
 
+streamRoutes.get("/:id/poster", async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const thumbnailDir = path.join(config.storageDir, "thumbnails");
+    await fs.promises.mkdir(thumbnailDir, { recursive: true });
+    const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const go2rtcRes = await fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (go2rtcRes.ok) {
+        const buffer = Buffer.from(await go2rtcRes.arrayBuffer());
+        // Simpan snapshot ke disk (.storage/thumbnails) agar bisa di-fallback
+        fs.promises.writeFile(thumbnailPath, buffer).catch(err => console.error(`[Poster] Gagal menyimpan thumbnail untuk ${id}:`, err.message));
+        res.setHeader("Cache-Control", "no-cache");
+        res.type("image/jpeg");
+        return res.send(buffer);
+      }
+    } catch (err) {
+      // Timeout atau error dari go2rtc, kita akan fallback ke file disk
+    }
+
+    if (fs.existsSync(thumbnailPath)) {
+      res.setHeader("Cache-Control", "no-cache");
+      res.type("image/jpeg");
+      return res.sendFile(thumbnailPath);
+    }
+
+    res.status(404).json({ error: "Poster tidak ditemukan" });
+  } catch (err) { next(err); }
+});
+
 streamRoutes.post("/:id/start", async (req, res, next) => {
   try {
     const output = await getCameraOutput(req.params.id);

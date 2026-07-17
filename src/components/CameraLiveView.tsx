@@ -134,7 +134,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     <div 
       className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}
       style={{
-        backgroundImage: `url(/api/frame.jpeg?src=${camera.id})`,
+        backgroundImage: `url(/api/streams/${camera.id}/poster)`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}

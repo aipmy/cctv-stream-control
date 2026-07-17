@@ -136,7 +136,6 @@ function proxyToGo2rtc(req, res) {
 
 app.use("/api/ws", proxyToGo2rtc);
 app.use("/video-rtc.js", proxyToGo2rtc);
-app.use("/api/frame.jpeg", proxyToGo2rtc);
 
 app.use("/api/setup", setupRoutes);
 app.use("/api/auth", authRoutes);

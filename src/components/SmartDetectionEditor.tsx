@@ -731,7 +731,7 @@ export function SmartDetectionEditor({
           <div 
             className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 text-slate-300 gap-2 z-0"
             style={{
-              backgroundImage: `url(/api/frame.jpeg?src=${cameraId})`,
+              backgroundImage: `url(/api/streams/${cameraId}/poster)`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundBlendMode: 'overlay'
