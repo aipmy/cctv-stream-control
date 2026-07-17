@@ -31,19 +31,39 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   }, [status, onStatusChange]);
 
   useEffect(() => {
-    if (document.querySelector('script[src="/video-rtc.js"]')) {
-      setScriptLoaded(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "/video-rtc.js";
-    script.type = "module";
-    script.onload = () => setScriptLoaded(true);
-    document.head.appendChild(script);
+    const loadGo2RTC = async () => {
+      if (customElements.get("video-rtc")) {
+        setScriptLoaded(true);
+        return;
+      }
+      if (document.querySelector('script[data-go2rtc]')) {
+        const waitForElement = () => {
+          if (customElements.get("video-rtc")) { setScriptLoaded(true); return; }
+          setTimeout(waitForElement, 100);
+        };
+        waitForElement();
+        return;
+      }
+      const script = document.createElement('script');
+      script.setAttribute('data-go2rtc', 'true');
+      script.type = 'module';
+      script.textContent = `
+        import { VideoRTC } from '/video-rtc.js';
+        if (!customElements.get('video-rtc')) {
+          customElements.define('video-rtc', VideoRTC);
+        }
+        window.dispatchEvent(new Event('video-rtc-ready'));
+      `;
+      const onReady = () => { setScriptLoaded(true); window.removeEventListener('video-rtc-ready', onReady); };
+      window.addEventListener('video-rtc-ready', onReady);
+      document.head.appendChild(script);
+    };
+    loadGo2RTC();
   }, []);
 
   useEffect(() => {
     if (!scriptLoaded || !camera.enabled || !containerRef.current) return;
+    
     containerRef.current.innerHTML = "";
     setStatus("connecting");
     setErrorMsg("");
@@ -90,7 +110,6 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       }
     };
     attachEvents();
-
   }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls]);
 
   useEffect(() => {
