@@ -166,7 +166,12 @@ server.on("upgrade", (req, socket, head) => {
     port: GO2RTC_PORT,
     path: req.url,
     method: req.method,
-    headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
+    headers: { 
+      ...req.headers, 
+      host: `${GO2RTC_HOST}:${GO2RTC_PORT}`,
+      connection: "upgrade",
+      upgrade: "websocket"
+    },
   });
 
   proxyReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
