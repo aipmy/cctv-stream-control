@@ -19,7 +19,8 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
+  const [status, setStatus] = useState<PlaybackStatus>("connecting");
   
   useEffect(() => {
     const loadGo2RTC = async () => {
@@ -56,7 +57,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     if (!scriptLoaded || !camera.enabled || !containerRef.current) return;
     
     containerRef.current.innerHTML = "";
-    setIsLoading(true);
+    setStatus("connecting");
     
     const modes = output || camera.streamType || "webrtc,mse,hls,mjpeg";
     const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
@@ -77,11 +78,13 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         internalVideo.controls = controls;
         internalVideo.muted = typeof muted === 'boolean' ? muted : true;
         
-        internalVideo.addEventListener("playing", () => setIsLoading(false));
-        internalVideo.addEventListener("canplay", () => setIsLoading(false));
-        internalVideo.addEventListener("waiting", () => setIsLoading(true));
-        internalVideo.addEventListener("stalled", () => setIsLoading(true));
-        internalVideo.addEventListener("error", () => setIsLoading(false)); // Hide loader on hard error
+        internalVideo.addEventListener("playing", () => setStatus("playing"));
+        internalVideo.addEventListener("canplay", () => setStatus("playing"));
+        internalVideo.addEventListener("waiting", () => {
+          setStatus(prev => prev === "playing" ? "buffering" : "connecting");
+        });
+        internalVideo.addEventListener("stalled", () => setStatus("buffering"));
+        internalVideo.addEventListener("error", () => setStatus("error"));
       } else {
         setTimeout(attachEvents, 100);
       }
@@ -110,11 +113,25 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
 
   return (
     <div className={cn("absolute inset-0 bg-black overflow-hidden flex items-center justify-center", className)}>
-      {/* Container managed purely by React for the loading overlay */}
-      {isLoading && (
+      {/* Container managed purely by React for the loading/status overlay */}
+      {(status === "connecting" || status === "buffering") && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] pointer-events-none transition-opacity duration-300">
           <Loader2 className="h-7 w-7 mb-3 animate-spin text-primary opacity-80" />
-          <div className="text-xs font-semibold tracking-widest uppercase text-white/70">Connecting</div>
+          <div className="text-xs font-semibold tracking-widest uppercase text-white/70">
+            {status === "connecting" ? "Connecting" : "Buffering"}
+          </div>
+        </div>
+      )}
+
+      {status === "error" && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
+          <AlertTriangle className="h-7 w-7 mb-3 text-destructive opacity-80" />
+          <div className="text-xs font-semibold tracking-widest uppercase text-destructive/90">
+            Koneksi Terputus
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-1 max-w-[80%] text-center">
+            Kamera lambat merespon atau server terputus dari jaringan CCTV.
+          </div>
         </div>
       )}
       
