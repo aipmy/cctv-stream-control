@@ -38,7 +38,13 @@ fi
 # 2. Download go2rtc
 echo "Downloading $GO2RTC_BINARY..."
 mkdir -p backend/bin
-curl -L -o backend/bin/go2rtc "https://github.com/AlexxIT/go2rtc/releases/latest/download/$GO2RTC_BINARY"
+if [[ "$GO2RTC_BINARY" == *"mac"* || "$GO2RTC_BINARY" == *"win"* ]]; then
+    curl -L -o backend/bin/go2rtc.zip "https://github.com/AlexxIT/go2rtc/releases/latest/download/${GO2RTC_BINARY}.zip"
+    unzip -o backend/bin/go2rtc.zip -d backend/bin/
+    rm backend/bin/go2rtc.zip
+else
+    curl -L -o backend/bin/go2rtc "https://github.com/AlexxIT/go2rtc/releases/latest/download/$GO2RTC_BINARY"
+fi
 chmod +x backend/bin/go2rtc
 echo "go2rtc downloaded successfully."
 

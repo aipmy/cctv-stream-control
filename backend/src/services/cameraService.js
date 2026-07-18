@@ -226,7 +226,11 @@ setInterval(async () => {
 
         if (streamData) {
           if (streamData.consumers) {
-            const validConsumers = streamData.consumers.filter(c => c.format_name !== 'keyframe' && c.format_name !== 'snapshot');
+            const validConsumers = streamData.consumers.filter(c => 
+              c.format_name !== 'keyframe' && 
+              c.format_name !== 'snapshot' && 
+              !(c.remote_addr && c.remote_addr.startsWith('127.0.0.1'))
+            );
             newViewers = validConsumers.length;
             outBytes = validConsumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
             

@@ -32,7 +32,13 @@ export async function syncGo2rtc(cameras) {
       doc.set("api", doc.createNode({ listen: ":1984", origin: "*" }));
     }
     if (!doc.has("webrtc")) {
-      doc.set("webrtc", doc.createNode({ listen: ":8555" }));
+      doc.set("webrtc", doc.createNode({ 
+        listen: ":8555",
+        candidates: [
+          "172.16.20.11:8555",
+          "stun:8555"
+        ]
+      }));
     }
     if (!doc.has("rtsp")) {
       doc.set("rtsp", doc.createNode({ listen: ":8554" }));

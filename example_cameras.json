@@ -1,0 +1,35 @@
+[
+  {
+    "id": "cam_example_01",
+    "name": "Main Entrance",
+    "streamUrl": "rtsp://admin:YourPassword123@192.168.1.100:554/Streaming/Channels/101",
+    "site": "Office",
+    "location": "Front Door",
+    "vendor": "Hikvision",
+    "enabled": true,
+    "ipAddress": "192.168.1.100",
+    "subStreamUrl": "rtsp://admin:YourPassword123@192.168.1.100:554/Streaming/Channels/102",
+    "ptzEnabled": true,
+    "audio": "muted",
+    "streamType": "webrtc,mse,hls,mjpeg",
+    "smartDetection": {
+      "enabled": false,
+      "aiSensitivity": 50,
+      "motionSensitivity": 10,
+      "enableSoundDetection": false,
+      "showPixelMotion": false,
+      "showPerson": true,
+      "showPet": false,
+      "showObject": false,
+      "areas": []
+    },
+    "recording": {
+      "enabled": false,
+      "quality": "medium",
+      "resolution": "1080p",
+      "fps": 15,
+      "retentionDays": 7,
+      "storagePath": "/path/to/recordings"
+    }
+  }
+]

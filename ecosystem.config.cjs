@@ -7,6 +7,7 @@ module.exports = {
       cwd: __dirname,
       watch: false,
       restart_delay: 5000,
+      interpreter: "none"
     },
     {
       name: "cctv-monitoring-lite",

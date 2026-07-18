@@ -123,6 +123,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const activePtzPointer = useRef<number | null>(null);
   const feedbackTimer = useRef<number | null>(null);
   const [liveStatus, setLiveStatus] = useState<"connecting" | "playing" | "buffering" | "error">("connecting");
+  const [activeMode, setActiveMode] = useState("");
   const [audio, setAudio] = useState(() => readAudioState(camera));
   const [controlsVisible, setControlsVisible] = useState(false);
   const [ptzFeedback, setPtzFeedback] = useState<PtzFeedback | null>(null);
@@ -272,7 +273,9 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
               Error
             </Badge>
           )}
-          <Badge variant="outline" className={cn("text-[10px]", streamColors[camera.streamType])}>{camera.streamType}</Badge>
+          <Badge variant="outline" className={cn("text-[10px] uppercase font-mono font-bold tracking-wider", streamColors[activeMode || camera.streamType || "webrtc"])}>
+            {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
+          </Badge>
           <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
             {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
           </Badge>
@@ -286,7 +289,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
       >
-        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} onStatusChange={setLiveStatus} />
+        <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} onStatusChange={setLiveStatus} onModeChange={setActiveMode} />
         {ptzFeedback && (
           <Badge
             variant="outline"

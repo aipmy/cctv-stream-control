@@ -54,6 +54,7 @@ export function SmartDetectionEditor({
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
   const [isHoveringZone, setIsHoveringZone] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [activeMode, setActiveMode] = useState("");
   const [isMotionDetected, setIsMotionDetected] = useState(false);
   const [detectionCount, setDetectionCount] = useState(0);
   const [currentFps, setCurrentFps] = useState(0);
@@ -135,6 +136,10 @@ export function SmartDetectionEditor({
          internalVideo.controls = false;
          if (internalVideo.readyState >= 2) { // HAVE_CURRENT_DATA
            setImgLoaded(true);
+           if (videoRtc.pcState === 1) setActiveMode("webrtc");
+           else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) setActiveMode("mse");
+           else if (videoRtc.wsState === 1) setActiveMode("mjpeg");
+           else setActiveMode("hls");
            clearInterval(interval);
          }
        }
@@ -736,12 +741,6 @@ export function SmartDetectionEditor({
         {!imgLoaded && (
           <div 
             className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 text-slate-300 gap-2 z-0"
-            style={{
-              backgroundImage: `url(/api/streams/${cameraId}/poster)`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundBlendMode: 'overlay'
-            }}
           >
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-primary" />
             <span className="text-[10px] uppercase tracking-wider font-semibold">Menghubungkan Kamera...</span>
@@ -762,6 +761,11 @@ export function SmartDetectionEditor({
         />
 
         {/* Removed overlay SSE connection indicator to avoid blocking camera timestamp */}
+        {activeMode && (
+          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono font-bold tracking-widest uppercase text-indigo-400 border border-indigo-500/30 z-20">
+            {activeMode}
+          </div>
+        )}
         {showPixelMotion && (
           <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
             Activity: {activity} blocks

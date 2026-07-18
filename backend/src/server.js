@@ -88,12 +88,11 @@ function proxyToGo2rtc(req, res) {
   if (req.originalUrl.startsWith("/api/ws")) {
     const proxySocket = net.connect(GO2RTC_PORT, GO2RTC_HOST, () => {
       let rawReq = `${req.method} ${req.originalUrl} HTTP/1.1\r\n`;
-      const headers = { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` };
+      const headers = { ...req.headers };
       // Force explicitly to ensure Gorilla WS accepts it
       headers.connection = "Upgrade";
       headers.upgrade = "websocket";
       headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-      headers.origin = `http://${GO2RTC_HOST}:${GO2RTC_PORT}`;
       
       for (const [key, value] of Object.entries(headers)) {
         if (Array.isArray(value)) {
@@ -141,6 +140,27 @@ function proxyToGo2rtc(req, res) {
 
 app.use("/api/ws", proxyToGo2rtc);
 app.use("/video-rtc.js", proxyToGo2rtc);
+
+// Proxy any other direct Go2RTC API endpoints (e.g., /api/stream.mp4, /stream.html)
+app.use("/api/go2rtc", (req, res) => {
+  const targetPath = req.originalUrl.replace("/api/go2rtc", "");
+  const proxyReq = http.request({
+    hostname: GO2RTC_HOST,
+    port: GO2RTC_PORT,
+    path: targetPath || "/",
+    method: req.method,
+    headers: { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` },
+  }, (proxyRes) => {
+    // Forward the response exactly as it is (including content-type, cache-control, etc)
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+  proxyReq.on("error", (err) => {
+    console.error("[go2rtc proxy direct] HTTP error:", err.message);
+    if (!res.headersSent) res.status(502).json({ error: "go2rtc unavailable" });
+  });
+  req.pipe(proxyReq, { end: true });
+});
 
 app.use("/api/setup", setupRoutes);
 app.use("/api/auth", authRoutes);
@@ -250,12 +270,11 @@ server.on("upgrade", (req, socket, head) => {
     // Build raw HTTP request to bypass Node's http module stripping hop-by-hop headers
     let rawReq = `${req.method} ${req.url} HTTP/1.1\r\n`;
     
-    const headers = { ...req.headers, host: `${GO2RTC_HOST}:${GO2RTC_PORT}` };
+    const headers = { ...req.headers };
     // Force explicitly to ensure Gorilla WS accepts it
     headers.connection = "Upgrade";
     headers.upgrade = "websocket";
     headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-    headers.origin = `http://${GO2RTC_HOST}:${GO2RTC_PORT}`;
     
     for (const [key, value] of Object.entries(headers)) {
       if (Array.isArray(value)) {

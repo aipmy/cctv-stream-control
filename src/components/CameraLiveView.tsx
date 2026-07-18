@@ -14,9 +14,10 @@ interface Props {
   controls?: boolean;
   controlsVisible?: boolean;
   onStatusChange?: (status: "connecting" | "playing" | "buffering" | "error") => void;
+  onModeChange?: (mode: string) => void;
 }
 
-export function CameraLiveView({ camera, output, className, controls = false, muted = true, volume = 1, onStatusChange }: Props) {
+export function CameraLiveView({ camera, output, className, controls = false, muted = true, volume = 1, onStatusChange, onModeChange }: Props) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
@@ -70,67 +71,132 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     setErrorMsg("");
 
     const modes = output || camera.streamType || "webrtc,mse,hls,mjpeg";
-    const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
     
-    const videoRtc = document.createElement("video-rtc") as any;
-    videoRtc.mode = modes;
-    videoRtc.background = true;
-    videoRtc.style.display = "block";
-    videoRtc.style.width = "100%";
-    videoRtc.style.height = "100%";
+    let directVideoSrc = "";
+    if (modes === "mp4_modern") directVideoSrc = `/api/go2rtc/api/stream.mp4?src=${encodeURIComponent(camera.id)}&mp4`;
+    else if (modes === "mp4_all") directVideoSrc = `/api/go2rtc/api/stream.mp4?src=${encodeURIComponent(camera.id)}&mp4=flac`;
+    else if (modes === "frame_mp4") directVideoSrc = `/api/go2rtc/api/frame.mp4?src=${encodeURIComponent(camera.id)}`;
+    else if (modes === "hls_ts") directVideoSrc = `/api/go2rtc/api/stream.m3u8?src=${encodeURIComponent(camera.id)}`;
+    else if (modes === "hls_fmp4") directVideoSrc = `/api/go2rtc/api/stream.m3u8?src=${encodeURIComponent(camera.id)}&mp4`;
+    else if (modes === "hls_modern") directVideoSrc = `/api/go2rtc/api/stream.m3u8?src=${encodeURIComponent(camera.id)}&mp4=flac`;
 
-    containerRef.current.appendChild(videoRtc);
-    videoRtc.addEventListener("stream-error", (e: any) => {
-      if (disposed) return;
-      console.warn("Go2RTC Backend Error:", e.detail);
-      const msg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
-      setErrorMsg(msg || "Unknown backend error");
-      setStatus("error");
-    });
-    videoRtc.src = src;
+    let playerElement: HTMLElement | null = null;
 
-    const attachEvents = () => {
-      if (disposed) return;
-      const internalVideo = videoRtc.querySelector("video");
-      if (internalVideo) {
-        internalVideo.controls = controls;
-        internalVideo.muted = typeof muted === 'boolean' ? muted : true;
-        internalVideo.addEventListener("playing", () => {
-          if (!disposed) setStatus("playing");
-        });
-        internalVideo.addEventListener("canplay", () => {
-          if (!disposed) setStatus("playing");
-        });
-        internalVideo.addEventListener("waiting", () => {
-          if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting");
-        });
-        internalVideo.addEventListener("stalled", () => {
-          if (!disposed) setStatus("buffering");
-        });
-        internalVideo.addEventListener("error", () => {
-          if (disposed) return;
-          const err = internalVideo.error;
-          if (err) {
-            setErrorMsg(`Stream Error [${err.code}]: ${err.message || "Network or decoding failed"}`);
-          }
-          setStatus("error");
-        });
-      } else {
-        setTimeout(attachEvents, 100);
-      }
-    };
-    attachEvents();
+    if (directVideoSrc) {
+      // For direct HTTP streams, use a native <video> element
+      const vid = document.createElement("video");
+      vid.src = directVideoSrc;
+      vid.autoplay = true;
+      vid.controls = controls;
+      vid.muted = typeof muted === 'boolean' ? muted : true;
+      vid.playsInline = true;
+      vid.style.display = "block";
+      vid.style.width = "100%";
+      vid.style.height = "100%";
+      vid.style.objectFit = "contain";
+      containerRef.current.appendChild(vid);
+      playerElement = vid;
+
+      vid.addEventListener("playing", () => {
+        if (!disposed) {
+          setStatus("playing");
+          if (onModeChange) onModeChange(modes.startsWith("mp4") ? "mp4" : modes.startsWith("hls") ? "hls" : modes);
+        }
+      });
+      vid.addEventListener("canplay", () => {
+        if (!disposed) {
+          setStatus("playing");
+          if (onModeChange) onModeChange(modes.startsWith("mp4") ? "mp4" : modes.startsWith("hls") ? "hls" : modes);
+        }
+      });
+      vid.addEventListener("waiting", () => { if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting"); });
+      vid.addEventListener("stalled", () => { if (!disposed) setStatus("buffering"); });
+      vid.addEventListener("error", () => {
+        if (disposed) return;
+        setErrorMsg(`Format not supported or Network Error`);
+        setStatus("error");
+      });
+    } else {
+      // For WebRTC, MSE, legacy MP4, legacy HLS, MJPEG use video-rtc component
+      const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
+      const videoRtc = document.createElement("video-rtc") as any;
+      videoRtc.mode = modes;
+      videoRtc.background = true;
+      videoRtc.style.display = "block";
+      videoRtc.style.width = "100%";
+      videoRtc.style.height = "100%";
+      containerRef.current.appendChild(videoRtc);
+      playerElement = videoRtc;
+
+      videoRtc.addEventListener("stream-error", (e: any) => {
+        if (disposed) return;
+        console.warn("Go2RTC Backend Error:", e.detail);
+        const msg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
+        setErrorMsg(msg || "Unknown backend error");
+        setStatus("error");
+      });
+      videoRtc.src = src;
+
+      const attachEvents = () => {
+        if (disposed) return;
+        const internalVideo = videoRtc.querySelector("video");
+        if (internalVideo) {
+          internalVideo.controls = controls;
+          internalVideo.muted = typeof muted === 'boolean' ? muted : true;
+          internalVideo.addEventListener("playing", () => {
+            if (!disposed) {
+              setStatus("playing");
+              if (onModeChange && videoRtc) {
+                 if (videoRtc.pcState === 1) onModeChange("webrtc");
+                 else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
+                 else if (videoRtc.wsState === 1) onModeChange("mjpeg");
+                 else onModeChange("hls");
+              }
+            }
+          });
+          internalVideo.addEventListener("canplay", () => {
+            if (!disposed) {
+              setStatus("playing");
+              if (onModeChange && videoRtc) {
+                 if (videoRtc.pcState === 1) onModeChange("webrtc");
+                 else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
+                 else if (videoRtc.wsState === 1) onModeChange("mjpeg");
+                 else onModeChange("hls");
+              }
+            }
+          });
+          internalVideo.addEventListener("waiting", () => { if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting"); });
+          internalVideo.addEventListener("stalled", () => { if (!disposed) setStatus("buffering"); });
+          internalVideo.addEventListener("error", () => {
+            if (disposed) return;
+            const err = internalVideo.error;
+            setErrorMsg(`Stream Error [${err?.code}]: ${err?.message || "Network or decoding failed"}`);
+            setStatus("error");
+          });
+        } else {
+          setTimeout(attachEvents, 100);
+        }
+      };
+      attachEvents();
+    }
 
     return () => {
       disposed = true;
-      if (videoRtc && typeof videoRtc.ondisconnect === 'function') {
-        videoRtc.ondisconnect();
-      }
-      try {
-        if (containerRef.current && containerRef.current.contains(videoRtc)) {
-          containerRef.current.removeChild(videoRtc);
+      if (playerElement) {
+        if ('ondisconnect' in playerElement && typeof (playerElement as any).ondisconnect === 'function') {
+          (playerElement as any).ondisconnect();
         }
-      } catch (e) {}
+        if (playerElement instanceof HTMLVideoElement) {
+          playerElement.pause();
+          playerElement.src = "";
+          playerElement.load();
+        }
+        try {
+          if (containerRef.current && containerRef.current.contains(playerElement)) {
+            containerRef.current.removeChild(playerElement);
+          }
+        } catch (e) {}
+      }
     };
   }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls]);
 

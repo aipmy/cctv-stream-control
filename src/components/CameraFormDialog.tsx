@@ -476,8 +476,13 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                           if (val === "webrtc,mse,hls,mjpeg") return <div className="font-medium">Auto-select mode</div>;
                           if (val === "webrtc") return <div className="font-medium">WebRTC stream</div>;
                           if (val === "mse") return <div className="font-medium">MSE stream</div>;
-                          if (val === "mp4") return <div className="font-medium">MP4 stream</div>;
-                          if (val === "hls") return <div className="font-medium">HLS/fMP4 stream</div>;
+                          if (val === "mp4") return <div className="font-medium">legacy MP4 stream</div>;
+                          if (val === "mp4_modern") return <div className="font-medium">modern MP4 stream</div>;
+                          if (val === "mp4_all") return <div className="font-medium">MP4 stream with any audio</div>;
+                          if (val === "frame_mp4") return <div className="font-medium">snapshot in MP4-format</div>;
+                          if (val === "hls") return <div className="font-medium">legacy HLS/TS</div>;
+                          if (val === "hls_fmp4") return <div className="font-medium">legacy HLS/fMP4</div>;
+                          if (val === "hls_modern") return <div className="font-medium">modern HLS/fMP4</div>;
                           if (val === "mjpeg") return <div className="font-medium">MJPEG stream</div>;
                           return <div className="font-medium">{val}</div>;
                         })()}
@@ -497,12 +502,32 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                         <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox, Safari Mac/iPad / codecs: H264, H265*, AAC, PCMA*, PCMU*, PCM*</div>
                       </SelectItem>
                       <SelectItem value="mp4" className="py-2">
-                        <div className="font-medium">MP4 stream</div>
-                        <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox / codecs: H264, H265*, AAC, FLAC, OPUS, MP3</div>
+                        <div className="font-medium">legacy MP4 stream (AAC audio)</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox / codecs: H264, H265*, AAC</div>
+                      </SelectItem>
+                      <SelectItem value="mp4_modern" className="py-2">
+                        <div className="font-medium">modern MP4 stream (common audio)</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Chrome, Firefox / codecs: H264, H265*, AAC, FLAC (PCMA, PCMU, PCM)</div>
+                      </SelectItem>
+                      <SelectItem value="mp4_all" className="py-2">
+                        <div className="font-medium">MP4 stream with any audio</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Chrome / codecs: H264, H265*, AAC, OPUS, MP3, FLAC (PCMA, PCMU, PCM)</div>
+                      </SelectItem>
+                      <SelectItem value="frame_mp4" className="py-2">
+                        <div className="font-medium">snapshot in MP4-format</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: all / codecs: H264, H265*</div>
                       </SelectItem>
                       <SelectItem value="hls" className="py-2">
-                        <div className="font-medium">HLS/fMP4 stream</div>
+                        <div className="font-medium">legacy HLS/TS</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Safari all, Chrome Android / codecs: H264</div>
+                      </SelectItem>
+                      <SelectItem value="hls_fmp4" className="py-2">
+                        <div className="font-medium">legacy HLS/fMP4</div>
                         <div className="text-[10px] text-muted-foreground">browsers: Safari all, Chrome Android / codecs: H264, H265*, AAC</div>
+                      </SelectItem>
+                      <SelectItem value="hls_modern" className="py-2">
+                        <div className="font-medium">modern HLS/fMP4</div>
+                        <div className="text-[10px] text-muted-foreground">browsers: Safari all, Chrome Android / codecs: H264, H265*, AAC, FLAC (PCMA, PCMU, PCM)</div>
                       </SelectItem>
                       <SelectItem value="mjpeg" className="py-2">
                         <div className="font-medium">MJPEG stream</div>
