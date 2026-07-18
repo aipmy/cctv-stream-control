@@ -26,12 +26,24 @@ export async function requireAuth(req, res, next) {
     req.authToken = token;
     
     // Track IP for Go2RTC viewer mapping
+    // Record both direct IP and real public IP from proxy headers
     const clientIp = req.ip || req.connection?.remoteAddress;
-    if (clientIp) {
-      import("../core/userTracker.js").then(({ recordUserIp }) => {
-        recordUserIp(clientIp, dbUser.username);
-      }).catch(() => {}); // ignore import error
-    }
+    const cfIp = req.headers['cf-connecting-ip'];
+    const xffHeader = req.headers['x-forwarded-for'];
+    const xRealIp = req.headers['x-real-ip'];
+    
+    import("../core/userTracker.js").then(({ recordUserIp }) => {
+      if (clientIp) recordUserIp(clientIp, dbUser.username);
+      if (cfIp) recordUserIp(cfIp, dbUser.username);
+      if (xRealIp && xRealIp !== clientIp) recordUserIp(xRealIp, dbUser.username);
+      if (xffHeader) {
+        // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+        const ips = xffHeader.split(',').map(s => s.trim());
+        for (const ip of ips) {
+          if (ip && ip !== clientIp) recordUserIp(ip, dbUser.username);
+        }
+      }
+    }).catch(() => {});
 
     return next();
   } catch (err) {
