@@ -1,6 +1,14 @@
 module.exports = {
   apps: [
     {
+      name: "cctv-go2rtc",
+      script: "./backend/bin/go2rtc",
+      args: "-c ./backend/go2rtc.yaml",
+      cwd: __dirname,
+      watch: false,
+      restart_delay: 5000,
+    },
+    {
       name: "cctv-monitoring-lite",
       cwd: __dirname,
       script: "backend/src/server.js",
