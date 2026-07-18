@@ -93,7 +93,7 @@ function proxyToGo2rtc(req, res) {
       headers.connection = "Upgrade";
       headers.upgrade = "websocket";
       headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-      delete headers.origin;
+      headers.origin = `http://${GO2RTC_HOST}:${GO2RTC_PORT}`;
       
       for (const [key, value] of Object.entries(headers)) {
         if (Array.isArray(value)) {
@@ -255,7 +255,7 @@ server.on("upgrade", (req, socket, head) => {
     headers.connection = "Upgrade";
     headers.upgrade = "websocket";
     headers["x-forwarded-for"] = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-    delete headers.origin;
+    headers.origin = `http://${GO2RTC_HOST}:${GO2RTC_PORT}`;
     
     for (const [key, value] of Object.entries(headers)) {
       if (Array.isArray(value)) {
