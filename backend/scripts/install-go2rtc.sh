@@ -39,7 +39,8 @@ if [[ "$GO2RTC_BINARY" == *"mac"* || "$GO2RTC_BINARY" == *"win"* ]]; then
     unzip -o bin/go2rtc.zip -d bin/
     rm bin/go2rtc.zip
 else
-    curl -L -o bin/go2rtc "https://github.com/AlexxIT/go2rtc/releases/latest/download/$GO2RTC_BINARY"
+    curl -L -o bin/go2rtc.tmp "https://github.com/AlexxIT/go2rtc/releases/latest/download/$GO2RTC_BINARY"
+    mv bin/go2rtc.tmp bin/go2rtc
 fi
 
 chmod +x bin/go2rtc
