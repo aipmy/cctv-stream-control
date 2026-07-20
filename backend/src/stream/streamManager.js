@@ -489,9 +489,10 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               excludeAreas: camera.excludeAreas || [],
             });
             pixelMotionDetected = Boolean(result && result.motion);
+            session.lastPixelBoxes = result && result.boxes ? result.boxes : [];
             
             if (pixelMotionDetected && hasSmart) {
-              const pixelBoxes = result.boxes.map(b => ({
+              const pixelBoxes = session.lastPixelBoxes.map(b => ({
                 ...b,
                 frameWidth: result.width,
                 frameHeight: result.height
@@ -534,7 +535,33 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   if (isIgnoredPoint(nx, ny, camera.excludeAreas || [])) {
                     return false; // Center is in masked area, ignore!
                   }
-                  return true;
+                  
+                  // Enforce physical motion: Ignore stationary objects (like parked cars)
+                  if (!session.lastPixelBoxes || session.lastPixelBoxes.length === 0) {
+                    return false;
+                  }
+                  
+                  const pLeft = p.bbox[0];
+                  const pTop = p.bbox[1];
+                  const pRight = pLeft + p.bbox[2];
+                  const pBottom = pTop + p.bbox[3];
+                  
+                  for (const pb of session.lastPixelBoxes) {
+                    const pbLeft = pb.x;
+                    const pbTop = pb.y;
+                    const pbRight = pb.x + pb.w;
+                    const pbBottom = pb.y + pb.h;
+                    
+                    const overlapLeft = Math.max(pLeft, pbLeft);
+                    const overlapTop = Math.max(pTop, pbTop);
+                    const overlapRight = Math.min(pRight, pbRight);
+                    const overlapBottom = Math.min(pBottom, pbBottom);
+                    
+                    if (overlapLeft < overlapRight && overlapTop < overlapBottom) {
+                      return true; // Overlaps with motion box!
+                    }
+                  }
+                  return false;
                 });
                 
                 let finalPredictions = filtered;
