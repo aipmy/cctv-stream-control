@@ -26,6 +26,10 @@ streams:
   #   - rtsp://admin:password123@192.168.1.101:554/cam/realmonitor?channel=1&subtype=0
 
 webrtc:
-  listen: ":8555" # default public port for WebRTC server (TCP and UDP)
+  # TCP and UDP listen port for WebRTC clients
+  listen: :8555
+  # STUN servers help WebRTC find the public IP for peer-to-peer connections
   ice_servers:
-    - urls: [ "stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302" ]
+    - urls:
+      - stun:stun.cloudflare.com:3478
+      - stun:stun.l.google.com:19302

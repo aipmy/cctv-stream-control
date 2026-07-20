@@ -34,8 +34,8 @@ export async function syncGo2rtc(cameras) {
     if (!doc.has("webrtc")) {
       doc.set("webrtc", doc.createNode({ 
         listen: `:${config.go2rtcWebrtcPort}`,
-        candidates: [
-          `stun:${config.go2rtcWebrtcPort}`
+        ice_servers: [
+          { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }
         ]
       }));
     }
