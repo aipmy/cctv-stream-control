@@ -150,7 +150,7 @@ async function startRecording(camera) {
   
   
   const playlistPath = path.join(outputDir, "index.m3u8");
-  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
+  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}?mp4`;
 
   const args = [
     "-hide_banner", "-loglevel", "error",
@@ -166,9 +166,7 @@ async function startRecording(camera) {
   }
   
   args.push(
-    "-c:a", "aac",
-    "-ac", "1",
-    "-b:a", "32k",
+    "-c:a", "copy",
     "-f", "hls",
     "-hls_time", "5",
     "-hls_list_size", "0",

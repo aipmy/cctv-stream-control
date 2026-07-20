@@ -17,16 +17,14 @@ export function buildRtspInputArgs(camera) {
   return [
     "-rtsp_transport", "tcp",
     "-stimeout", "5000000",
-    "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort || 8554}/${camera.id}`
+    "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort || 8554}/${camera.id}?mp4`
   ];
 }
 
 export function buildHlsArgs(camera, outputType) {
   return [
     "-c:v", "copy",
-    "-c:a", "aac",
-    "-ac", "1",
-    "-b:a", "32k",
+    "-c:a", "copy",
     "-f", "hls",
     "-hls_time", "2",
     "-hls_list_size", "3",
