@@ -6,6 +6,7 @@ backend/backups/
 backend/logs/
 backend/storage/
 backend/go2rtc.yaml
+backend/bin/
 storage/
 
 # logs/history
