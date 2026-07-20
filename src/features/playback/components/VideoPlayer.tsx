@@ -196,13 +196,20 @@ export function VideoPlayer() {
       // Find the block that contains the target timestamp
       let found = mappings.find((m: any) => targetTs >= m.ts && targetTs < m.ts + m.duration);
       
-      if (!found) {
-        // Fall back: find the last block that starts before the target
-        const before = mappings.filter((m: any) => m.ts <= targetTs);
-        found = before.length > 0 ? before[before.length - 1] : mappings[0];
+      if (found) {
+        // Target is inside a recorded segment
+        offset = found.offset + Math.max(0, targetTs - found.ts);
+      } else {
+        // Target is in a gap (missing recording). Auto-skip to the NEXT available segment
+        const after = mappings.filter((m: any) => m.ts > targetTs);
+        if (after.length > 0) {
+          offset = after[0].offset; // Seek exactly to the start of the next available segment
+        } else {
+          // If no segments exist after the target, just go to the very last available segment
+          const last = mappings[mappings.length - 1];
+          offset = last.offset + last.duration - 1; // Seek to the end of the video
+        }
       }
-      
-      offset = found.offset + Math.max(0, targetTs - found.ts);
     } else {
       offset = targetTs - playbackInfo.firstSegmentUnixTime;
     }
