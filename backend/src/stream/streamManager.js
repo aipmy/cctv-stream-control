@@ -182,13 +182,21 @@ async function startRecording(camera) {
   child.on("close", (code) => {
     console.log(`[Recording] FFmpeg stopped for camera ${camera.id} (code ${code})`);
     recordSessions.delete(camera.id);
+    
+    if (!child.intentionallyKilled && camera.enableRecording) {
+      console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
+      setTimeout(() => {
+        startRecording(camera).catch(console.error);
+      }, 5000);
+    }
   });
 }
 
 function stopRecording(cameraId) {
   const child = recordSessions.get(cameraId);
   if (child) {
-    child.kill("SIGTERM");
+    child.intentionallyKilled = true;
+    child.kill("SIGKILL");
     recordSessions.delete(cameraId);
   }
 }
@@ -489,15 +497,14 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
               excludeAreas: camera.excludeAreas || [],
             });
             pixelMotionDetected = Boolean(result && result.motion);
-            session.lastPixelBoxes = result && result.boxes ? result.boxes : [];
+            session.lastPixelBoxes = result && result.boxes ? result.boxes.map(b => ({
+              ...b,
+              frameWidth: result.width,
+              frameHeight: result.height
+            })) : [];
             
             if (pixelMotionDetected && hasSmart) {
-              const pixelBoxes = session.lastPixelBoxes.map(b => ({
-                ...b,
-                frameWidth: result.width,
-                frameHeight: result.height
-              }));
-              void handleMotionDetected(camera, null, pixelBoxes, frame);
+              void handleMotionDetected(camera, null, session.lastPixelBoxes, frame);
             }
           }
 
@@ -541,16 +548,18 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                     return false;
                   }
                   
-                  const pLeft = p.bbox[0];
-                  const pTop = p.bbox[1];
-                  const pRight = pLeft + p.bbox[2];
-                  const pBottom = pTop + p.bbox[3];
+                  const pLeft = p.bbox[0] / p.frameWidth;
+                  const pTop = p.bbox[1] / p.frameHeight;
+                  const pRight = (p.bbox[0] + p.bbox[2]) / p.frameWidth;
+                  const pBottom = (p.bbox[1] + p.bbox[3]) / p.frameHeight;
                   
                   for (const pb of session.lastPixelBoxes) {
-                    const pbLeft = pb.x;
-                    const pbTop = pb.y;
-                    const pbRight = pb.x + pb.w;
-                    const pbBottom = pb.y + pb.h;
+                    const fw = pb.frameWidth || 640;
+                    const fh = pb.frameHeight || 360;
+                    const pbLeft = pb.x / fw;
+                    const pbTop = pb.y / fh;
+                    const pbRight = (pb.x + pb.w) / fw;
+                    const pbBottom = (pb.y + pb.h) / fh;
                     
                     const overlapLeft = Math.max(pLeft, pbLeft);
                     const overlapTop = Math.max(pTop, pbTop);
