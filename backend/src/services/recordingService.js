@@ -344,7 +344,6 @@ export async function runStorageCleanup() {
     const events = await listEvents();
     const eventsByCamera = new Map();
     for (const evt of events) {
-      if (evt.type !== "motion") continue;
       if (!eventsByCamera.has(evt.cameraId)) {
         eventsByCamera.set(evt.cameraId, []);
       }
