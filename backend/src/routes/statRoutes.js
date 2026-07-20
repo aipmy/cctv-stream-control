@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { listCameras } from "../services/cameraService.js";
-import { streamMetricsFor, streamRuntimeStatusFor } from "../stream/streamManager.js";
 import { getLatestTraffic, getTrafficHistory } from "../modules/stats/trafficHistoryService.js";
 
 export const statRoutes = Router();

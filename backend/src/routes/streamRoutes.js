@@ -5,7 +5,7 @@ import os from "node:os";
 import { Router } from "express";
 import { config } from "../core/config.js";
 import { getCamera, markCameraStatus } from "../services/cameraService.js";
-import { getHlsFilePath, serveMjpeg, startHls, startMjpeg, stopCameraStreams, streamStatus, waitForPlaylist, waitForMjpegFrame, recordViewer, recordCameraTraffic, isChildAlive, motionEmitter } from "../stream/streamManager.js";
+import { startAiStream, motionEmitter } from "../stream/streamManager.js";
 import { classifyStreamError } from "../stream/streamError.js";
 import { requirePermission } from "../middleware/authMiddleware.js";
 
@@ -48,7 +48,7 @@ streamRoutes.get("/:id/events", async (req, res) => {
 
   // Wake up the AI backend loop if it's not running
   try {
-    await startHls(id);
+    await startAiStream(id);
   } catch (err) {
     console.error(`[SSE] Failed to wake up AI backend for ${id}:`, err.message);
   }
@@ -82,150 +82,11 @@ streamRoutes.get("/:id/events", async (req, res) => {
   });
 });
 
-async function getCameraOutput(id) {
-  const camera = await getCamera(id);
-  if (!camera) return "HLS Stable";
-  const q = camera.streamType;
-  if (q === "MJPEG" || q === "mjpeg") return "MJPEG";
-  return q === "HLS Low Latency" || q === "ll" ? "HLS Low Latency" : "HLS Stable";
-}
-
-function viewerId(req) {
-  return String(req.query.vid || req.headers["x-cctv-viewer-id"] || `${req.ip}:${req.get("user-agent") || "ua"}`);
-}
-
-function getClientIp(req) {
-  const cfIp = req.headers["cf-connecting-ip"];
-  if (cfIp) return cfIp;
-  const xForwardedFor = req.headers["x-forwarded-for"];
-  if (xForwardedFor) {
-    const parts = xForwardedFor.split(",");
-    return parts[0].trim();
-  }
-  const xRealIp = req.headers["x-real-ip"];
-  if (xRealIp) return xRealIp;
-  return req.ip || req.socket.remoteAddress || "";
-}
-
-function viewerDetails(req) {
-  return {
-    username: req.auth?.username || "anonymous",
-    ip: getClientIp(req),
-    userAgent: req.get("user-agent") || ""
-  };
-}
-
-function segmentQuery(req, output) {
-  const params = new URLSearchParams({ output });
-  if (req.authToken) params.set("token", req.authToken);
-  params.set("vid", viewerId(req));
-  return params.toString();
-}
-
 function appendQuery(line, query) {
+  if (!query) return line;
   const sep = line.includes("?") ? "&" : "?";
   return `${line}${sep}${query}`;
 }
-
-streamRoutes.get("/status", (_req, res) => res.json(streamStatus()));
-
-streamRoutes.post("/:id/start", async (req, res, next) => {
-  try {
-    const output = await getCameraOutput(req.params.id);
-    if (output === "MJPEG") {
-      const session = await startMjpeg(req.params.id);
-      if (!session) return res.status(404).json({ error: "Camera not found" });
-      const ready = await waitForMjpegFrame(session);
-      if (!ready) {
-        const msg = classifyStreamError(session.rawError)?.message
-          || "Kamera tidak mengirim frame sebelum batas waktu. Periksa IP, port, path, dan jaringan kamera.";
-        await markCameraStatus(req.params.id, { status: "offline" });
-        await stopCameraStreams(req.params.id);
-        return res.status(504).json({ error: msg });
-      }
-      return res.json({ ok: true, ready: true, streamUrl: `/api/streams/${req.params.id}/video.mjpg?${segmentQuery(req, output)}`, pid: session.pid });
-    }
-    recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
-    const session = await startHls(req.params.id, output);
-    if (!session) return res.status(404).json({ error: "Camera not found" });
-    const q = segmentQuery(req, output);
-    const isReady = fs.existsSync(session.playlist) && session.status !== "starting";
-    res.json({ ok: true, ready: isReady, streamUrl: `/api/streams/${req.params.id}/index.m3u8?${q}`, pid: session.pid });
-  } catch (err) { next(err); }
-});
-
-streamRoutes.post("/:id/stop", async (req, res, next) => {
-  try { res.json({ stopped: await stopCameraStreams(req.params.id) }); } catch (err) { next(err); }
-});
-
-streamRoutes.post("/:id/ping", async (req, res) => {
-  try {
-    const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-streamRoutes.post("/:id/leave", async (req, res) => {
-  try {
-    const { removeViewer } = await import("../stream/streamManager.js");
-    removeViewer(req.params.id, viewerId(req));
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-streamRoutes.post("/:id/fallback", async (req, res, next) => {
-  try {
-    const { updateCamera } = await import("../services/cameraService.js");
-    await updateCamera(req.params.id, { hlsMode: "transcode" });
-    await stopCameraStreams(req.params.id);
-    res.json({ ok: true, fallback: "transcode" });
-  } catch (err) { next(err); }
-});
-
-streamRoutes.get("/:id/video.mjpg", async (req, res, next) => {
-  try { await serveMjpeg(req.params.id, res); } catch (err) { next(err); }
-});
-
-streamRoutes.get("/:id/index.m3u8", async (req, res, next) => {
-  try {
-    const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
-    const session = await startHls(req.params.id, output);
-    if (!session) return res.status(404).send("Camera not found");
-    const ready = await waitForPlaylist(session);
-    if (!ready) {
-      if (!isChildAlive(session.child)) {
-        const msg = classifyStreamError(session.rawError)?.message
-          || "Gagal memulai stream kamera. Periksa koneksi dan konfigurasi.";
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        return res.status(504).json({ error: msg });
-      }
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      return res.type("application/vnd.apple.mpegurl").send("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n");
-    }
-    await markCameraStatus(req.params.id, { status: "online", lastSeen: new Date().toISOString() });
-    if (session.status !== "running") session.status = "running";
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.type("application/vnd.apple.mpegurl");
-    const raw = await fs.promises.readFile(session.playlist, "utf8");
-    const q = segmentQuery(req, output);
-    const rewritten = raw.split("\n").map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) return line;
-      return appendQuery(trimmed, q);
-    }).join("\n");
-    res.send(rewritten);
-  } catch (err) { next(err); }
-});
-
-streamRoutes.get("/:id/info", async (req, res, next) => {
-  try {
-    const camera = await getCamera(req.params.id);
-    if (!camera) return res.status(404).json({ error: "Camera not found" });
-    res.json({ camera, streams: streamStatus().filter((s) => s.id === req.params.id) });
-  } catch (err) { next(err); }
-});
 
 streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), async (req, res, next) => {
   try {
@@ -269,9 +130,6 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const streamType = camera?.streamType || "HLS Stable";
     const targetDuration = (hlsMode === "copy" || streamType === "HLS Low Latency") ? 1 : 2;
 
-    const output = await getCameraOutput(id);
-    
-    // Determine the correct recording directory (unified under record_hls/<id>/)
     const dir = path.join(config.storageDir, "record_hls", id);
     
     if (!dir || !fs.existsSync(dir)) {
@@ -354,9 +212,6 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const segDur = settings.segmentDuration || 5;
     const targetDuration = 30; // Max segment length without re-encoding could be up to keyframe interval
 
-    const output = await getCameraOutput(id);
-    
-    // Determine the correct recording directory (now always in record_hls without output subfolder)
     const dir = path.join(config.storageDir, "record_hls", id);
     
     if (!dir || !fs.existsSync(dir)) {
@@ -397,7 +252,7 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
 
-    const q = segmentQuery(req, output);
+    const q = req.authToken ? `token=${req.authToken}` : "";
     for (let i = 0; i < segments.length; i++) {
       const current = segments[i];
       let duration = segDur;
@@ -518,7 +373,6 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
       return res.status(400).send("Valid start and end Unix timestamps are required");
     }
 
-    const output = await getCameraOutput(id);
     const dir = path.join(config.storageDir, "record_hls", id);
     if (!dir || !fs.existsSync(dir)) {
       return res.status(404).send("Stream directory not found");
@@ -590,25 +444,11 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
 
 streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
-    const output = await getCameraOutput(req.params.id);
-    recordViewer(req.params.id, viewerId(req), output, viewerDetails(req));
-    let filePath = getHlsFilePath(req.params.id, output, req.params.file);
-    if (!filePath || !fs.existsSync(filePath)) {
-      // Fallback to record_hls directory for playback segments
-      const recordFilePath = path.join(config.storageDir, "record_hls", req.params.id, req.params.file);
-      if (fs.existsSync(recordFilePath) && !req.params.file.includes("..")) {
-        filePath = recordFilePath;
-      } else {
-        return res.status(404).send("Segment not found");
-      }
+    const recordFilePath = path.join(config.storageDir, "record_hls", req.params.id, req.params.file);
+    if (fs.existsSync(recordFilePath) && !req.params.file.includes("..")) {
+      res.setHeader("Cache-Control", "no-cache");
+      return res.sendFile(recordFilePath);
     }
-    try {
-      const st = fs.statSync(filePath);
-      if (st.isFile()) {
-        recordCameraTraffic(req.params.id, "out", st.size);
-      }
-    } catch { /* counted by response middleware if stat unavailable */ }
-    res.setHeader("Cache-Control", "no-cache");
-    res.sendFile(filePath);
+    return res.status(404).send("Segment not found");
   } catch (err) { next(err); }
 });

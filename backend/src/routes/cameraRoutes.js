@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createCamera, deleteCamera, getCamera, listCameras, probeAll, probeCamera, probeTransientCamera, replaceCameras, updateCamera } from "../services/cameraService.js";
-import { stopCameraStreams } from "../stream/streamManager.js";
+import { stopAiStream } from "../stream/streamManager.js";
 import { clearPtzCache, sendPtzCommand, testPtzConnection } from "../services/ptzService.js";
 import { requireRole, requirePermission } from "../middleware/authMiddleware.js";
 import { auditRequest, changedFields } from "../modules/audit/auditService.js";
@@ -92,10 +92,10 @@ cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, ne
     );
 
     if (camera.enabled === false) {
-      await stopCameraStreams(req.params.id);
+      await stopAiStream(req.params.id);
     } else if (needsRestart) {
       // Stop and let the next viewer request auto-start with new settings
-      await stopCameraStreams(req.params.id);
+      await stopAiStream(req.params.id);
     }
 
     await auditRequest(req, {
@@ -126,7 +126,7 @@ cameraRoutes.put("/:id", requirePermission("canEditCamera"), async (req, res, ne
 cameraRoutes.delete("/:id", requirePermission("canDeleteCamera"), async (req, res, next) => {
   try {
     const camera = await getCamera(req.params.id);
-    await stopCameraStreams(req.params.id);
+    await stopAiStream(req.params.id);
     clearPtzCache(req.params.id);
     const ok = await deleteCamera(req.params.id);
     if (!ok) return res.status(404).json({ error: "Camera not found" });
@@ -149,7 +149,7 @@ cameraRoutes.delete("/:id", requirePermission("canDeleteCamera"), async (req, re
 
 cameraRoutes.post("/:id/restart", requirePermission("canRestartStream"), async (req, res, next) => {
   try {
-    await stopCameraStreams(req.params.id);
+    await stopAiStream(req.params.id);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

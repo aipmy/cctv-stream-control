@@ -2,8 +2,6 @@ import { Router } from "express";
 import { requireRole } from "../middleware/authMiddleware.js";
 import { spawn } from "node:child_process";
 import { config } from "../core/config.js";
-import { streamStatus } from "../stream/streamManager.js";
-
 export const systemRoutes = Router();
 
 function binVersion(bin, args = ["-version"], timeoutMs = 2500) {
@@ -40,7 +38,6 @@ systemRoutes.get("/status", async (_req, res, next) => {
       streamProfile: config.streamProfile,
       hlsStartTimeoutMs: config.hlsStartTimeoutMs,
       streamIdleMs: config.streamIdleMs,
-      activeStreams: streamStatus(),
       dataDir: config.dataDir,
       storageDir: config.storageDir,
       ffmpeg,

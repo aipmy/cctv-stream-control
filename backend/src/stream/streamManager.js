@@ -201,104 +201,11 @@ function stopRecording(cameraId) {
   }
 }
 
-const hlsSessions = new Map();      // cameraId -> session, termasuk stopped/error beberapa menit untuk debug
-const hlsStartLocks = new Map();    // cameraId -> Promise<session|null>
-const mjpegSessions = new Map();    // cameraId -> shared MJPEG session
-const mjpegStartLocks = new Map();  // cameraId -> Promise<session|null>
-const streamViewers = new Map();       // cameraId -> Map(viewerId -> { lastSeen, output })
-const cameraTrafficTotals = new Map(); // cameraId -> { pullBytes, outBytes }
-const cameraTrafficLast = new Map();   // cameraId -> { at, pullBytes, outBytes }
-const audioFailures = new Set();       // cameraId
-const VIEWER_TTL_MS = 18_000;
+const aiSessions = new Map();      // cameraId -> session, termasuk stopped/error beberapa menit untuk debug
+const aiStartLocks = new Map();    // cameraId -> Promise<session|null>
 
-export { motionEmitter, mjpegSessions };
+export { motionEmitter };
 
-function cameraTraffic(id) {
-  const key = String(id || "unknown");
-  let t = cameraTrafficTotals.get(key);
-  if (!t) {
-    t = { pullBytes: 0, outBytes: 0 };
-    cameraTrafficTotals.set(key, t);
-  }
-  return t;
-}
-
-export function recordCameraTraffic(id, kind, bytes) {
-  const n = Number(bytes || 0);
-  if (!id || !Number.isFinite(n) || n <= 0) return;
-  const t = cameraTraffic(id);
-  if (kind === "pull") t.pullBytes += n;
-  else if (kind === "out") t.outBytes += n;
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function safeViewerId(value) {
-  return String(value || "")
-    .replace(/[^a-zA-Z0-9_.:-]/g, "")
-    .slice(0, 120) || "anonymous";
-}
-
-export function removeViewer(id, viewerId) { const k = safeViewerId(viewerId); const v = streamViewers.get(id); if (v) { v.delete(k); if (v.size === 0) streamViewers.delete(id); } }
-
-export function recordViewer(id, viewerId, output = "HLS Stable", details = {}) {
-  if (!id) return;
-  const key = safeViewerId(viewerId);
-  const now = Date.now();
-  let viewers = streamViewers.get(id);
-  if (!viewers) {
-    viewers = new Map();
-    streamViewers.set(id, viewers);
-  }
-  viewers.set(key, {
-    lastSeen: now,
-    output: normalizeOutput(output),
-    username: details.username || "anonymous",
-    ip: details.ip || "",
-    userAgent: details.userAgent || "",
-  });
-  for (const [k, v] of viewers.entries()) {
-    if (now - v.lastSeen > VIEWER_TTL_MS) viewers.delete(k);
-  }
-  if (viewers.size === 0) streamViewers.delete(id);
-}
-
-export function getActiveViewerList(id) {
-  const viewers = streamViewers.get(id);
-  if (!viewers) return [];
-  const now = Date.now();
-  const list = [];
-  for (const [k, v] of viewers.entries()) {
-    if (now - v.lastSeen <= VIEWER_TTL_MS) {
-      list.push({
-        id: k,
-        username: v.username || "anonymous",
-        ip: v.ip || "",
-        userAgent: v.userAgent || "",
-        output: v.output,
-        lastSeenAgoSeconds: Math.round((now - v.lastSeen) / 1000)
-      });
-    } else {
-      viewers.delete(k);
-    }
-  }
-  return list;
-}
-
-function activeViewerCount(id) {
-  const viewers = streamViewers.get(id);
-  if (!viewers) return 0;
-  const now = Date.now();
-  let count = 0;
-  for (const [k, v] of viewers.entries()) {
-    if (now - v.lastSeen <= VIEWER_TTL_MS) count += 1;
-    else viewers.delete(k);
-  }
-  if (viewers.size === 0) streamViewers.delete(id);
-  return count;
-}
 
 function redact(value = "") {
   return String(value)
@@ -340,15 +247,15 @@ export function isChildAlive(session) {
   return session && session.status !== "stopped" && session.status !== "error";
 }
 
-function scheduleHlsIdleCleanup() {
+function scheduleAiIdleCleanup() {
   const interval = Math.max(5000, Math.floor(config.streamIdleMs / 2));
   const timer = setInterval(() => {
     const now = Date.now();
-    for (const [id, session] of hlsSessions.entries()) {
+    for (const [id, session] of aiSessions.entries()) {
       const alive = isChildAlive(session);
       if (!alive) {
         const closedAt = session.closedAt ? new Date(session.closedAt).getTime() : 0;
-        if (closedAt && now - closedAt > config.streamErrorRetentionMs) hlsSessions.delete(id);
+        if (closedAt && now - closedAt > config.streamErrorRetentionMs) aiSessions.delete(id);
         continue;
       }
       
@@ -360,69 +267,28 @@ function scheduleHlsIdleCleanup() {
         if (session.pollTimer) clearInterval(session.pollTimer);
         continue;
       }
-
-      if (session.keepAlive) {
-        session.lastRequestAt = now;
-        continue;
-      }
-      if (session.lastRequestAt && now - session.lastRequestAt > config.streamIdleMs) {
-        session.status = "idle-timeout";
-        logLifecycle(session, `idle timeout ${config.streamIdleMs}ms, stopping polling`);
-        if (session.pollTimer) clearInterval(session.pollTimer);
-      }
     }
   }, interval);
   timer.unref?.();
 }
 
-scheduleHlsIdleCleanup();
+scheduleAiIdleCleanup();
 
-function normalizeOutput(output = "HLS Stable") {
-  return output === "HLS Low Latency" || output === "ll" ? "HLS Low Latency" : "HLS Stable";
+function nowIso() {
+  return new Date().toISOString();
 }
 
-function streamDir(id, output = "HLS Stable") {
-  return path.join("/tmp", "cctv_hls", id, output.replace(/\W+/g, "_").toLowerCase());
-}
-
-async function exists(filePath) {
-  try { await fs.access(filePath); return true; }
-  catch { return false; }
-}
-
-async function playlistReady(filePath) {
-  try {
-    const raw = await fs.readFile(filePath, "utf8");
-    return raw.includes("#EXTINF") && raw.includes(".ts");
-  } catch {
-    return false;
-  }
-}
-
-function maskArgs(args) {
-  return args.map((arg) => redact(arg));
-}
-
-async function cleanDir(dir) {
-  await fs.rm(dir, { recursive: true, force: true });
-  await fs.mkdir(dir, { recursive: true });
-}
-
-export async function startHls(id, requestedOutput = "HLS Stable") {
-  const output = normalizeOutput(requestedOutput);
-
-  const locked = hlsStartLocks.get(id);
+export async function startAiStream(id) {
+  const locked = aiStartLocks.get(id);
   if (locked) {
     const session = await locked;
-    if (session) session.lastRequestAt = Date.now();
     return session;
   }
 
   const startPromise = (async () => {
-    const existing = hlsSessions.get(id);
+    const existing = aiSessions.get(id);
     if (existing) {
       if (existing.status !== "stopped" && existing.status !== "error") {
-        existing.lastRequestAt = Date.now();
         return existing;
       }
     }
@@ -438,7 +304,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     const session = {
       id,
       key: id,
-      output,
+      output: "AI_FRAME",
       startedAt: nowIso(),
       status: "starting",
       rawError: "",
@@ -448,7 +314,7 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
       lastFrameAt: Date.now(),
       pollTimer: null
     };
-    hlsSessions.set(id, session);
+    aiSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
     
     // Start FFmpeg recording if enabled
@@ -612,18 +478,6 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
           }
         }
 
-        // Feed to MJPEG clients if any
-        const mjpeg = mjpegSessions.get(id);
-        if (mjpeg) {
-          mjpeg.status = "running";
-          mjpeg.lastFrame = frame;
-          for (const waiter of [...mjpeg.frameWaiters || []]) waiter(true);
-          mjpeg.frameWaiters?.clear?.();
-          for (const client of [...mjpeg.clients]) {
-            writeMjpegFrame(id, client, frame);
-          }
-        }
-        
         start = frameBuffer.indexOf(startMarker);
         end = frameBuffer.indexOf(endMarker);
       }
@@ -644,18 +498,18 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     session.child.on("close", (code) => {
       if (session.status !== "stopping" && code !== 0 && code !== 255) {
         console.error(`[AI-FFmpeg] Process for ${id} died (code ${code}). Restarting in 5s...`);
-        setTimeout(() => startHls(id, output), 5000);
+        setTimeout(() => startAiStream(id), 5000);
       }
     });
 
     return session;
-  })().finally(() => hlsStartLocks.delete(id));
+  })().finally(() => aiStartLocks.delete(id));
 
-  hlsStartLocks.set(id, startPromise);
+  aiStartLocks.set(id, startPromise);
   return startPromise;
 }
 
-export async function stopHls(id, _output) {
+export async function stopAiStream(id) {
   const stopped = [];
   const stopOne = async (cameraId, session) => {
     if (!session) return;
@@ -671,377 +525,13 @@ export async function stopHls(id, _output) {
   };
 
   if (id) {
-    await stopOne(id, hlsSessions.get(id));
-    hlsSessions.delete(id);
+    await stopOne(id, aiSessions.get(id));
+    aiSessions.delete(id);
   } else {
-    for (const [cameraId, session] of hlsSessions.entries()) {
+    for (const [cameraId, session] of aiSessions.entries()) {
       await stopOne(cameraId, session);
     }
-    hlsSessions.clear();
+    aiSessions.clear();
   }
   return stopped;
-}
-
-export async function waitForPlaylist(session) {
-  const started = Date.now();
-  while (Date.now() - started < config.hlsStartTimeoutMs) {
-    // eslint-disable-next-line no-await-in-loop
-    if (await playlistReady(session.playlist)) {
-      session.status = "running";
-      await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
-      return true;
-    }
-    if (!isChildAlive(session.child) && session.status !== "starting") return false;
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  const ok = await exists(session.playlist);
-  if (ok) {
-    session.status = "running";
-    await markCameraStatus(session.id, { status: "online", lastSeen: nowIso() });
-  }
-  return ok;
-}
-
-export function getHlsFilePath(id, output, filename) {
-  const safeName = filename || "index.m3u8";
-  if (safeName.includes("..") || safeName.includes("/") || safeName.includes("\\")) return null;
-  return path.join(streamDir(id, normalizeOutput(output)), safeName);
-}
-
-function proxyHttpMjpeg(id, camera, res) {
-  const source = camera.streamUrl;
-  const url = new URL(source);
-  const client = url.protocol === "https:" ? https : http;
-  let firstByte = false;
-  const req = client.get(url, async (upstream) => {
-    if ((upstream.statusCode || 200) < 400) await markCameraStatus(id, { status: "online", lastSeen: nowIso() });
-    res.writeHead(upstream.statusCode || 200, {
-      "Content-Type": upstream.headers["content-type"] || "multipart/x-mixed-replace; boundary=frame",
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Connection": "close",
-    });
-    upstream.on("data", (chunk) => {
-      firstByte = true;
-      recordCameraTraffic(id, "pull", chunk.length);
-      recordCameraTraffic(id, "out", chunk.length);
-    });
-    upstream.pipe(res);
-  });
-  req.setTimeout(config.mjpegStartTimeoutMs, () => {
-    if (!firstByte) req.destroy(new Error(`MJPEG timeout ${config.mjpegStartTimeoutMs}ms: tidak ada frame dari source`));
-  });
-  req.on("error", async (err) => {
-    await markCameraStatus(id, { status: "offline" });
-    if (!res.headersSent) res.status(504).json({ error: err.message });
-    else res.end();
-  });
-  res.on("close", () => req.destroy());
-}
-
-function extractJpegs() {
-  let buffer = Buffer.alloc(0);
-  let frameCount = 0;
-  return (chunk, onFrame) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    while (true) {
-      const start = buffer.indexOf(Buffer.from([0xff, 0xd8]));
-      const end = start >= 0 ? buffer.indexOf(Buffer.from([0xff, 0xd9]), start + 2) : -1;
-      if (start < 0 || end < 0) {
-        if (buffer.length > 4_000_000) buffer = buffer.slice(-256_000);
-        break;
-      }
-      const frame = buffer.slice(start, end + 2);
-      buffer = buffer.slice(end + 2);
-      frameCount++;
-      if (frameCount % 10 === 0) console.log(`[extractJpegs] parsed ${frameCount} frames, buffer size ${buffer.length}`);
-      onFrame(frame);
-    }
-  };
-}
-
-function writeMjpegFrame(id, res, frame) {
-  if (res.writableEnded || res.destroyed) return;
-  const header = `--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`;
-  res.write(header);
-  res.write(frame);
-  res.write("\r\n");
-  recordCameraTraffic(id, "out", Buffer.byteLength(header) + frame.length + 2);
-}
-
-async function startSharedMjpeg(id) {
-  const existing = mjpegSessions.get(id);
-  if (existing) return existing;
-
-  const hlsSession = await startHls(id);
-  if (!hlsSession) return null;
-
-  const session = {
-    id,
-    output: "MJPEG",
-    clients: new Set(),
-    startedAt: nowIso(),
-    status: hlsSession.status === "running" ? "running" : "starting",
-    rawError: "",
-    lastFrame: hlsSession.lastFrame || null,
-    frameWaiters: new Set(),
-    stopTimer: null,
-  };
-  mjpegSessions.set(id, session);
-  return session;
-}
-
-function scheduleMjpegStop(id, session) {
-  if (session.stopTimer) clearTimeout(session.stopTimer);
-  session.stopTimer = setTimeout(() => {
-    if (session.clients.size > 0) return;
-    mjpegSessions.delete(id);
-  }, config.streamIdleMs);
-}
-
-export async function waitForMjpegFrame(session, timeoutMs = config.mjpegStartTimeoutMs) {
-  if (!session) return false;
-  if (session.lastFrame) return true;
-  
-  const hlsSession = hlsSessions.get(session.id);
-  if (!hlsSession || !isChildAlive(hlsSession.child)) return false;
-
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (ok) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      session.frameWaiters?.delete?.(finish);
-      resolve(Boolean(ok));
-    };
-    const timer = setTimeout(() => finish(false), Math.max(1000, timeoutMs));
-    session.frameWaiters?.add?.(finish);
-  });
-}
-
-export async function startMjpeg(id) {
-  return startSharedMjpeg(id);
-}
-
-export async function serveMjpeg(id, res) {
-  const camera = await getCamera(id, { revealSecret: true });
-  if (!camera) {
-    res.status(404).json({ error: "Camera not found" });
-    return;
-  }
-  if (!camera.enabled) {
-    res.status(409).json({ error: "Camera disabled" });
-    return;
-  }
-
-  if (camera.sourceType === "MJPEG") {
-    proxyHttpMjpeg(id, camera, res);
-    return;
-  }
-
-  const session = await startSharedMjpeg(id);
-  if (!session) {
-    res.status(404).json({ error: "Camera not found" });
-    return;
-  }
-  if (session.child) {
-    session.child.kill("SIGKILL");
-    session.child = null;
-  }
-
-  const ready = await waitForMjpegFrame(session);
-  if (!ready) {
-    session.status = "error";
-    const msg = classifyStreamError(session.rawError)?.message
-      || "Kamera tidak mengirim frame sebelum batas waktu. Periksa IP, port, path, dan jaringan kamera.";
-    await markCameraStatus(id, { status: "offline" });
-    if (isChildAlive(session.child) && session.clients.size === 0) session.child.kill("SIGTERM");
-    res.status(504).json({ error: msg });
-    return;
-  }
-
-  res.writeHead(200, {
-    "Content-Type": "multipart/x-mixed-replace; boundary=frame",
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Connection": "close",
-  });
-
-  session.clients.add(res);
-  if (session.lastFrame) writeMjpegFrame(id, res, session.lastFrame);
-  res.on("close", () => {
-    session.clients.delete(res);
-    if (session.clients.size === 0) scheduleMjpegStop(id, session);
-  });
-}
-
-export function streamStatus() {
-  const now = Date.now();
-  const items = [];
-  for (const [id, session] of hlsSessions.entries()) {
-    if (session.status === "starting" && fsSync.existsSync(session.playlist)) {
-      session.status = "running";
-    }
-    items.push({
-      key: id,
-      id: session.id,
-      output: session.output,
-      hlsMode: session.hlsMode,
-      rtspTransport: session.rtspTransport,
-      rtspTimeoutOption: session.rtspTimeoutOption || "none",
-      pid: session.pid,
-      status: isChildAlive(session.child) ? session.status : session.status || "stopped",
-      startedAt: session.startedAt,
-      closedAt: session.closedAt || null,
-      exitCode: session.exitCode ?? null,
-      signalCode: session.signalCode ?? null,
-      lastRequestAt: session.lastRequestAt ? new Date(session.lastRequestAt).toISOString() : null,
-      idleSeconds: session.lastRequestAt ? Math.round((now - session.lastRequestAt) / 1000) : null,
-      viewers: activeViewerCount(id),
-      error: classifyStreamError(session.rawError),
-      playlistReady: fsSync.existsSync(session.playlist),
-    });
-  }
-  for (const [id, session] of mjpegSessions.entries()) {
-    items.push({
-      key: `${id}:mjpeg`,
-      id,
-      output: "MJPEG",
-      rtspTransport: session.rtspTransport,
-      rtspTimeoutOption: session.rtspTimeoutOption || "none",
-      pid: session.pid,
-      status: isChildAlive(session.child) ? session.status : session.status || "stopped",
-      clients: activeViewerCount(id),
-      startedAt: session.startedAt,
-      closedAt: session.closedAt || null,
-      exitCode: session.exitCode ?? null,
-      signalCode: session.signalCode ?? null,
-      error: classifyStreamError(session.rawError),
-    });
-  }
-  return items;
-}
-
-function estimatedKbpsFor(streamType) {
-  return streamType === "MJPEG"
-    ? config.mjpegBandwidthKbps
-    : streamType === "HLS Low Latency"
-      ? config.hlsLowLatencyBandwidthKbps
-      : config.hlsStableBandwidthKbps;
-}
-
-export function streamRuntimeStatusFor(id) {
-  const hls = hlsSessions.get(id);
-  if (hls && isChildAlive(hls.child)) {
-    if (hls.status === "starting" && fsSync.existsSync(hls.playlist)) {
-      hls.status = "running";
-    }
-    return hls.status === "running" ? "online" : "starting";
-  }
-  const mjpeg = mjpegSessions.get(id);
-  if (mjpeg && isChildAlive(mjpeg.child)) {
-    return mjpeg.status === "running" ? "online" : "starting";
-  }
-  return null;
-}
-
-function cameraTrafficRatesFor(id, fallbackPullKbps = 0, fallbackOutKbps = 0) {
-  const now = Date.now();
-  const totals = cameraTraffic(id);
-  const prev = cameraTrafficLast.get(id) || { at: now, pullBytes: totals.pullBytes, outBytes: totals.outBytes };
-  const elapsed = Math.max(0.25, (now - prev.at) / 1000);
-  const measuredPull = (totals.pullBytes - prev.pullBytes) / elapsed;
-  const measuredOut = (totals.outBytes - prev.outBytes) / elapsed;
-  cameraTrafficLast.set(id, { at: now, pullBytes: totals.pullBytes, outBytes: totals.outBytes });
-  return {
-    pullBytesPerSec: Math.max(0, measuredPull, (Number(fallbackPullKbps || 0) * 1000) / 8),
-    outBytesPerSec: Math.max(0, measuredOut, (Number(fallbackOutKbps || 0) * 1000) / 8),
-  };
-}
-
-export function streamMetricsFor(id, streamType) {
-  let viewers = 0;
-  let running = false;
-  let starting = false;
-  const hls = hlsSessions.get(id);
-  if (hls && isChildAlive(hls.child)) {
-    running = hls.status === "running";
-    starting = hls.status !== "running";
-  }
-  const mjpeg = mjpegSessions.get(id);
-  if (mjpeg && isChildAlive(mjpeg.child)) {
-    running = running || mjpeg.status === "running";
-    starting = starting || mjpeg.status !== "running";
-  }
-  if (running || starting) {
-    viewers = activeViewerCount(id);
-  }
-  const perViewerKbps = estimatedKbpsFor(streamType);
-  const fallbackOutKbps = viewers === 0 ? 0 : perViewerKbps * viewers;
-  const fallbackPullKbps = (running || starting) ? perViewerKbps : 0;
-  const rates = cameraTrafficRatesFor(id, fallbackPullKbps, fallbackOutKbps);
-  const bandwidthKbps = (rates.outBytesPerSec * 8) / 1000;
-  const cctvPullKbps = (rates.pullBytesPerSec * 8) / 1000;
-  const latencyMs = viewers === 0 ? 0 : streamType === "MJPEG" ? 700 : streamType === "HLS Low Latency" ? 650 : 1800;
-  return {
-    viewers, running, starting,
-    bandwidthKbps, cctvPullKbps, latencyMs,
-    outBytesPerSec: rates.outBytesPerSec,
-    pullBytesPerSec: rates.pullBytesPerSec,
-    activeViewers: getActiveViewerList(id),
-  };
-}
-
-export function streamSystemMetrics() {
-  let cctvPullKbps = 0;
-  let cctvOutKbps = 0;
-  let viewers = 0;
-  let activeProcesses = 0;
-  const seen = new Set();
-  for (const [id, session] of hlsSessions.entries()) {
-    if (!isChildAlive(session.child)) continue;
-    activeProcesses += 1;
-    const type = session.output || "HLS Stable";
-    const per = estimatedKbpsFor(type);
-    cctvPullKbps += per;
-    const v = activeViewerCount(id);
-    viewers += v;
-    cctvOutKbps += per * v;
-    seen.add(id);
-  }
-  for (const [id, session] of mjpegSessions.entries()) {
-    if (!isChildAlive(session.child)) continue;
-    activeProcesses += 1;
-    const per = estimatedKbpsFor("MJPEG");
-    cctvPullKbps += per;
-    const v = activeViewerCount(id);
-    viewers += v;
-    cctvOutKbps += per * v;
-    seen.add(id);
-  }
-  return { cctvPullKbps, cctvOutKbps, viewers, activeProcesses, activeCameras: seen.size };
-}
-
-export async function stopMjpeg(id) {
-  const mjpeg = mjpegSessions.get(id);
-  if (mjpeg) {
-    mjpegSessions.delete(id);
-    return true;
-  }
-  return false;
-}
-
-export async function stopCameraStreams(id) {
-  const stopped = await stopHls(id);
-  if (await stopMjpeg(id)) {
-    stopped.push(`${id}:mjpeg`);
-  }
-  return stopped;
-}
-
-export async function stopAllStreams() {
-  await stopHls();
-  mjpegSessions.clear();
 }

@@ -13,7 +13,7 @@ import { setupRoutes } from "./routes/setupRoutes.js";
 import { cameraRoutes } from "./routes/cameraRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
 import { streamRoutes } from "./routes/streamRoutes.js";
-import { stopAllStreams } from "./stream/streamManager.js";
+import { stopAiStream } from "./stream/streamManager.js";
 import { statRoutes } from "./routes/statRoutes.js";
 import { systemRoutes } from "./routes/systemRoutes.js";
 import { auditRoutes } from "./routes/auditRoutes.js";
@@ -313,7 +313,7 @@ async function shutdown(signal) {
   try { await closeAudit(); } catch (err) { console.error(err); }
   try { await stopBlacklist(); } catch (err) { console.error(err); }
   try { await stopTrafficHistory(); } catch (err) { console.error(err); }
-  try { await stopAllStreams(); } catch (err) { console.error(err); }
+  try { await stopAiStream(); } catch (err) { console.error(err); }
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 3000).unref();
 }

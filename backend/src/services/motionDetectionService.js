@@ -1,5 +1,5 @@
 import { listCameras } from "./cameraService.js";
-import { startHls } from "../stream/streamManager.js";
+import { startAiStream } from "../stream/streamManager.js";
 
 let monitorInterval = null;
 
@@ -30,7 +30,7 @@ async function checkSmartCameras() {
         // 1. Ensure HLS stream is running continuously for pre-recording buffer
         // Note: startHls will return the existing session if it's already active.
         try {
-          const session = await startHls(camera.id, camera.streamType);
+          const session = await startAiStream(camera.id);
           if (session) {
             session.keepAlive = true;
           }

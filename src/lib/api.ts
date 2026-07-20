@@ -231,12 +231,6 @@ export interface ServerSettings {
 }
 
 export const streamApi = {
-  start: (id: string, output?: StreamType) => api<{ ok: boolean; ready: boolean; streamUrl: string }>(`/api/streams/${encodeURIComponent(id)}/start?vid=${encodeURIComponent(getViewerId())}`, { method: "POST", json: { output } }),
-  stop: (id: string, output?: StreamType) => api<{ stopped: string[] }>(`/api/streams/${encodeURIComponent(id)}/stop`, { method: "POST", json: { output } }),
-  ping: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/ping?vid=${encodeURIComponent(getViewerId())}`, { method: "POST" }),
-  leave: (id: string) => api<{ ok: boolean }>(`/api/streams/${encodeURIComponent(id)}/leave?vid=${encodeURIComponent(getViewerId())}`, { method: "POST" }),
-  fallback: (id: string) => api<{ ok: boolean; fallback: string }>(`/api/streams/${encodeURIComponent(id)}/fallback`, { method: "POST" }),
-  status: () => api<StreamStatus[]>("/api/streams/status"),
   playbackInfo: (id: string, date: string, start?: number, end?: number) => {
     let url = `/api/streams/${encodeURIComponent(id)}/playback-info?date=${encodeURIComponent(date)}`;
     if (start !== undefined) url += `&start=${start}`;

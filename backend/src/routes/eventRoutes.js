@@ -5,7 +5,7 @@ import os from "node:os";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "../core/config.js";
-import { streamSystemMetrics, getOngoingEventIds } from "../stream/streamManager.js";
+import { getOngoingEventIds } from "../stream/streamManager.js";
 
 const execAsync = promisify(exec);
 import {
@@ -212,9 +212,8 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
     let diskReadMb = 0.0;
     let diskWriteMb = 0.0;
     try {
-      const sysMetrics = streamSystemMetrics();
       const baseCpu = 3 + Math.floor(Math.random() * 4);
-      const streamCpu = (sysMetrics.activeProcesses || 0) * 11;
+      const streamCpu = 0;
       const numCpus = os.cpus().length || 1;
       const loadPercentage = Math.round((os.loadavg()[0] / numCpus) * 100);
       cpuUsage = Math.min(Math.max(loadPercentage || (baseCpu + streamCpu), 3), 98);

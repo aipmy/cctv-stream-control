@@ -70,8 +70,8 @@ export async function updateSettings(payload) {
   }
 
   if (isStorageDirChanged) {
-    import("../stream/streamManager.js").then(({ stopAllStreams }) => {
-      stopAllStreams().catch(err => console.error("Gagal menghentikan stream setelah ganti folder:", err));
+    import("../stream/streamManager.js").then(({ stopAiStream }) => {
+      stopAiStream().catch(err => console.error("Gagal menghentikan stream setelah ganti folder:", err));
     }).catch(err => console.error("Gagal import streamManager:", err));
   }
 
