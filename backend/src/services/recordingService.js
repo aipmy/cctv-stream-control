@@ -150,8 +150,65 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
   // Handle Snapshot Generation from buffer
   if (snapshotBuffer) {
     try {
-      // Save the raw snapshot directly to avoid heavy blocking JPEG encoding on the Raspberry Pi CPU
+      // Save the raw snapshot directly
       await fs.writeFile(snapshotFile, snapshotBuffer);
+
+      // FIRE & FORGET: Draw bounding boxes using FFmpeg (zero Node.js event loop blocking)
+      const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
+      let boxesToDraw = [];
+      let classifiedMode = "pixel";
+      
+      if (predictions && predictions.length > 0) {
+        const hasHuman = predictions.some((p) => p.class === "person");
+        const hasPet = predictions.some((p) => ["cat", "dog", "bird"].includes(p.class));
+        if (hasHuman && detectionModes.includes("human")) classifiedMode = "human";
+        else if (hasPet && detectionModes.includes("pet")) classifiedMode = "pet";
+      }
+
+      if (classifiedMode !== "pixel" && predictions) {
+        for (const p of predictions) {
+          if (classifiedMode === "human" && p.class !== "person") continue;
+          if (classifiedMode === "pet" && !["cat", "dog", "bird"].includes(p.class)) continue;
+          boxesToDraw.push({
+            x: Math.max(0, Math.round(p.bbox[0])),
+            y: Math.max(0, Math.round(p.bbox[1])),
+            w: Math.max(1, Math.round(p.bbox[2])),
+            h: Math.max(1, Math.round(p.bbox[3])),
+            color: classifiedMode === "human" ? "red" : "blue"
+          });
+        }
+      } else if (classifiedMode === "pixel" && pixelBoxes && pixelBoxes.length > 0) {
+        const largestBox = pixelBoxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
+        boxesToDraw.push({
+          x: Math.max(0, largestBox.x),
+          y: Math.max(0, largestBox.y),
+          w: Math.max(1, largestBox.w),
+          h: Math.max(1, largestBox.h),
+          color: "yellow"
+        });
+      }
+
+      if (boxesToDraw.length > 0) {
+        const drawboxFilters = boxesToDraw.map(b => `drawbox=x=${b.x}:y=${b.y}:w=${b.w}:h=${b.h}:color=${b.color}@0.8:t=3`).join(',');
+        const tempFile = snapshotFile + ".tmp.jpg";
+        
+        const ffmpegChild = spawn(config.ffmpegBin || "ffmpeg", [
+          "-y",
+          "-v", "error",
+          "-i", snapshotFile,
+          "-vf", drawboxFilters,
+          "-q:v", "3",
+          tempFile
+        ]);
+        
+        ffmpegChild.on("close", (code) => {
+          if (code === 0 && fsSync.existsSync(tempFile)) {
+            fsSync.renameSync(tempFile, snapshotFile);
+          } else if (fsSync.existsSync(tempFile)) {
+            fsSync.unlinkSync(tempFile);
+          }
+        });
+      }
     } catch (err) {
       console.error(`[Event Recording] Failed to generate snapshot for ${eventId}`, err);
     }
