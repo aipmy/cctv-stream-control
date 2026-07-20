@@ -760,17 +760,7 @@ export function SmartDetectionEditor({
           }}
         />
 
-        {/* Removed overlay SSE connection indicator to avoid blocking camera timestamp */}
-        {activeMode && (
-          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono font-bold tracking-widest uppercase text-indigo-400 border border-indigo-500/30 z-20">
-            {activeMode}
-          </div>
-        )}
-        {showPixelMotion && (
-          <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[9px] font-mono text-green-400 z-20">
-            Activity: {activity} blocks
-          </div>
-        )}
+        {/* Removed overlay SSE connection indicator and stream badge to avoid blocking camera timestamp */}
         {/* Helper guide */}
         {mode !== "none" && (
           <div className="absolute bottom-2 left-2 right-2 bg-black/85 border border-slate-700/50 backdrop-blur-sm px-2 py-1.5 rounded text-[10px] text-yellow-200 z-20 animate-fade-in font-medium">
@@ -782,13 +772,26 @@ export function SmartDetectionEditor({
       </div>
 
       {/* ══════ Status Bar ══════ */}
-      <div className="text-xs text-slate-400 font-mono px-1 flex items-center justify-between">
-        <div>
-          Objects: <span className="text-white font-semibold">{detectionCount}</span>
-          {" | "}
+      <div className="text-xs text-slate-400 font-mono px-1 flex items-center justify-between mt-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeMode && (
+            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[9px] font-mono font-bold tracking-widest uppercase text-indigo-400 border border-indigo-500/30">
+              {activeMode}
+            </span>
+          )}
+          <span>
+            Objects: <span className="text-white font-semibold">{detectionCount}</span>
+          </span>
+          <span className="opacity-50">|</span>
           <span className="font-semibold">FPS: {currentFps}</span>
+          {showPixelMotion && (
+            <>
+              <span className="opacity-50">|</span>
+              <span>Activity: <span className="text-green-400">{activity} blk</span></span>
+            </>
+          )}
           {isMotionDetected && showPixelMotion && (
-            <span className="text-red-400 font-bold animate-pulse ml-2">● MOTION DETECTED</span>
+            <span className="text-red-400 font-bold animate-pulse ml-1">● MOTION</span>
           )}
         </div>
         <div className="flex items-center gap-1.5 text-[10px]">
