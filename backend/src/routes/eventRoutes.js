@@ -169,11 +169,20 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
     const hlsDir = path.join(config.storageDir, "hls");
     const recordHlsDir = path.join(config.storageDir, "record_hls");
     
+    // Cache for heavy du calculations
+    if (!global.dirSizeCache) global.dirSizeCache = {};
+    const now = Date.now();
+    
     async function getDirSize(dirPath) {
+      if (global.dirSizeCache[dirPath] && now - global.dirSizeCache[dirPath].time < 5 * 60 * 1000) {
+        return global.dirSizeCache[dirPath].size;
+      }
       try {
         const { stdout } = await execAsync(`du -sk "${dirPath}"`);
         const kb = parseInt(stdout.split(/\\s+/)[0], 10);
-        return isNaN(kb) ? 0 : kb * 1024;
+        const size = isNaN(kb) ? 0 : kb * 1024;
+        global.dirSizeCache[dirPath] = { time: now, size };
+        return size;
       } catch (err) {
         return 0;
       }
