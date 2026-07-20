@@ -227,7 +227,6 @@ setInterval(async () => {
         if (streamData) {
            if (streamData.consumers) {
             const humanConsumers = streamData.consumers.filter(c => {
-              console.log("[DEBUG] Checking consumer:", c.format_name, c.remote_addr, c.user_agent);
               if (c.format_name === 'keyframe' || c.format_name === 'snapshot') return false;
               if (c.remote_addr && c.remote_addr.startsWith('127.0.0.1')) return false;
               if (c.remote_addr && c.remote_addr.startsWith('[::1]')) return false;
