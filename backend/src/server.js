@@ -28,7 +28,6 @@ import { closeAudit, initializeAudit } from "./modules/audit/auditService.js";
 import { initializeBlacklist, stopBlacklist } from "./core/tokenBlacklist.js";
 import { listCameras, getGlobalMetrics } from "./services/cameraService.js";
 import { syncGo2rtc } from "./services/go2rtcSync.js";
-import { startTurnSync } from "./services/cloudflareTurn.js";
 
 const GO2RTC_HOST = "127.0.0.1";
 const GO2RTC_PORT = config.go2rtcApiPort;
@@ -253,8 +252,6 @@ startMotionDetectionWorker();
 const initialCameras = await listCameras({ revealSecret: true });
 await syncGo2rtc(initialCameras);
 
-// Start Cloudflare TURN sync
-startTurnSync();
 
 const server = app.listen(config.port, config.host, () => {
   console.log(`CCTV Monitoring Lite backend running on http://${config.host}:${config.port}`);
