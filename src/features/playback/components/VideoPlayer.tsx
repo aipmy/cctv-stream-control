@@ -5,7 +5,7 @@ import { playbackUrl } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Loader2, AlertTriangle, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Maximize } from "lucide-react";
+import { PlayCircle, Loader2, AlertTriangle, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Maximize, Download } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
 export function VideoPlayer() {
@@ -24,7 +24,8 @@ export function VideoPlayer() {
     setCurrentPlaybackTs, setCurrentRecordingTime,
     setTimelineCenterTs,
     jumpToTimeTrigger, setJumpToTimeTrigger,
-    loadPlaybackTrigger
+    loadPlaybackTrigger,
+    setIsDownloadFormOpen
   } = usePlayback();
 
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
@@ -179,7 +180,7 @@ export function VideoPlayer() {
   useEffect(() => {
     if (jumpToTimeTrigger !== null) {
       seekToTimestamp(jumpToTimeTrigger);
-      setTimelineCenterTs(jumpToTimeTrigger);
+      setTimelineCenterTs(null); // Reset to null so it auto-follows currentPlaybackTs
       setJumpToTimeTrigger(null); // consume trigger
     }
   }, [jumpToTimeTrigger]);
@@ -286,10 +287,10 @@ export function VideoPlayer() {
 
   return (
     <>
-      <div className="shrink-0 lg:sticky lg:top-[72px] z-30 space-y-2 lg:bg-slate-950/80 lg:backdrop-blur-xl lg:p-2 lg:-mx-2 lg:rounded-xl">
+      <div className="w-full h-full flex flex-col gap-2">
         <Card 
           ref={playerContainerRef} 
-          className="overflow-hidden bg-slate-950 aspect-video relative flex flex-col items-center justify-center border border-border/40 shadow-glow group"
+          className="w-full h-full max-h-full overflow-hidden bg-black relative flex flex-col items-center justify-center border-none rounded-xl"
         >
           {loading && !activePosterUrl && (
             <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-white/10 px-2.5 py-1.5 rounded-full text-white text-[10px] font-medium z-25 shadow-lg animate-fade-in">
@@ -307,12 +308,13 @@ export function VideoPlayer() {
               </p>
             </div>
           ) : playbackInfo?.hasRecording ? (
-            <div className="relative w-full flex-1 flex items-center justify-center min-h-0">
+            <div className="relative w-full h-full flex items-center justify-center min-h-0">
               <video
                 ref={videoRef}
                 className="w-full h-full object-contain cursor-pointer"
                 crossOrigin="anonymous"
                 muted={isMuted}
+                playsInline
                 onTimeUpdate={handleVideoTimeUpdate}
                 onWaiting={() => {
                   const v = videoRef.current;
@@ -379,8 +381,8 @@ export function VideoPlayer() {
         </Card>
 
         {playbackInfo?.hasRecording && (
-          <Card className="w-full bg-slate-950/90 border border-white/10 p-2.5 flex items-center justify-between flex-wrap gap-2 shadow-glow">
-            <div className="flex items-center gap-1.5">
+          <div className="w-full bg-slate-950/90 border border-white/10 p-1.5 sm:p-2 flex items-center justify-between flex-nowrap overflow-x-auto scrollbar-hide gap-2 shrink-0 rounded-b-xl z-20 relative">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               <Button
                 size="sm"
                 variant="ghost"
@@ -426,12 +428,12 @@ export function VideoPlayer() {
                   step="0.05"
                   value={volume}
                   onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="w-16 md:w-20 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary transition-all duration-200"
+                  className="hidden sm:block w-16 md:w-20 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary transition-all duration-200"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
               <div className="flex items-center gap-1.5 text-white text-xs font-semibold bg-white/5 rounded-lg px-2 py-0.5 border border-white/5">
                 <span className="text-[9px] text-slate-400 uppercase tracking-wider">{t("speed")}</span>
                 <Select
@@ -456,12 +458,22 @@ export function VideoPlayer() {
                 size="sm"
                 variant="ghost"
                 className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors shrink-0"
+                onClick={() => setIsDownloadFormOpen(true)}
+                title={t("downloadClip")}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-white hover:bg-white/10 hover:text-white rounded-lg transition-colors shrink-0"
                 onClick={toggleFullscreen}
               >
                 <Maximize className="h-4 w-4" />
               </Button>
             </div>
-          </Card>
+          </div>
         )}
       </div>
     </>

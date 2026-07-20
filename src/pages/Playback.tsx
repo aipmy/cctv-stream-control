@@ -18,14 +18,15 @@ import { toast } from "sonner";
 
 function PlaybackContent() {
   const { t, lang } = useTranslation();
-  
+
   const {
     selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs,
     setLoading, setError, setCurrentPlaybackTs, setCurrentRecordingTime, setTimelineCenterTs,
     setPlaybackInfo, setEvents, setActivePosterUrl, setJumpToTimeTrigger,
     activeSnapshot, setActiveSnapshot,
     deleteEventTarget, setDeleteEventTarget,
-    loadPlaybackTrigger, setLoadPlaybackTrigger
+    loadPlaybackTrigger, setLoadPlaybackTrigger,
+    isDownloadFormOpen, setIsDownloadFormOpen
   } = usePlayback();
 
   const location = useLocation();
@@ -144,55 +145,44 @@ function PlaybackContent() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl pb-10 select-none">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold tracking-tight">
-          {t("playback")}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {lang === "id" ? "Lihat rekaman ulang dari kamera" : "View playback from camera"}
-        </p>
+    <div className="flex flex-col h-[calc(100dvh-160px)] md:h-[calc(100vh-112px)] w-full max-w-7xl mx-auto overflow-hidden">
+
+      <div className="shrink-0 mb-2 sm:mb-4">
+        <PlaybackControls />
       </div>
 
-      <PlaybackControls />
-
-      {/* Responsive Layout */}
-      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 items-start h-[calc(100vh-64px)] lg:h-auto overflow-hidden lg:overflow-visible">
-        {/* Left Column */}
-        <div className="w-full lg:col-span-2 flex flex-col h-full min-h-0 lg:block lg:space-y-6 lg:pr-1 lg:pb-4">
-          <VideoPlayer />
-
-          {/* Desktop Timeline and Downloader */}
-          <div className="hidden lg:block space-y-6 mt-4 lg:mt-0">
-            <TimelineCanvas />
-            <DownloadClipForm />
-          </div>
-
-          {/* Mobile Tabs */}
-          <div className="lg:hidden flex-1 flex flex-col min-h-0 mt-4">
-            <Tabs defaultValue="events" className="flex flex-col h-full">
-              <TabsList className="grid grid-cols-2 w-full shrink-0">
-                <TabsTrigger value="events">{lang === "id" ? "Kejadian" : "Events"}</TabsTrigger>
-                <TabsTrigger value="timeline">{lang === "id" ? "Garis Waktu" : "Timeline"}</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="events" className="flex-1 overflow-y-auto mt-4 outline-none">
-                 <EventList />
-              </TabsContent>
-              
-              <TabsContent value="timeline" className="flex-1 overflow-y-auto mt-4 outline-none space-y-4 pb-8">
-                 <TimelineCanvas />
-                 <DownloadClipForm />
-              </TabsContent>
-            </Tabs>
+      {/* Layout: Fills remaining height. Fixed on all screens, no scrolling */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-6 min-h-0 min-w-0 overflow-hidden">
+        
+        {/* Main Content: Video Player ONLY */}
+        <div className="flex-none lg:flex-1 h-[40%] sm:h-[50%] lg:h-auto min-w-0 min-h-0 flex flex-col">
+          <div className="w-full h-full rounded-xl overflow-hidden shadow-sm bg-black">
+            <VideoPlayer />
           </div>
         </div>
 
-        {/* Right Column: Scrollable Detection Events List (Desktop only) */}
-        <div className="max-lg:hidden lg:col-span-1 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto pr-1 pb-4 scrollbar-thin">
-          <EventList />
+        {/* Right Sidebar: Vertical Timeline & Events */}
+        <div className="flex-1 lg:w-[400px] xl:w-[450px] min-h-0 flex gap-2 lg:gap-3">
+          {/* Vertical Timeline */}
+          <div className="w-16 lg:w-24 shrink-0 min-h-0 h-full relative rounded-xl overflow-hidden">
+            <div className="absolute inset-0">
+              <TimelineCanvas />
+            </div>
+          </div>
+
+          {/* Events List */}
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+            <EventList />
+          </div>
         </div>
       </div>
+      
+      {/* Download Clip Dialog */}
+      <Dialog open={isDownloadFormOpen} onOpenChange={setIsDownloadFormOpen}>
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-card border-border/40">
+          <DownloadClipForm />
+        </DialogContent>
+      </Dialog>
 
       {/* Zoomed Snapshot Dialog */}
       <Dialog open={!!activeSnapshot} onOpenChange={(o) => !o && setActiveSnapshot(null)}>

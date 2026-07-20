@@ -1,3 +1,5 @@
+import { config } from "../core/config.js";
+
 export function normalizeRtspTransport(t) {
   return "tcp";
 }
@@ -11,10 +13,11 @@ export function normalizeHlsMode(m) {
 }
 
 export function buildRtspInputArgs(camera) {
+  // Selalu tarik dari go2rtc (sebagai proxy lokal) agar kamera hanya menerima 1 koneksi
   return [
     "-rtsp_transport", "tcp",
     "-stimeout", "5000000",
-    "-i", camera.streamUrl || `rtsp://127.0.0.1:8554/${camera.id}`
+    "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort || 8554}/${camera.id}`
   ];
 }
 

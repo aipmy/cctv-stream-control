@@ -50,17 +50,17 @@ export function PlaybackControls() {
   };
 
   return (
-    <Card className="p-5 border border-border/40 bg-card/65 backdrop-blur-md shadow-sm">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("selectCamera")}</Label>
+    <Card className="p-2 sm:p-5 border border-border/40 bg-card/65 backdrop-blur-md shadow-sm">
+      <div className="flex overflow-x-auto lg:grid lg:grid-cols-4 flex-nowrap gap-2 sm:gap-4 items-end pb-1 lg:pb-0 scrollbar-hide">
+        <div className="lg:space-y-1 shrink-0 w-[150px] lg:w-auto">
+          <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("selectCamera")}</Label>
           <Popover open={isCameraPopoverOpen} onOpenChange={setIsCameraPopoverOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={isCameraPopoverOpen}
-                className="w-full justify-between font-normal text-left h-10 bg-background border-border text-sm"
+                className="w-full justify-between font-normal text-left h-9 sm:h-10 bg-background border-border text-xs sm:text-sm px-2 sm:px-4"
               >
                 <span className="truncate">
                   {cameras.find((c) => c.id === selectedCameraId)?.name || t("selectCamera")}
@@ -111,8 +111,8 @@ export function PlaybackControls() {
           </Popover>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("selectDate")}</Label>
+        <div className="lg:space-y-1 shrink-0 w-[140px] lg:w-auto">
+          <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("selectDate")}</Label>
           <div className="relative">
             <input
               type="date"
@@ -121,18 +121,18 @@ export function PlaybackControls() {
                 setSelectedDate(e.target.value);
                 setActivePosterUrl(null);
               }}
-              className="w-full h-10 pl-10 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
+              className="w-full h-9 sm:h-10 pl-8 sm:pl-10 pr-2 sm:pr-3 py-1 sm:py-2 rounded-md border border-border bg-background text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer relative block appearance-none"
               style={{
                 colorScheme: theme === "dark" ? "dark" : "light",
                 boxSizing: "border-box"
               }}
             />
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
+            <Calendar className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground/60 pointer-events-none" />
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("loadWindowLimit")}</Label>
+        <div className="lg:space-y-1 shrink-0 w-[140px] lg:w-auto">
+          <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("loadWindowLimit")}</Label>
           <Select 
             value={playbackWindowMinutes} 
             onValueChange={(val) => {
@@ -144,7 +144,7 @@ export function PlaybackControls() {
               }
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm px-2 sm:px-3">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -158,9 +158,9 @@ export function PlaybackControls() {
           </Select>
         </div>
 
-        <div className="h-10 flex items-center justify-between px-3 bg-muted/20 border border-border/40 rounded-md">
-          <span className="text-xs text-muted-foreground font-medium">{t("diskUsage")}</span>
-          <span className="font-semibold text-foreground text-xs font-mono bg-slate-900 border border-border/45 px-1.5 py-0.5 rounded">
+        <div className="h-9 sm:h-10 flex items-center justify-between px-2 sm:px-3 bg-muted/20 border border-border/40 rounded-md overflow-hidden shrink-0 w-[120px] lg:w-auto">
+          <span className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate mr-1">{t("diskUsage")}</span>
+          <span className="font-semibold text-foreground text-[10px] sm:text-xs font-mono bg-slate-900 border border-border/45 px-1 sm:px-1.5 py-0.5 rounded shrink-0">
             {selectedCameraId && playbackInfo ? formatBytes(playbackInfo.diskUsageBytes) : "-- B"}
           </span>
         </div>

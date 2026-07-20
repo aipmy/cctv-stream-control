@@ -65,6 +65,9 @@ export const config = {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean),
+  go2rtcApiPort: Number(process.env.GO2RTC_API_PORT || 1984),
+  go2rtcRtspPort: Number(process.env.GO2RTC_RTSP_PORT || 8554),
+  go2rtcWebrtcPort: Number(process.env.GO2RTC_WEBRTC_PORT || 8555),
 };
 
 export const corsAllowAnyOrigin = config.corsOrigins.length === 0 || config.corsOrigins.includes("*");

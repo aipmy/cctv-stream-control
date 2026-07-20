@@ -18,7 +18,7 @@ import {
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
-import { CameraMotionEngine, motionEmitter } from "../core/motionEngine.js";
+import { CameraMotionEngine, motionEmitter, isIgnoredPoint } from "../core/motionEngine.js";
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
@@ -137,6 +137,60 @@ function getMotionEngine(cameraId) {
     motionEngines.set(cameraId, engine);
   }
   return engine;
+}
+
+const recordSessions = new Map(); // cameraId -> ChildProcess (FFmpeg)
+
+async function startRecording(camera) {
+  if (!camera.enableRecording) return;
+  if (recordSessions.has(camera.id)) return;
+  
+  const outputDir = path.join(config.storageDir, "record_hls", camera.id);
+  await fs.mkdir(outputDir, { recursive: true });
+  
+  
+  const playlistPath = path.join(outputDir, "index.m3u8");
+  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
+
+  const args = [
+    "-hide_banner", "-loglevel", "error",
+    "-rtsp_transport", "tcp",
+    "-i", go2rtcInput,
+    "-sn", "-dn"
+  ];
+  
+  if (camera.recordMode === "transcode") {
+    args.push("-c:v", config.videoEncoder || "libx264", "-preset", "ultrafast");
+  } else {
+    args.push("-c:v", "copy");
+  }
+  
+  args.push(
+    "-c:a", "aac",
+    "-f", "hls",
+    "-hls_time", "5",
+    "-hls_list_size", "0",
+    "-strftime", "1",
+    "-hls_segment_filename", path.join(outputDir, "seg_%s.ts"),
+    playlistPath
+  );
+
+  const child = spawn(config.ffmpegBin || "ffmpeg", args);
+  recordSessions.set(camera.id, child);
+  console.log(`[Recording] Started FFmpeg recording for camera ${camera.id}`);
+
+  child.on("close", (code) => {
+    console.log(`[Recording] FFmpeg stopped for camera ${camera.id} (code ${code})`);
+    recordSessions.delete(camera.id);
+  });
+}
+
+function stopRecording(cameraId) {
+  const child = recordSessions.get(cameraId);
+  if (child) {
+    child.kill("SIGTERM");
+    recordSessions.delete(cameraId);
+  }
 }
 
 const hlsSessions = new Map();      // cameraId -> session, termasuk stopped/error beberapa menit untuk debug
@@ -388,10 +442,15 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
     };
     hlsSessions.set(id, session);
     await markCameraStatus(id, { status: "starting" });
+    
+    // Start FFmpeg recording if enabled
+    if (camera.enableRecording) {
+      startRecording(camera).catch(console.error);
+    }
 
     logLifecycle(session, `start polling go2rtc for camera: ${id}`);
     
-    const go2rtcUrl = `http://127.0.0.1:1984/api/frame.jpeg?src=${id}`;
+    const go2rtcUrl = `http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`;
     const fps = camera.detectFps || 6;
     const intervalMs = Math.max(200, 1000 / fps);
     
@@ -467,6 +526,15 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
                   if (modes.includes("object") && !PERSON_CLASSES.includes(p.class) && !PET_CLASSES.includes(p.class)) return true;
                   if (modes.includes("vehicle") && VEHICLE_CLASSES.includes(p.class)) return true;
                   return false;
+                }).filter(p => {
+                  const cx = p.bbox[0] + (p.bbox[2] / 2);
+                  const cy = p.bbox[1] + (p.bbox[3] / 2);
+                  const nx = cx / p.frameWidth;
+                  const ny = cy / p.frameHeight;
+                  if (isIgnoredPoint(nx, ny, camera.excludeAreas || [])) {
+                    return false; // Center is in masked area, ignore!
+                  }
+                  return true;
                 });
                 
                 let finalPredictions = filtered;
@@ -531,6 +599,7 @@ export async function stopHls(id, _output) {
     if (session.pollTimer) {
       clearInterval(session.pollTimer);
     }
+    stopRecording(cameraId);
     session.status = "stopped";
     session.closedAt = nowIso();
     stopped.push(cameraId);

@@ -62,6 +62,8 @@ interface PlaybackState {
   
   deleteEventTarget: SmartEvent | null;
   setDeleteEventTarget: (target: SmartEvent | null) => void;
+  isDownloadFormOpen: boolean;
+  setIsDownloadFormOpen: (open: boolean) => void;
   
   isPreviewDownloadOpen: boolean;
   setIsPreviewDownloadOpen: (open: boolean) => void;
@@ -114,7 +116,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [volume, setVolume] = useState(1);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
-  const [timelineZoom, setTimelineZoom] = useState<"24h" | "6h" | "1h" | "15m" | "5m" | "1m">("24h");
+  const [timelineZoom, setTimelineZoom] = useState<"24h" | "6h" | "1h" | "15m" | "5m" | "1m">("15m");
   const [timelineCenterTs, setTimelineCenterTs] = useState<number | null>(null);
   const [currentPlaybackTs, setCurrentPlaybackTs] = useState<number | null>(null);
   const [currentRecordingTime, setCurrentRecordingTime] = useState<string | null>(null);
@@ -136,6 +138,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   const [deleteEventTarget, setDeleteEventTarget] = useState<SmartEvent | null>(null);
 
+  const [isDownloadFormOpen, setIsDownloadFormOpen] = useState(false);
   const [isPreviewDownloadOpen, setIsPreviewDownloadOpen] = useState(false);
   const [previewStartTs, setPreviewStartTs] = useState<number | null>(null);
   const [previewEndTs, setPreviewEndTs] = useState<number | null>(null);
@@ -187,6 +190,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     filterStartTime, setFilterStartTime,
     filterEndTime, setFilterEndTime,
     deleteEventTarget, setDeleteEventTarget,
+    isDownloadFormOpen, setIsDownloadFormOpen,
     isPreviewDownloadOpen, setIsPreviewDownloadOpen,
     previewStartTs, setPreviewStartTs,
     previewEndTs, setPreviewEndTs,

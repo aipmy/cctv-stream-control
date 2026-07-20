@@ -6,7 +6,7 @@ import { URL } from "node:url";
 import path from "node:path";
 import { JsonStore } from "../core/jsonStore.js";
 import { config } from "../core/config.js";
-import { getUsernameByIp } from "../core/userTracker.js";
+import { getUsernameByIp, getFallbackUsername } from "../core/userTracker.js";
 import { normalizeCamera, publicCamera } from "../core/cctv.js";
 import { syncGo2rtc } from "./go2rtcSync.js";
 
@@ -225,41 +225,51 @@ setInterval(async () => {
         let activeViewers = [];
 
         if (streamData) {
-          if (streamData.consumers) {
-            const validConsumers = streamData.consumers.filter(c => {
-              // Always skip keyframe/snapshot consumers
+           if (streamData.consumers) {
+            const humanConsumers = streamData.consumers.filter(c => {
+              console.log("[DEBUG] Checking consumer:", c.format_name, c.remote_addr, c.user_agent);
               if (c.format_name === 'keyframe' || c.format_name === 'snapshot') return false;
-              // Skip internal services (127.0.0.1 with non-browser user agents like 'node')
-              if (c.remote_addr && c.remote_addr.startsWith('127.0.0.1') && 
-                  (!c.user_agent || c.user_agent === 'node' || c.user_agent === 'go2rtc')) return false;
+              if (c.remote_addr && c.remote_addr.startsWith('127.0.0.1')) return false;
+              if (c.remote_addr && c.remote_addr.startsWith('[::1]')) return false;
+              if (c.user_agent === 'node' || c.user_agent === 'go2rtc') return false;
               return true;
             });
-            newViewers = validConsumers.length;
-            outBytes = validConsumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
-            
-            activeViewers = validConsumers
-              .map(c => {
-                let rawIp = c.remote_addr || "Unknown IP";
-                let realIp = rawIp;
-                
-                // If go2rtc appended forwarded IP (e.g. "127.0.0.1:1234 forwarded 192.168.1.5")
-                if (rawIp.includes("forwarded ")) {
-                  realIp = rawIp.split("forwarded ")[1].trim();
-                } else if (rawIp.includes(":")) {
-                  // Strip port if no forwarded info exists (e.g. "192.168.1.5:1234")
-                  realIp = rawIp.split(":")[0].replace(/\[|\]/g, ''); // also handle ipv6 [::1]:80
-                }
 
-                const username = getUsernameByIp(realIp) || "go2rtc_client";
-                return {
+            outBytes = humanConsumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
+
+            // Step 2: Deduplicate by username — 1 person = 1 viewer
+            const viewerMap = new Map(); // key: username or IP
+            for (const c of humanConsumers) {
+              let rawIp = c.remote_addr || "Unknown IP";
+              let realIp = rawIp;
+              
+              if (rawIp.includes("forwarded ")) {
+                realIp = rawIp.split("forwarded ")[1].trim();
+              } else if (rawIp.includes(" ")) {
+                // WebRTC format: "214.213.212.1:63933 prflx"
+                realIp = rawIp.split(" ")[0];
+                if (realIp.includes(":")) realIp = realIp.split(":")[0];
+              } else if (rawIp.includes(":")) {
+                realIp = rawIp.split(":")[0].replace(/\[|\]/g, '');
+              }
+
+              const username = getUsernameByIp(realIp) || getFallbackUsername() || "Pengguna";
+              const viewerKey = username !== "Pengguna" ? username : realIp;
+
+              if (!viewerMap.has(viewerKey)) {
+                viewerMap.set(viewerKey, {
                   id: String(c.id),
                   username,
                   ip: realIp,
                   userAgent: c.user_agent || "Unknown Browser",
                   output: c.format_name || "unknown",
                   lastSeenAgoSeconds: 0
-                };
-              });
+                });
+              }
+            }
+
+            activeViewers = Array.from(viewerMap.values());
+            newViewers = activeViewers.length;
           }
           if (streamData.producers) {
             pullBytes = streamData.producers.reduce((acc, p) => acc + (p.bytes_recv || 0), 0);

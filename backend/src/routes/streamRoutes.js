@@ -311,7 +311,7 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
         let isContiguous = false;
         if (i < segments.length - 1) {
           const diff = segments[i + 1].ts - seg.ts;
-          if (diff > 0 && diff <= 5) {
+          if (diff > 0 && diff <= 30) {
             duration = diff;
             isContiguous = true;
           }
@@ -352,7 +352,7 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const { getSettings } = await import("../services/recordingService.js");
     const settings = await getSettings();
     const segDur = settings.segmentDuration || 5;
-    const targetDuration = Math.max(segDur, 6);
+    const targetDuration = 30; // Max segment length without re-encoding could be up to keyframe interval
 
     const output = await getCameraOutput(id);
     
@@ -403,12 +403,12 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       let duration = segDur;
       if (i < segments.length - 1) {
         const diff = segments[i + 1].ts - current.ts;
-        if (diff > 0 && diff <= segDur + 1) {
+        if (diff > 0 && diff <= 30) {
           duration = diff;
         }
       }
       
-      if (i > 0 && current.ts - segments[i - 1].ts > segDur + 1) {
+      if (i > 0 && current.ts - segments[i - 1].ts > 30) {
         lines.push("#EXT-X-DISCONTINUITY");
       }
       

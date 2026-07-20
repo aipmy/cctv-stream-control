@@ -45,3 +45,21 @@ export function getUsernameByIp(ipStr) {
   }
   return null;
 }
+
+export function getFallbackUsername() {
+  let latestSeen = 0;
+  let latestUsername = null;
+  const now = Date.now();
+  
+  for (const [ip, record] of ipMap.entries()) {
+    if (now - record.lastSeen < 60 * 60 * 1000) {
+      if (record.lastSeen > latestSeen) {
+        latestSeen = record.lastSeen;
+        latestUsername = record.username;
+      }
+    } else {
+      ipMap.delete(ip);
+    }
+  }
+  return latestUsername;
+}

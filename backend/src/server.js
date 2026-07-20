@@ -30,7 +30,7 @@ import { listCameras, getGlobalMetrics } from "./services/cameraService.js";
 import { syncGo2rtc } from "./services/go2rtcSync.js";
 
 const GO2RTC_HOST = "127.0.0.1";
-const GO2RTC_PORT = 1984;
+const GO2RTC_PORT = config.go2rtcApiPort;
 
 const app = express();
 app.set("trust proxy", true);
@@ -80,7 +80,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 // ─── go2rtc HTTP proxy (BEFORE auth) ───────────────────────────────
-// Proxy /api/ws and /video-rtc.js to go2rtc running on port 1984.
+// Proxy /api/ws and /video-rtc.js to go2rtc.
 // Uses native http.request — http-proxy-middleware v3 silently fails with ESM.
 function proxyToGo2rtc(req, res) {
   // If it's the websocket endpoint, hijack the socket from Express
@@ -174,7 +174,7 @@ app.get("/api/streams/:id/poster", async (req, res, next) => {
     const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
 
     // Fire & Forget: ambil frame terbaru dari Go2RTC, kompres dengan Jimp, lalu simpan
-    fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`)
+    fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`)
       .then(r => { if (r.ok) return r.arrayBuffer(); throw new Error("fail"); })
       .then(buf => Jimp.read(Buffer.from(buf)))
       .then(img => {
@@ -195,7 +195,7 @@ app.get("/api/streams/:id/poster", async (req, res, next) => {
     try {
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), 2000);
-      const r = await fetch(`http://127.0.0.1:1984/api/frame.jpeg?src=${id}`, { signal: controller.signal });
+      const r = await fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`, { signal: controller.signal });
       clearTimeout(tid);
       if (r.ok) {
         const buffer = Buffer.from(await r.arrayBuffer());

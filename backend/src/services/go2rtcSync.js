@@ -29,19 +29,18 @@ export async function syncGo2rtc(cameras) {
 
     // Ensure default settings exist if not manually overridden
     if (!doc.has("api")) {
-      doc.set("api", doc.createNode({ listen: ":1984", origin: "*" }));
+      doc.set("api", doc.createNode({ listen: `:${config.go2rtcApiPort}`, origin: "*" }));
     }
     if (!doc.has("webrtc")) {
       doc.set("webrtc", doc.createNode({ 
-        listen: ":8555",
+        listen: `:${config.go2rtcWebrtcPort}`,
         candidates: [
-          "172.16.20.11:8555",
-          "stun:8555"
+          `stun:${config.go2rtcWebrtcPort}`
         ]
       }));
     }
     if (!doc.has("rtsp")) {
-      doc.set("rtsp", doc.createNode({ listen: ":8554" }));
+      doc.set("rtsp", doc.createNode({ listen: `:${config.go2rtcRtspPort}` }));
     }
 
     const currentIds = new Set();
@@ -84,7 +83,7 @@ export async function syncGo2rtc(cameras) {
     for (const oldId of lastSyncedIds) {
       if (!currentIds.has(oldId)) {
         try {
-          await fetch(`http://127.0.0.1:1984/api/streams?src=${encodeURIComponent(oldId)}`, { method: "DELETE" });
+          await fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/streams?src=${encodeURIComponent(oldId)}`, { method: "DELETE" });
           console.log(`[go2rtcSync] Deleted stream ${oldId} from running go2rtc`);
         } catch (e) {}
       }
@@ -93,7 +92,7 @@ export async function syncGo2rtc(cameras) {
     for (const cam of cameras) {
       if (!cam.enabled) {
         try {
-          await fetch(`http://127.0.0.1:1984/api/streams?src=${encodeURIComponent(cam.id)}`, { method: "DELETE" });
+          await fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/streams?src=${encodeURIComponent(cam.id)}`, { method: "DELETE" });
         } catch(e) {}
         continue;
       }
@@ -101,7 +100,7 @@ export async function syncGo2rtc(cameras) {
       const finalUrl = cam.streamUrl || "";
 
       try {
-        const url = `http://127.0.0.1:1984/api/streams?name=${encodeURIComponent(cam.id)}&src=${encodeURIComponent(finalUrl)}`;
+        const url = `http://127.0.0.1:${config.go2rtcApiPort}/api/streams?name=${encodeURIComponent(cam.id)}&src=${encodeURIComponent(finalUrl)}`;
         await fetch(url, { method: "PUT" });
       } catch (e) {}
     }
