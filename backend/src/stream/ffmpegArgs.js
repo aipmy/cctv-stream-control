@@ -25,6 +25,8 @@ export function buildHlsArgs(camera, outputType) {
   return [
     "-c:v", "copy",
     "-c:a", "aac",
+    "-ac", "1",
+    "-b:a", "32k",
     "-f", "hls",
     "-hls_time", "2",
     "-hls_list_size", "3",
