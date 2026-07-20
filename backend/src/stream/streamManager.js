@@ -458,16 +458,30 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
 
     logLifecycle(session, `start polling go2rtc for camera: ${id}`);
     
-    const go2rtcUrl = `http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`;
     const fps = camera.detectFps || 6;
-    const intervalMs = Math.max(200, 1000 / fps);
-    
-    session.pollTimer = setInterval(async () => {
-      try {
-        const res = await fetch(go2rtcUrl);
-        if (!res.ok) return;
-        const arrayBuffer = await res.arrayBuffer();
-        const frame = Buffer.from(arrayBuffer);
+    const args = [
+      "-hide_banner", "-loglevel", "error",
+      "-rtsp_transport", "tcp",
+      "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${id}?mp4`,
+      "-vf", `fps=${fps}`,
+      "-c:v", "mjpeg",
+      "-f", "image2pipe",
+      "pipe:1"
+    ];
+
+    session.child = spawn(config.ffmpegBin || "ffmpeg", args);
+    let frameBuffer = Buffer.alloc(0);
+    const startMarker = Buffer.from([0xFF, 0xD8]);
+    const endMarker = Buffer.from([0xFF, 0xD9]);
+
+    session.child.stdout.on("data", (chunk) => {
+      frameBuffer = Buffer.concat([frameBuffer, chunk]);
+      let start = frameBuffer.indexOf(startMarker);
+      let end = frameBuffer.indexOf(endMarker);
+      
+      while (start !== -1 && end !== -1 && end > start) {
+        const frame = frameBuffer.slice(start, end + 2);
+        frameBuffer = frameBuffer.slice(end + 2);
         
         session.lastFrame = frame;
         session.lastFrameAt = Date.now();
@@ -478,13 +492,6 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
         const hasListeners = motionEmitter.listenerCount(`motion-${id}`) > 0;
         const hasAiListeners = motionEmitter.listenerCount(`ai-motion-${id}`) > 0;
         
-        if (!hasSmart && !hasListeners && !hasAiListeners && !session.keepAlive) {
-           console.log(`[Motion Detection] Stopping idle AI polling for ${id}`);
-           clearInterval(session.pollTimer);
-           hlsSessions.delete(id);
-           return;
-        }
-
         if (hasSmart || hasListeners || hasAiListeners) {
           const nowMs = Date.now();
           let pixelMotionDetected = false;
@@ -616,10 +623,30 @@ export async function startHls(id, requestedOutput = "HLS Stable") {
             writeMjpegFrame(id, client, frame);
           }
         }
-      } catch (err) {
-        // Silently ignore polling errors
+        
+        start = frameBuffer.indexOf(startMarker);
+        end = frameBuffer.indexOf(endMarker);
       }
-    }, intervalMs);
+      
+      // Prevent buffer from growing infinitely on bad data
+      if (frameBuffer.length > 5 * 1024 * 1024) {
+        frameBuffer = Buffer.alloc(0);
+      }
+    });
+
+    session.child.stderr.on("data", (data) => {
+      const msg = data.toString();
+      if (!msg.includes("frame=") && config.ffmpegLogToConsole) {
+        console.error(`[AI-FFmpeg][${id}] ${msg.trim()}`);
+      }
+    });
+
+    session.child.on("close", (code) => {
+      if (session.status !== "stopping" && code !== 0 && code !== 255) {
+        console.error(`[AI-FFmpeg] Process for ${id} died (code ${code}). Restarting in 5s...`);
+        setTimeout(() => startHls(id, output), 5000);
+      }
+    });
 
     return session;
   })().finally(() => hlsStartLocks.delete(id));
@@ -632,8 +659,10 @@ export async function stopHls(id, _output) {
   const stopped = [];
   const stopOne = async (cameraId, session) => {
     if (!session) return;
-    if (session.pollTimer) {
-      clearInterval(session.pollTimer);
+    if (session.child) {
+      session.status = "stopping";
+      session.child.kill("SIGTERM");
+      session.child = null;
     }
     stopRecording(cameraId);
     session.status = "stopped";
@@ -817,9 +846,9 @@ export async function serveMjpeg(id, res) {
     res.status(404).json({ error: "Camera not found" });
     return;
   }
-  if (session.stopTimer) {
-    clearTimeout(session.stopTimer);
-    session.stopTimer = null;
+  if (session.child) {
+    session.child.kill("SIGKILL");
+    session.child = null;
   }
 
   const ready = await waitForMjpegFrame(session);
