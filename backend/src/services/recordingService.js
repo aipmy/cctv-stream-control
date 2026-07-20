@@ -147,78 +147,11 @@ export async function triggerEvent(cameraId, type, { req = null, predictions = n
     }
   }
 
-  // Handle Snapshot Generation from buffer (bypassing ffmpeg extraction)
+  // Handle Snapshot Generation from buffer
   if (snapshotBuffer) {
     try {
-      const decoded = jpeg.decode(snapshotBuffer, { useTArray: true });
-      const width = decoded.width;
-      const height = decoded.height;
-
-      const detectionModes = camera?.detectionModes || ["pixel", "human", "pet"];
-      let boxesToDraw = [];
-
-      // Determine the classified mode (for boxes and labels)
-      let classifiedMode = "pixel";
-      if (predictions && predictions.length > 0) {
-        const hasHuman = predictions.some((p) => p.class === "person");
-        const hasPet = predictions.some((p) => ["cat", "dog", "bird"].includes(p.class));
-        if (hasHuman && detectionModes.includes("human")) classifiedMode = "human";
-        else if (hasPet && detectionModes.includes("pet")) classifiedMode = "pet";
-      }
-
-      if (classifiedMode !== "pixel" && predictions) {
-        for (const p of predictions) {
-          if (classifiedMode === "human" && p.class !== "person") continue;
-          if (classifiedMode === "pet" && !["cat", "dog", "bird"].includes(p.class)) continue;
-          boxesToDraw.push({
-            x: Math.round(p.bbox[0]),
-            y: Math.round(p.bbox[1]),
-            w: Math.round(p.bbox[2]),
-            h: Math.round(p.bbox[3]),
-            color: classifiedMode === "human" ? [239, 68, 68] : [59, 130, 246]
-          });
-        }
-      } else if (classifiedMode === "pixel" && pixelBoxes && pixelBoxes.length > 0) {
-        const largestBox = pixelBoxes.reduce((a, b) => (a.w * a.h > b.w * b.h ? a : b));
-        boxesToDraw.push({
-          x: largestBox.x,
-          y: largestBox.y,
-          w: largestBox.w,
-          h: largestBox.h,
-          color: [251, 191, 36]
-        });
-      }
-
-      // Draw boxes
-      for (const box of boxesToDraw) {
-        const thickness = 3;
-        const bx = Math.max(0, box.x);
-        const by = Math.max(0, box.y);
-        const bx2 = Math.min(width - 1, box.x + box.w);
-        const by2 = Math.min(height - 1, box.y + box.h);
-        const [r, g, b] = box.color;
-        for (let t = 0; t < thickness; t++) {
-          for (let x = bx; x <= bx2; x++) {
-            for (const row of [by + t, by2 - t]) {
-              if (row >= 0 && row < height) {
-                const idx = (width * row + x) << 2;
-                decoded.data[idx] = r; decoded.data[idx + 1] = g; decoded.data[idx + 2] = b;
-              }
-            }
-          }
-          for (let y = by; y <= by2; y++) {
-            for (const col of [bx + t, bx2 - t]) {
-              if (col >= 0 && col < width) {
-                const idx = (width * y + col) << 2;
-                decoded.data[idx] = r; decoded.data[idx + 1] = g; decoded.data[idx + 2] = b;
-              }
-            }
-          }
-        }
-      }
-
-      const encoded = jpeg.encode({ data: decoded.data, width, height }, 85);
-      fsSync.writeFileSync(snapshotFile, encoded.data);
+      // Save the raw snapshot directly to avoid heavy blocking JPEG encoding on the Raspberry Pi CPU
+      await fs.writeFile(snapshotFile, snapshotBuffer);
     } catch (err) {
       console.error(`[Event Recording] Failed to generate snapshot for ${eventId}`, err);
     }
