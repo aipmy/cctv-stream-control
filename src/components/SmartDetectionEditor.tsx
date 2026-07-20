@@ -178,22 +178,19 @@ export function SmartDetectionEditor({
         }
 
         if (data.type === "ai-motion") {
-          if (data.predictions) {
-            if (data.predictions.length > 0) {
-              aiBoxesRef.current = data.predictions;
-              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 400);
-            } else {
-              if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
-              (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 150);
-            }
+          if (data.predictions && data.predictions.length > 0) {
+            aiBoxesRef.current = data.predictions;
+            if ((window as any)._aiBoxClearTimeout) clearTimeout((window as any)._aiBoxClearTimeout);
+            // Retain the AI box for 1.5 seconds to prevent flickering if pixel-motion drops for a frame
+            (window as any)._aiBoxClearTimeout = setTimeout(() => { aiBoxesRef.current = []; }, 1500);
           }
           return;
         }
         if (data.boxes && data.boxes.length > 0) {
           boxesRef.current = data.boxes;
           if ((window as any)._boxClearTimeout) clearTimeout((window as any)._boxClearTimeout);
-          (window as any)._boxClearTimeout = setTimeout(() => { boxesRef.current = []; }, 800);
+          // Retain the pixel motion box for 1 second
+          (window as any)._boxClearTimeout = setTimeout(() => { boxesRef.current = []; }, 1000);
         }
         if (data.frame) frameDims.current = data.frame;
         if (data.activity != null) setActivity(data.activity);
