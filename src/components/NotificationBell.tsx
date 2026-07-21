@@ -281,7 +281,7 @@ export function NotificationBell() {
                         state: {
                           cameraId: notif.cameraId,
                           date: dateStr,
-                          timestamp: Math.floor(dateObj.getTime() / 1000),
+                          timestamp: Math.floor(dateObj.getTime() / 1000) - 15,
                           eventSeek: true
                         }
                       });

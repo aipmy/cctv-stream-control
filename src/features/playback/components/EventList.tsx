@@ -137,7 +137,7 @@ export function EventList() {
     setActivePosterUrl(eventApi.snapshotUrl(evt.id));
 
     const isCameraChanging = selectedCameraId !== evt.cameraId;
-    const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
+    const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 15;
 
     if (isCameraChanging) {
       setPendingSeekTs(eventTime);

@@ -62,7 +62,7 @@ export default function Events() {
       state: {
         cameraId: evt.cameraId,
         date: dateStr,
-        timestamp: Math.floor(dateObj.getTime() / 1000),
+        timestamp: Math.floor(dateObj.getTime() / 1000) - 15,
         eventSeek: true
       }
     });
