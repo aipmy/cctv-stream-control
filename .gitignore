@@ -29,6 +29,7 @@ test-preview.js
 
 # agent superpowers
 .agent/
+.gemini/
 
 # package locks
 package-lock.json
