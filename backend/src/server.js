@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import { Jimp } from "jimp";
 import net from "node:net";
 import http from "node:http";
 import express from "express";
@@ -173,34 +172,28 @@ app.get("/api/streams/:id/poster", async (req, res, next) => {
     await fs.promises.mkdir(thumbnailDir, { recursive: true });
     const thumbnailPath = path.join(thumbnailDir, `${id}.jpg`);
 
-    // Fire & Forget: ambil frame terbaru dari Go2RTC, kompres dengan Jimp, lalu simpan
-    fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`)
-      .then(r => { if (r.ok) return r.arrayBuffer(); throw new Error("fail"); })
-      .then(buf => Jimp.read(Buffer.from(buf)))
-      .then(img => {
-        if (img.bitmap.width > 800) img.resize({ w: 800 });
-        return img.getBuffer("image/jpeg", { quality: 50 });
-      })
-      .then(outBuf => fs.promises.writeFile(thumbnailPath, outBuf))
-      .catch((e) => { console.error("[Poster] Compress error:", e.message); });
-
-    // Lazy load: jika file sudah ada, kirim langsung tanpa menunggu Go2RTC
+    // If cached thumbnail exists, serve immediately and refresh in background
     if (fs.existsSync(thumbnailPath)) {
-      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "public, max-age=5");
       res.type("image/jpeg");
+      // Fire-and-forget: refresh thumbnail in background (no Jimp blocking response)
+      fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`)
+        .then(r => { if (r.ok) return r.arrayBuffer(); throw new Error("fail"); })
+        .then(buf => fs.promises.writeFile(thumbnailPath, Buffer.from(buf)))
+        .catch(() => {});
       return res.sendFile(thumbnailPath);
     }
 
-    // Pertama kali: tunggu maks 2 detik
+    // First time: fetch raw frame directly (skip Jimp resize — too slow on RPi)
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 2000);
+      const tid = setTimeout(() => controller.abort(), 3000);
       const r = await fetch(`http://127.0.0.1:${config.go2rtcApiPort}/api/frame.jpeg?src=${id}`, { signal: controller.signal });
       clearTimeout(tid);
       if (r.ok) {
         const buffer = Buffer.from(await r.arrayBuffer());
         fs.promises.writeFile(thumbnailPath, buffer).catch(() => {});
-        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Cache-Control", "public, max-age=5");
         res.type("image/jpeg");
         return res.send(buffer);
       }
@@ -223,7 +216,15 @@ app.use("/api/audit", auditRoutes);
 app.use("/api/events", eventRoutes);
 
 if (fs.existsSync(config.frontendDist)) {
-  app.use(express.static(config.frontendDist));
+  // Cache hashed assets (JS/CSS) for 1 year, other files for 1 hour
+  app.use(express.static(config.frontendDist, {
+    maxAge: '1h',
+    setHeaders(res, filePath) {
+      if (filePath.match(/\.(js|css)$/) && filePath.includes('assets')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(config.frontendDist, "index.html"));

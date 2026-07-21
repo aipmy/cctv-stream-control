@@ -162,136 +162,95 @@ eventRoutes.get("/video/:id", requirePermission("canViewEvents"), async (req, re
 });
 
 // Storage Status
-eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (req, res, next) => {
+// ─── Background storage-status cache ───────────────────────────────
+// Precompute heavy stats in background so API responds instantly.
+let _storageStatusCache = null;
+let _storageStatusUpdating = false;
+
+async function _updateStorageStatusCache() {
+  if (_storageStatusUpdating) return;
+  _storageStatusUpdating = true;
   try {
     const settings = await getSettings();
     const eventsDir = path.join(config.storageDir, "events");
     const hlsDir = path.join(config.storageDir, "hls");
     const recordHlsDir = path.join(config.storageDir, "record_hls");
-    
-    // Cache for heavy du calculations
-    if (!global.dirSizeCache) global.dirSizeCache = {};
-    const now = Date.now();
-    
-    async function getDirSize(dirPath) {
-      if (global.dirSizeCache[dirPath] && now - global.dirSizeCache[dirPath].time < 5 * 60 * 1000) {
-        return global.dirSizeCache[dirPath].size;
-      }
-      try {
-        const { stdout } = await execAsync(`du -sk "${dirPath}"`);
-        const kb = parseInt(stdout.split(/\\s+/)[0], 10);
-        const size = isNaN(kb) ? 0 : kb * 1024;
-        global.dirSizeCache[dirPath] = { time: now, size };
-        return size;
-      } catch (err) {
-        return 0;
-      }
-    }
 
-    const eventsSize = await getDirSize(eventsDir);
-    const hlsSize = await getDirSize(hlsDir);
-    const recordHlsSize = await getDirSize(recordHlsDir);
-    const usedBytes = eventsSize + hlsSize + recordHlsSize;
-    const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
-
+    // Use statfs for total storage size — instant, no disk scan
     let diskTotal = 0;
     let diskAvailable = 0;
     try {
       const diskStats = await fs.statfs(config.storageDir);
       diskTotal = diskStats.blocks * diskStats.bsize;
       diskAvailable = diskStats.bavail * diskStats.bsize;
-    } catch (err) {
-      // ignore
-    }
-    
-    let cpuUsage = 5;
-    let ramUsage = 15;
-    let ramTotal = 0;
-    let ramFree = 0;
-    let ramUsed = 0;
-    let diskReadMb = 0.0;
-    let diskWriteMb = 0.0;
-    try {
-      const baseCpu = 3 + Math.floor(Math.random() * 4);
-      const streamCpu = 0;
-      const numCpus = os.cpus().length || 1;
-      const loadPercentage = Math.round((os.loadavg()[0] / numCpus) * 100);
-      cpuUsage = Math.min(Math.max(loadPercentage || (baseCpu + streamCpu), 3), 98);
+    } catch (_) {}
 
-      ramTotal = os.totalmem();
-      let freeMem = os.freemem();
-      
+    // Fast dir size: walk files and sum stat.size (avoids spawning du process)
+    async function fastDirSize(dirPath) {
+      let total = 0;
       try {
-        if (process.platform === "linux") {
-          const meminfo = await fs.readFile("/proc/meminfo", "utf8");
-          const lines = meminfo.split("\n");
-          let memAvailable = 0;
-          for (const line of lines) {
-            if (line.startsWith("MemAvailable:")) {
-              memAvailable = parseInt(line.match(/\d+/)[0], 10) * 1024;
-              break;
-            }
-          }
-          if (memAvailable > 0) {
-            freeMem = memAvailable;
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+          if (entry.isDirectory()) {
+            total += await fastDirSize(fullPath);
           } else {
-            let memFree = 0;
-            let buffers = 0;
-            let cached = 0;
-            let reclaimable = 0;
-            for (const line of lines) {
-              if (line.startsWith("MemFree:")) {
-                memFree = parseInt(line.match(/\d+/)[0], 10) * 1024;
-              } else if (line.startsWith("Buffers:")) {
-                buffers = parseInt(line.match(/\d+/)[0], 10) * 1024;
-              } else if (line.startsWith("Cached:")) {
-                cached = parseInt(line.match(/\d+/)[0], 10) * 1024;
-              } else if (line.startsWith("SReclaimable:")) {
-                reclaimable = parseInt(line.match(/\d+/)[0], 10) * 1024;
-              }
-            }
-            freeMem = memFree + buffers + cached + reclaimable;
+            try {
+              const stat = await fs.stat(fullPath);
+              total += stat.size;
+            } catch (_) {}
           }
-        } else if (process.platform === "darwin") {
-          const { stdout } = await execAsync("vm_stat");
-          const lines = stdout.split("\n");
-          let pageSize = 4096;
-          const sizeMatch = lines[0].match(/page size of (\d+) bytes/);
-          if (sizeMatch) {
-            pageSize = parseInt(sizeMatch[1], 10);
-          }
-          let pagesFree = 0;
-          let pagesInactive = 0;
-          let pagesSpeculative = 0;
-          let pagesPurgeable = 0;
-          for (const line of lines) {
-            if (line.trim().startsWith("Pages free:")) {
-              pagesFree = parseInt(line.match(/\d+/)[0], 10);
-            } else if (line.trim().startsWith("Pages inactive:")) {
-              pagesInactive = parseInt(line.match(/\d+/)[0], 10);
-            } else if (line.trim().startsWith("Pages speculative:")) {
-              pagesSpeculative = parseInt(line.match(/\d+/)[0], 10);
-            } else if (line.trim().startsWith("Pages purgeable:")) {
-              pagesPurgeable = parseInt(line.match(/\d+/)[0], 10);
-            }
-          }
-          freeMem = (pagesFree + pagesInactive + pagesSpeculative + pagesPurgeable) * pageSize;
         }
-      } catch (memErr) {
-        // fallback
-      }
-
-      ramFree = freeMem;
-      ramUsed = ramTotal - ramFree;
-      ramUsage = Math.round((ramUsed / ramTotal) * 100);
-
-      diskWriteMb = parseFloat(((sysMetrics.activeProcesses || 0) * 1.25 + Math.random() * 0.15).toFixed(2));
-      diskReadMb = parseFloat(((sysMetrics.viewers || 0) * 0.85 + Math.random() * 0.1).toFixed(2));
-    } catch (err) {
-      // ignore
+      } catch (_) {}
+      return total;
     }
 
-    res.json({
+    const [eventsSize, hlsSize, recordHlsSize] = await Promise.all([
+      fastDirSize(eventsDir),
+      fastDirSize(hlsDir),
+      fastDirSize(recordHlsDir),
+    ]);
+    const usedBytes = eventsSize + hlsSize + recordHlsSize;
+    const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
+
+    // CPU & RAM — lightweight, no shell commands
+    const numCpus = os.cpus().length || 1;
+    const loadPercentage = Math.round((os.loadavg()[0] / numCpus) * 100);
+    const cpuUsage = Math.min(Math.max(loadPercentage, 3), 98);
+
+    const ramTotal = os.totalmem();
+    let freeMem = os.freemem();
+    try {
+      if (process.platform === "linux") {
+        const meminfo = await fs.readFile("/proc/meminfo", "utf8");
+        const lines = meminfo.split("\n");
+        let memAvailable = 0;
+        for (const line of lines) {
+          if (line.startsWith("MemAvailable:")) {
+            memAvailable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            break;
+          }
+        }
+        if (memAvailable > 0) {
+          freeMem = memAvailable;
+        } else {
+          let memFree = 0, buffers = 0, cached = 0, reclaimable = 0;
+          for (const line of lines) {
+            if (line.startsWith("MemFree:")) memFree = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            else if (line.startsWith("Buffers:")) buffers = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            else if (line.startsWith("Cached:")) cached = parseInt(line.match(/\d+/)[0], 10) * 1024;
+            else if (line.startsWith("SReclaimable:")) reclaimable = parseInt(line.match(/\d+/)[0], 10) * 1024;
+          }
+          freeMem = memFree + buffers + cached + reclaimable;
+        }
+      }
+    } catch (_) {}
+
+    const ramFree = freeMem;
+    const ramUsed = ramTotal - ramFree;
+    const ramUsage = Math.round((ramUsed / ramTotal) * 100);
+
+    _storageStatusCache = {
       usedBytes,
       maxBytes,
       recordingMode: settings.recordingMode || "continuous",
@@ -304,9 +263,28 @@ eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (re
       ramTotal,
       ramFree,
       ramUsed,
-      diskReadMb,
-      diskWriteMb,
-    });
+      diskReadMb: 0,
+      diskWriteMb: 0,
+      _ts: Date.now(),
+    };
+  } catch (err) {
+    console.error("[StorageStatus] Background update error:", err.message);
+  } finally {
+    _storageStatusUpdating = false;
+  }
+}
+
+// Kick off initial computation + refresh every 30 seconds
+void _updateStorageStatusCache();
+setInterval(() => void _updateStorageStatusCache(), 30_000);
+
+eventRoutes.get("/storage-status", requirePermission("canViewEvents"), async (req, res, next) => {
+  try {
+    // If cache not ready yet, compute on-the-fly (only first request)
+    if (!_storageStatusCache) {
+      await _updateStorageStatusCache();
+    }
+    res.json(_storageStatusCache || {});
   } catch (err) {
     next(err);
   }
