@@ -144,12 +144,11 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const files = await fs.promises.readdir(dir);
     const segments = [];
     for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
-      if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
-        segments.push({ ts });
+      if (file.startsWith("seg_") && file.endsWith(".ts")) {
+        const ts = parseInt(file.slice(4, -3), 10);
+        if (ts >= startUnix && ts <= endUnix) {
+          segments.push({ ts });
+        }
       }
     }
 
@@ -165,8 +164,10 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
       let activeBlock = null;
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
+        // Default to targetDuration for the last segment before a gap or EOF
         let duration = targetDuration;
         let isContiguous = false;
+        
         if (i < segments.length - 1) {
           const diff = segments[i + 1].ts - seg.ts;
           if (diff > 0 && diff <= 30) {
@@ -174,6 +175,7 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
             isContiguous = true;
           }
         }
+        
         if (!activeBlock) {
           activeBlock = {
             ts: seg.ts,
@@ -183,6 +185,7 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
         } else {
           activeBlock.duration += duration;
         }
+        
         if (!isContiguous) {
           segmentMappings.push(activeBlock);
           currentOffset += activeBlock.duration;
@@ -207,10 +210,10 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const { date } = req.query; // format YYYY-MM-DD
     if (!date) return res.status(400).send("Date query parameter is required");
 
-    const { getSettings } = await import("../services/recordingService.js");
-    const settings = await getSettings();
-    const segDur = settings.segmentDuration || 5;
-    const targetDuration = 30; // Max segment length without re-encoding could be up to keyframe interval
+    const camera = await getCamera(id);
+    const hlsMode = camera?.hlsMode || "copy";
+    const streamType = camera?.streamType || "HLS Stable";
+    const targetDuration = (hlsMode === "copy" || streamType === "HLS Low Latency") ? 1 : 2;
 
     const dir = path.join(config.storageDir, "record_hls", id);
     
@@ -248,14 +251,15 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       "#EXTM3U",
       "#EXT-X-VERSION:3",
       "#EXT-X-PLAYLIST-TYPE:VOD",
-      `#EXT-X-TARGETDURATION:${targetDuration}`,
+      `#EXT-X-TARGETDURATION:30`, // Must be >= max EXTINF which is 30
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
 
     const q = req.authToken ? `token=${req.authToken}` : "";
     for (let i = 0; i < segments.length; i++) {
       const current = segments[i];
-      let duration = segDur;
+      // USE targetDuration so it matches segmentMappings EXACTLY!
+      let duration = targetDuration;
       if (i < segments.length - 1) {
         const diff = segments[i + 1].ts - current.ts;
         if (diff > 0 && diff <= 30) {

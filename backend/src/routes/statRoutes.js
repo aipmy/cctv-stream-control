@@ -32,26 +32,33 @@ statRoutes.get("/", async (req, res, next) => {
       }
     }
     const enriched = enrichCameras(cameras);
-    const enabled = enriched.filter((c) => c.enabled).length;
-    const disabled = enriched.length - enabled;
-    const online = enriched.filter((c) => c.enabled && c.status === "online").length;
-    const starting = enriched.filter((c) => c.enabled && c.status === "starting").length;
+    const totals = enriched.reduce((acc, c) => {
+      acc.total++;
+      if (c.enabled) {
+        acc.enabled++;
+        if (c.status === "online") acc.online++;
+        else if (c.status === "starting") acc.starting++;
+        else if (c.status === "offline") acc.offline++;
+        
+        if (c.viewerCount > 0) acc.streaming++;
+        
+        acc.viewers += (c.viewerCount || 0);
+        acc.bandwidthKbps += (c.bandwidthKbps || 0);
+        acc.pullBandwidthKbps += (c.pullBandwidthKbps || 0);
+      } else {
+        acc.disabled++;
+      }
+      return acc;
+    }, {
+      total: 0, enabled: 0, disabled: 0, online: 0, starting: 0,
+      offline: 0, streaming: 0, viewers: 0, bandwidthKbps: 0, pullBandwidthKbps: 0
+    });
+
     const traffic = getLatestTraffic();
     res.json({
       cameras: enriched,
       traffic,
-      totals: {
-        total: enriched.length,
-        enabled,
-        disabled,
-        online,
-        starting,
-        offline: enriched.filter((c) => c.enabled && c.status === "offline").length,
-        streaming: enriched.filter((c) => c.enabled && c.viewerCount > 0).length,
-        viewers: enriched.reduce((a, c) => a + c.viewerCount, 0),
-        bandwidthKbps: enriched.reduce((a, c) => a + c.bandwidthKbps, 0),
-        pullBandwidthKbps: enriched.reduce((a, c) => a + (c.pullBandwidthKbps || 0), 0),
-      },
+      totals,
     });
   } catch (err) { next(err); }
 });
