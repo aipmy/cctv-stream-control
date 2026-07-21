@@ -268,10 +268,13 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
 
     segments.sort((a, b) => a.ts - b.ts);
 
+    const isToday = new Date().toISOString().split("T")[0] === date;
+    const playlistType = isToday ? "EVENT" : "VOD";
+
     const lines = [
       "#EXTM3U",
       "#EXT-X-VERSION:6",
-      "#EXT-X-PLAYLIST-TYPE:VOD",
+      `#EXT-X-PLAYLIST-TYPE:${playlistType}`,
       `#EXT-X-TARGETDURATION:30`, // Must be >= max EXTINF which is 30
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
@@ -306,7 +309,9 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       lines.push(`#EXTINF:${duration.toFixed(6)},`);
       lines.push(appendQuery(current.file, q));
     }
-    lines.push("#EXT-X-ENDLIST");
+    if (!isToday) {
+      lines.push("#EXT-X-ENDLIST");
+    }
 
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.type("application/vnd.apple.mpegurl");
