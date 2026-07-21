@@ -154,6 +154,9 @@ function PlaybackContent() {
         // Silent background fetch to update timeline canvas continuously
         const info = await streamApi.playbackInfo(selectedCameraId, selectedDate, start, end);
         setPlaybackInfo(info);
+
+        // Also silently fetch new events so they appear without reloading
+        loadEvents();
       } catch (e) {
         // Ignore polling errors
       }
