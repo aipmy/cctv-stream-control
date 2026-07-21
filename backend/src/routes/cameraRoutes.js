@@ -5,7 +5,25 @@ import { clearPtzCache, sendPtzCommand, testPtzConnection } from "../services/pt
 import { requireRole, requirePermission } from "../middleware/authMiddleware.js";
 import { auditRequest, changedFields } from "../modules/audit/auditService.js";
 
+import { syncCameraDateAndTime, syncAllCamerasTime } from "../services/cameraTimeSync.js";
+
 export const cameraRoutes = Router();
+
+cameraRoutes.post("/sync-time", requirePermission("canEditCamera"), async (_req, res, next) => {
+  try {
+    const results = await syncAllCamerasTime();
+    res.json({ ok: true, results });
+  } catch (err) { next(err); }
+});
+
+cameraRoutes.post("/:id/sync-time", requirePermission("canEditCamera"), async (req, res, next) => {
+  try {
+    const camera = await getCamera(req.params.id, { revealSecret: true });
+    if (!camera) return res.status(404).json({ error: "Camera not found" });
+    const result = await syncCameraDateAndTime(camera);
+    res.json(result);
+  } catch (err) { next(err); }
+});
 
 cameraRoutes.get("/", async (req, res, next) => {
   try {

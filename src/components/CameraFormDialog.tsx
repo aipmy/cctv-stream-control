@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrig
 import { toast } from "sonner";
 import type { Camera, CameraInput, Brand, StreamType, SourceType, MotionArea } from "@/types";
 import { SOURCE_SUPPORTS_PTZ, DEFAULT_PORTS } from "@/types";
-import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Check, ChevronsUpDown, ExternalLink } from "lucide-react";
+import { Info, Eye, EyeOff, Copy, Link2, Radio, TestTube2, Check, ChevronsUpDown, ExternalLink, Clock } from "lucide-react";
 import { cameraApi, type PtzResult } from "@/lib/api";
 import { useAuth } from "@/features/auth/store";
 import { useCamerasQuery, useCameraActions } from "@/features/cameras/queries";
@@ -239,6 +239,24 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       toast.error(err instanceof Error ? err.message : t("saveCameraFailed"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [syncingTime, setSyncingTime] = useState(false);
+  const handleSyncTime = async () => {
+    if (!camera) return;
+    setSyncingTime(true);
+    try {
+      const res = await cameraApi.syncTime(camera.id);
+      if (res.success) {
+        toast.success(res.message || "Jam kamera berhasil disinkronkan");
+      } else {
+        toast.error(res.error || "Gagal menyinkronkan jam kamera");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menyinkronkan jam kamera");
+    } finally {
+      setSyncingTime(false);
     }
   };
 
@@ -765,10 +783,16 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                     <div className="text-sm font-medium">{t("ptzDiagnostic")}</div>
                     <p className="text-[11px] text-muted-foreground">{t("ptzDiagnosticHelp")}</p>
                   </div>
-                  <Button type="button" variant="outline" onClick={testPtz} disabled={testingPtz}>
-                    <TestTube2 className="h-4 w-4" />
-                    {testingPtz ? t("ptzSending") : "Test ONVIF/PTZ"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleSyncTime} disabled={syncingTime}>
+                      <Clock className="h-3.5 w-3.5 mr-1" />
+                      {syncingTime ? "Proses..." : "Sync Jam Kamera"}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={testPtz} disabled={testingPtz}>
+                      <TestTube2 className="h-3.5 w-3.5 mr-1" />
+                      {testingPtz ? t("ptzSending") : "Test ONVIF/PTZ"}
+                    </Button>
+                  </div>
                 </div>
                 {ptzResult && (
                   <div className="mt-3 grid gap-1 text-xs font-mono">
