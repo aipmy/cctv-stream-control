@@ -122,9 +122,9 @@ export function EventList() {
 
   const formatEventTime = (ts: string | number) => {
     try {
-      return new Date(ts).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
+      return new Date(ts).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
     } catch {
-      return "--:--";
+      return "--:--:--";
     }
   };
 
@@ -183,7 +183,7 @@ export function EventList() {
               {filteredEvents.slice(0, 50).map((evt) => {
                 const badge = getClassificationBadge(evt.type, t);
                 const eventDate = new Date(evt.ts);
-                const timeStr = eventDate.toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+                const timeStr = eventDate.toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
                 const dateStr = eventDate.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "short", day: "numeric" });
                 
                 return (
