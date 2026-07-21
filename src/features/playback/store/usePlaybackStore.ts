@@ -168,7 +168,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   currentRecordingTime: null,
   setCurrentRecordingTime: (time) => set({ currentRecordingTime: time }),
   
-  preciseTimeInput: "12:00:00",
+  preciseTimeInput: new Date().toLocaleTimeString("sv-SE"),
   setPreciseTimeInput: (input) => set({ preciseTimeInput: input }),
   
   downloadStart: "12:00",

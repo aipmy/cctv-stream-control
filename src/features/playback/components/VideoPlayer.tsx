@@ -278,8 +278,10 @@ export function VideoPlayer() {
 
     if (block) {
       const ts = block.ts + (currentTime - block.offset);
+      const formattedTime = new Date(ts * 1000).toLocaleTimeString("id-ID", { hour12: false });
       setCurrentPlaybackTs(Math.floor(ts));
-      setCurrentRecordingTime(new Date(ts * 1000).toLocaleTimeString("id-ID", { hour12: false }));
+      setCurrentRecordingTime(formattedTime);
+      setPreciseTimeInput(new Date(ts * 1000).toLocaleTimeString("sv-SE"));
     }
   };
 

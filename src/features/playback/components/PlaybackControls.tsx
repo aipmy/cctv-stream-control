@@ -194,7 +194,7 @@ export function PlaybackControls() {
               setPlaybackWindowMinutes(val);
               if (val !== "none") {
                 const currentPlaybackTs = usePlaybackStore.getState().currentPlaybackTs;
-                setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(new Date(`${selectedDate}T12:00:00`).getTime() / 1000));
+                setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(Date.now() / 1000));
               } else {
                 setPlaybackWindowCenterTs(null);
               }
