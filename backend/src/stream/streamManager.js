@@ -154,6 +154,7 @@ async function startRecording(camera) {
   const args = [
     "-hide_banner", "-loglevel", "error",
     "-rtsp_transport", "tcp",
+    "-use_wallclock_as_timestamps", "1",
     "-i", go2rtcInput,
     "-sn", "-dn"
   ];
