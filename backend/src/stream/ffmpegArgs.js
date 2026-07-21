@@ -17,7 +17,7 @@ export function buildRtspInputArgs(camera) {
   return [
     "-rtsp_transport", "tcp",
     "-stimeout", "5000000",
-    "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort || 8554}/${camera.id}?mp4`
+    "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort || 8554}/${camera.id}`
   ];
 }
 

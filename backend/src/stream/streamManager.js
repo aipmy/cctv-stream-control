@@ -149,7 +149,7 @@ async function startRecording(camera) {
   await fs.mkdir(outputDir, { recursive: true });
   
   const playlistPath = path.join(outputDir, "index.m3u8");
-  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}?mp4`;
+  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
 
   const args = [
     "-hide_banner", "-loglevel", "error",
@@ -332,7 +332,7 @@ export async function startAiStream(id) {
     const args = [
       "-hide_banner", "-loglevel", "error",
       "-rtsp_transport", "tcp",
-      "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${id}?mp4`,
+      "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${id}`,
       "-vf", `fps=${fps}`,
       "-c:v", "mjpeg",
       "-f", "image2pipe",
