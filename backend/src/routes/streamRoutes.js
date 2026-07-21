@@ -270,11 +270,13 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
 
     const lines = [
       "#EXTM3U",
-      "#EXT-X-VERSION:3",
+      "#EXT-X-VERSION:6",
       "#EXT-X-PLAYLIST-TYPE:VOD",
       `#EXT-X-TARGETDURATION:30`, // Must be >= max EXTINF which is 30
       "#EXT-X-MEDIA-SEQUENCE:0",
     ];
+
+    let currentMap = null;
 
     const q = req.authToken ? `token=${req.authToken}` : "";
     for (let i = 0; i < segments.length; i++) {
@@ -290,8 +292,17 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       
       if (i > 0 && current.ts - segments[i - 1].ts > 30) {
         lines.push("#EXT-X-DISCONTINUITY");
+        currentMap = null;
       }
       
+      const isFmp4 = current.type === "m4s" || current.type === "mp4";
+      if (isFmp4 && currentMap !== "init.mp4") {
+        lines.push(`#EXT-X-MAP:URI="${appendQuery('init.mp4', q)}"`);
+        currentMap = "init.mp4";
+      } else if (!isFmp4 && currentMap !== null) {
+        currentMap = null;
+      }
+
       lines.push(`#EXTINF:${duration.toFixed(6)},`);
       lines.push(appendQuery(current.file, q));
     }
