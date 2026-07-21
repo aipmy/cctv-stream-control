@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlayCircle, Loader2, AlertTriangle, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Maximize, Download } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { toast } from "sonner";
 
 export function VideoPlayer() {
   const { t } = useTranslation();
@@ -233,10 +234,14 @@ export function VideoPlayer() {
         const after = mappings.filter((m: any) => m.ts > targetTs);
         if (after.length > 0) {
           offset = after[0].offset; // Seek exactly to the start of the next available segment
+          const gapTimeStr = new Date(targetTs * 1000).toLocaleTimeString("id-ID", { hour12: false });
+          const nextTimeStr = new Date(after[0].ts * 1000).toLocaleTimeString("id-ID", { hour12: false });
+          toast.info(`Jeda rekaman di ${gapTimeStr}. Melompat ke rekaman berikutnya (${nextTimeStr})`);
         } else {
           // If no segments exist after the target, just go to the very last available segment
           const last = mappings[mappings.length - 1];
           offset = last.offset + last.duration - 1; // Seek to the end of the video
+          toast.info("Tidak ada rekaman setelah waktu ini. Menampilkan akhir video.");
         }
       }
     } else {
