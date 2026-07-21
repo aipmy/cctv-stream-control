@@ -151,10 +151,17 @@ export function VideoPlayer() {
         });
 
         let mediaRecoveryAttempts = 0;
+        let lastRecoveryTime = 0;
         hls.on(Hls.Events.ERROR, (_evt, data) => {
           if (data.fatal) {
             if (data.type === "mediaError") {
-              if (mediaRecoveryAttempts < 3) {
+              const now = Date.now();
+              if (now - lastRecoveryTime > 3000) {
+                mediaRecoveryAttempts = 0;
+              }
+              lastRecoveryTime = now;
+
+              if (mediaRecoveryAttempts < 5) {
                 mediaRecoveryAttempts += 1;
                 hls.recoverMediaError();
               } else {
