@@ -271,10 +271,14 @@ export async function extendEventDuration(eventId, newEndTimeMs) {
   return updated;
 }
 
+let isCleanupRunning = false;
+
 /**
  * Cleanup / Auto-rotation service.
  */
 export async function runStorageCleanup() {
+  if (isCleanupRunning) return;
+  isCleanupRunning = true;
   try {
     const settings = await getSettings();
     const retentionMs = settings.retentionDays * 24 * 60 * 60 * 1000;
@@ -454,12 +458,13 @@ export async function runStorageCleanup() {
     let deletedSegments = 0;
     let freedBytes = 0;
 
+    const toDelete = [];
     for (const fileInfo of fileInfos) {
       const isExpired = (now - fileInfo.time) > retentionMs;
       const isOverQuota = totalSize > maxSizeBytes;
 
       if (isExpired || isOverQuota) {
-        await fs.unlink(fileInfo.path).catch(() => {});
+        toDelete.push(fileInfo);
         totalSize -= fileInfo.size;
         freedBytes += fileInfo.size;
 
@@ -473,6 +478,12 @@ export async function runStorageCleanup() {
           deletedSegments++;
         }
       }
+    }
+
+    // Parallel deletion to avoid slow SD card bottlenecks
+    for (let i = 0; i < toDelete.length; i += 50) {
+      const chunk = toDelete.slice(i, i + 50);
+      await Promise.all(chunk.map(f => fs.unlink(f.path).catch(() => {})));
     }
 
     if (deletedEventIds.size > 0) {
@@ -489,6 +500,8 @@ export async function runStorageCleanup() {
     }
   } catch (err) {
     console.error("[Storage Cleanup] Error running auto-rotation clean:", err);
+  } finally {
+    isCleanupRunning = false;
   }
 }
 
