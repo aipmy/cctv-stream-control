@@ -137,6 +137,32 @@ function PlaybackContent() {
   }, [selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs]);
 
   React.useEffect(() => {
+    const isToday = new Date().toLocaleDateString("sv-SE") === selectedDate;
+    if (!selectedCameraId || !isToday) return;
+
+    const interval = setInterval(async () => {
+      try {
+        let start: number | undefined;
+        let end: number | undefined;
+
+        if (playbackWindowMinutes !== "none" && playbackWindowCenterTs !== null) {
+          const halfWindow = (parseInt(playbackWindowMinutes, 10) * 60) / 2;
+          start = playbackWindowCenterTs - halfWindow;
+          end = playbackWindowCenterTs + halfWindow;
+        }
+
+        // Silent background fetch to update timeline canvas continuously
+        const info = await streamApi.playbackInfo(selectedCameraId, selectedDate, start, end);
+        setPlaybackInfo(info);
+      } catch (e) {
+        // Ignore polling errors
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs]);
+
+  React.useEffect(() => {
     loadEvents();
   }, [selectedCameraId, selectedDate]);
 
