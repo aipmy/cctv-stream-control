@@ -211,17 +211,19 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
         let duration = targetDuration;
         let isContiguous = false;
         
-        if (exactDurations.has(seg.file)) {
-          duration = exactDurations.get(seg.file);
-          isContiguous = true;
-        } else if (i < segments.length - 1) {
+        if (i < segments.length - 1) {
           const diff = segments[i + 1].ts - seg.ts;
           if (diff > 0 && diff <= 30) {
-            duration = diff;
             isContiguous = true;
           }
         }
         
+        if (exactDurations.has(seg.file)) {
+          duration = exactDurations.get(seg.file);
+        } else if (isContiguous) {
+          duration = segments[i + 1].ts - seg.ts;
+        }
+
         if (!activeBlock) {
           activeBlock = {
             ts: seg.ts,
