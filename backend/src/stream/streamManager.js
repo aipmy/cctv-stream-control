@@ -153,8 +153,8 @@ async function startRecording(camera) {
 
   const args = [
     "-hide_banner", "-loglevel", "error",
-    "-reconnect", "1", "-reconnect_at_eof", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
     "-rtsp_transport", "tcp",
+    "-stimeout", "5000000",
     "-use_wallclock_as_timestamps", "1",
     "-i", go2rtcInput,
     "-sn", "-dn"
