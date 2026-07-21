@@ -129,21 +129,35 @@ export function EventList() {
   };
 
   const handleEventClick = (evt: SmartEvent) => {
+    const localDate = new Date(evt.ts).toLocaleDateString("sv-SE");
+    if (selectedDate !== localDate) {
+      setSelectedDate(localDate);
+    }
+    
     setActivePosterUrl(eventApi.snapshotUrl(evt.id));
-    // Jump 3s before event
+
+    const isCameraChanging = selectedCameraId !== evt.cameraId;
     const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
-    if (playbackWindowMinutes !== "none") {
-      const start = playbackInfo?.firstSegmentUnixTime;
-      const end = playbackInfo?.lastSegmentUnixTime;
-      // If event is within the currently loaded window, just seek instantly
-      if (start && end && eventTime >= start && eventTime <= end) {
-        setJumpToTimeTrigger(eventTime);
-      } else {
+
+    if (isCameraChanging) {
+      setPendingSeekTs(eventTime);
+      if (playbackWindowMinutes !== "none") {
         setPlaybackWindowCenterTs(eventTime);
-        setPendingSeekTs(eventTime);
       }
+      setSelectedCameraId(evt.cameraId);
     } else {
-      setJumpToTimeTrigger(eventTime);
+      if (playbackWindowMinutes !== "none") {
+        const start = playbackInfo?.firstSegmentUnixTime;
+        const end = playbackInfo?.lastSegmentUnixTime;
+        if (start && end && eventTime >= start && eventTime <= end) {
+          setJumpToTimeTrigger(eventTime);
+        } else {
+          setPlaybackWindowCenterTs(eventTime);
+          setPendingSeekTs(eventTime);
+        }
+      } else {
+        setJumpToTimeTrigger(eventTime);
+      }
     }
   };
 
@@ -176,26 +190,7 @@ export function EventList() {
                   <div
                     key={evt.id}
                     className="group relative z-0 aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary/50 bg-muted/20 cursor-pointer shadow-sm transition-all duration-300 w-full"
-                    onClick={() => {
-                      const localDate = new Date(evt.ts).toLocaleDateString("sv-SE");
-                      setSelectedDate(localDate);
-                      setActivePosterUrl(eventApi.snapshotUrl(evt.id));
-                      setSelectedCameraId(evt.cameraId);
-                      
-                      const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
-                      if (playbackWindowMinutes !== "none") {
-                        const start = playbackInfo?.firstSegmentUnixTime;
-                        const end = playbackInfo?.lastSegmentUnixTime;
-                        if (start && end && eventTime >= start && eventTime <= end) {
-                          setJumpToTimeTrigger(eventTime);
-                        } else {
-                          setPlaybackWindowCenterTs(eventTime);
-                          setPendingSeekTs(eventTime);
-                        }
-                      } else {
-                        setJumpToTimeTrigger(eventTime);
-                      }
-                    }}
+                    onClick={() => handleEventClick(evt)}
                   >
                     <img
                       src={eventApi.snapshotUrl(evt.id)}
