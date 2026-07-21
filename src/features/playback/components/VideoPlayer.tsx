@@ -182,7 +182,7 @@ export function VideoPlayer() {
         hlsRef.current = null;
       }
     };
-  }, [playbackInfo, selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs, loadPlaybackTrigger]);
+  }, [playbackInfo?.hasRecording, selectedCameraId, selectedDate, playbackWindowMinutes, playbackWindowCenterTs, loadPlaybackTrigger]);
 
   // Synchronize playback speed
   useEffect(() => {
