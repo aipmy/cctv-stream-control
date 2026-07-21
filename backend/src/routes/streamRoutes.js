@@ -163,6 +163,27 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
     const files = await fs.promises.readdir(dir);
+    
+    // Parse index.m3u8 to get exact float durations to prevent MSE PTS drift
+    const exactDurations = new Map();
+    try {
+      const indexPath = path.join(dir, "index.m3u8");
+      if (fs.existsSync(indexPath)) {
+        const lines = fs.readFileSync(indexPath, "utf8").split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith("#EXTINF:")) {
+            const dur = parseFloat(lines[i].substring(8));
+            const file = lines[i + 1]?.trim();
+            if (file && file.startsWith("seg_")) {
+              exactDurations.set(file, dur);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error reading index.m3u8 for exact durations", err);
+    }
+
     const segments = [];
     for (const file of files) {
       const match = file.match(/^seg_(\d+)\.(ts|mp4|m4s)$/);
@@ -190,7 +211,10 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
         let duration = targetDuration;
         let isContiguous = false;
         
-        if (i < segments.length - 1) {
+        if (exactDurations.has(seg.file)) {
+          duration = exactDurations.get(seg.file);
+          isContiguous = true;
+        } else if (i < segments.length - 1) {
           const diff = segments[i + 1].ts - seg.ts;
           if (diff > 0 && diff <= 30) {
             duration = diff;
@@ -249,6 +273,27 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
     const files = await fs.promises.readdir(dir);
+    
+    // Parse index.m3u8 to get exact float durations to prevent MSE PTS drift
+    const exactDurations = new Map();
+    try {
+      const indexPath = path.join(dir, "index.m3u8");
+      if (fs.existsSync(indexPath)) {
+        const lines = fs.readFileSync(indexPath, "utf8").split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith("#EXTINF:")) {
+            const dur = parseFloat(lines[i].substring(8));
+            const file = lines[i + 1]?.trim();
+            if (file && file.startsWith("seg_")) {
+              exactDurations.set(file, dur);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error reading index.m3u8 for exact durations", err);
+    }
+
     const segments = [];
 
     for (const file of files) {
@@ -286,7 +331,9 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
       const current = segments[i];
       // USE targetDuration so it matches segmentMappings EXACTLY!
       let duration = targetDuration;
-      if (i < segments.length - 1) {
+      if (exactDurations.has(current.file)) {
+        duration = exactDurations.get(current.file);
+      } else if (i < segments.length - 1) {
         const diff = segments[i + 1].ts - current.ts;
         if (diff > 0 && diff <= 30) {
           duration = diff;
