@@ -169,7 +169,7 @@ async function startRecording(camera) {
   args.push(
     "-c:a", "copy",
     "-f", "hls",
-    "-hls_time", "10",
+    "-hls_time", "5",
     "-hls_list_size", "0",
     "-hls_segment_type", "fmp4",
     "-hls_fmp4_init_filename", "init.mp4",

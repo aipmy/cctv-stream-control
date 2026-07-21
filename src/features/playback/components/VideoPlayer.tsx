@@ -230,18 +230,25 @@ export function VideoPlayer() {
         // Target is inside a recorded segment
         offset = found.offset + Math.max(0, targetTs - found.ts);
       } else {
-        // Target is in a gap (missing recording). Auto-skip to the NEXT available segment
         const after = mappings.filter((m: any) => m.ts > targetTs);
         if (after.length > 0) {
-          offset = after[0].offset; // Seek exactly to the start of the next available segment
+          offset = after[0].offset; // Seek to start of next available segment
           const gapTimeStr = new Date(targetTs * 1000).toLocaleTimeString("id-ID", { hour12: false });
           const nextTimeStr = new Date(after[0].ts * 1000).toLocaleTimeString("id-ID", { hour12: false });
           toast.info(`Jeda rekaman di ${gapTimeStr}. Melompat ke rekaman berikutnya (${nextTimeStr})`);
         } else {
-          // If no segments exist after the target, just go to the very last available segment
+          // No segments exist AFTER targetTs. Check if targetTs is close to the latest available segment
           const last = mappings[mappings.length - 1];
-          offset = last.offset + last.duration - 1; // Seek to the end of the video
-          toast.info("Tidak ada rekaman setelah waktu ini. Menampilkan akhir video.");
+          const lastEnd = last.ts + last.duration;
+          
+          if (targetTs <= lastEnd + 90) {
+            // Target is for a very recent event whose segment was just written or is completing
+            offset = last.offset + Math.max(0, Math.min(last.duration - 1, targetTs - last.ts));
+          } else {
+            // Target is far beyond available recordings
+            offset = last.offset + Math.max(0, last.duration - 1);
+            toast.info("Rekaman belum tersedia untuk waktu ini. Menampilkan rekaman terbaru.");
+          }
         }
       }
     } else {
