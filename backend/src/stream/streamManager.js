@@ -148,7 +148,6 @@ async function startRecording(camera) {
   const outputDir = path.join(config.storageDir, "record_hls", camera.id);
   await fs.mkdir(outputDir, { recursive: true });
   
-  
   const playlistPath = path.join(outputDir, "index.m3u8");
   const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}?mp4`;
 
@@ -168,10 +167,12 @@ async function startRecording(camera) {
   args.push(
     "-c:a", "copy",
     "-f", "hls",
-    "-hls_time", "5",
+    "-hls_time", "10",
     "-hls_list_size", "0",
+    "-hls_segment_type", "fmp4",
+    "-hls_fmp4_init_filename", "init.mp4",
     "-strftime", "1",
-    "-hls_segment_filename", path.join(outputDir, "seg_%s.ts"),
+    "-hls_segment_filename", path.join(outputDir, "seg_%s.m4s"),
     playlistPath
   );
 

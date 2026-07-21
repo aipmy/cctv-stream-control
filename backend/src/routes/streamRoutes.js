@@ -12,6 +12,27 @@ import { requirePermission } from "../middleware/authMiddleware.js";
 export const streamRoutes = Router();
 const diskUsageCache = new Map(); // cameraId -> { size, ts }
 
+export function parseTimestamp(val) {
+  if (val === undefined || val === null || val === "") return null;
+  if (typeof val === "number") {
+    if (isNaN(val) || !isFinite(val) || val <= 0) return null;
+    return val > 1e11 ? val / 1000 : val;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    const num = Number(trimmed);
+    if (!isNaN(num)) {
+      if (num <= 0 || !isFinite(num)) return null;
+      return num > 1e11 ? num / 1000 : num;
+    }
+    const ms = Date.parse(trimmed);
+    if (isNaN(ms) || ms <= 0) return null;
+    return ms / 1000;
+  }
+  return null;
+}
+
 // Validate camera access by user's allowedGroups/sites
 streamRoutes.param("id", async (req, res, next, id) => {
   try {
@@ -144,10 +165,11 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const files = await fs.promises.readdir(dir);
     const segments = [];
     for (const file of files) {
-      if (file.startsWith("seg_") && file.endsWith(".ts")) {
-        const ts = parseInt(file.slice(4, -3), 10);
+      const match = file.match(/^seg_(\d+)\.(ts|mp4|m4s)$/);
+      if (match) {
+        const ts = parseInt(match[1], 10);
         if (ts >= startUnix && ts <= endUnix) {
-          segments.push({ ts });
+          segments.push({ ts, file, type: match[2] });
         }
       }
     }
@@ -230,12 +252,11 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const segments = [];
 
     for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
+      const match = file.match(/^seg_(\d+)\.(ts|mp4|m4s)$/);
       if (!match) continue;
       const ts = parseInt(match[1], 10);
       if (ts >= startUnix && ts <= endUnix) {
-        segments.push({ file, ts });
+        segments.push({ file, ts, type: match[2] });
       }
     }
 
@@ -302,11 +323,10 @@ streamRoutes.get("/:id/snapshot-at", async (req, res, next) => {
     const files = await fs.promises.readdir(dir);
     const segments = [];
     for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
+      const match = file.match(/^seg_(\d+)\.(ts|mp4|m4s)$/);
       if (!match) continue;
       const ts = parseInt(match[1], 10);
-      segments.push({ file, path: path.join(dir, file), ts });
+      segments.push({ file, path: path.join(dir, file), ts, type: match[2] });
     }
 
     if (segments.length === 0) return res.status(404).send("No recording segments found");
@@ -367,29 +387,49 @@ streamRoutes.delete("/:id/recordings/all", requirePermission("canViewPlayback"),
   } catch (err) { next(err); }
 });
 
-streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (req, res, next) => {
+const handleClipDownload = async (req, res, next) => {
+  let concatTxtPath = null;
+  let tempMp4Path = null;
   try {
     const { id } = req.params;
-    const startUnix = parseInt(req.query.start, 10);
-    const endUnix = parseInt(req.query.end, 10);
 
-    if (isNaN(startUnix) || isNaN(endUnix)) {
-      return res.status(400).send("Valid start and end Unix timestamps are required");
+    if (!id || id.includes("..") || id.includes("/") || id.includes("\\")) {
+      return res.status(404).json({ error: "Camera not found" });
+    }
+
+    const camera = await getCamera(id);
+    if (!camera) {
+      return res.status(404).json({ error: "Camera not found" });
+    }
+
+    const startRaw = req.query.startTime ?? req.query.start;
+    const endRaw = req.query.endTime ?? req.query.end;
+
+    const startUnix = parseTimestamp(startRaw);
+    const endUnix = parseTimestamp(endRaw);
+
+    if (startUnix === null || endUnix === null) {
+      return res.status(400).json({ error: "Invalid start/end timestamp format" });
+    }
+
+    if (startUnix >= endUnix) {
+      return res.status(400).json({ error: "startTime must be strictly less than endTime" });
     }
 
     const dir = path.join(config.storageDir, "record_hls", id);
     if (!dir || !fs.existsSync(dir)) {
-      return res.status(404).send("Stream directory not found");
+      return res.status(404).json({ error: "No recorded video segments found in this time range" });
     }
 
     const files = await fs.promises.readdir(dir);
     const segments = [];
+    const segDuration = 5;
+
     for (const file of files) {
-      if (!file.endsWith(".ts")) continue;
-      const match = file.match(/seg_(\d+)\.ts/);
+      const match = file.match(/^seg_(\d+)\.(ts|mp4|m4s)$/);
       if (!match) continue;
-      const ts = parseInt(match[1], 10);
-      if (ts >= startUnix && ts <= endUnix) {
+      let ts = parseInt(match[1], 10);
+      if (ts >= (startUnix - 10) && ts < endUnix && (ts + segDuration) > startUnix) {
         segments.push({
           file,
           path: path.join(dir, file),
@@ -399,35 +439,42 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
     }
 
     if (segments.length === 0) {
-      return res.status(404).send("No recorded video segments found in this time range");
+      return res.status(404).json({ error: "No recorded video segments found in this time range" });
     }
 
     segments.sort((a, b) => a.ts - b.ts);
 
-    // Create temp concat file and output MP4 file
+    const firstSegTs = segments[0].ts;
+    const startOffset = Math.max(0, startUnix - firstSegTs);
+    const totalDuration = endUnix - startUnix;
+
     const tempDir = path.join(config.storageDir, "temp_downloads");
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
-    const randomSuffix = Math.random().toString(36).slice(2, 6);
-    const concatTxtPath = path.join(tempDir, `concat_${id}_${randomSuffix}.txt`);
-    const tempMp4Path = path.join(tempDir, `clip_${id}_${randomSuffix}.mp4`);
 
-    const concatContent = segments.map((s) => `file '${s.path}'`).join("\n");
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    concatTxtPath = path.join(tempDir, `concat_${id}_${randomSuffix}.txt`);
+    tempMp4Path = path.join(tempDir, `clip_${id}_${randomSuffix}.mp4`);
+
+    const concatContent = segments.map((s) => `file '${s.path.replace(/'/g, "'\\''")}'`).join("\n");
     await fs.promises.writeFile(concatTxtPath, concatContent);
 
-    // Run FFmpeg to merge segments into standard MP4
+    const ffmpegBin = config.ffmpegBin || "ffmpeg";
     const concatArgs = [
       "-y",
       "-f", "concat",
       "-safe", "0",
       "-i", concatTxtPath,
-      "-c", "copy",
+      "-ss", String(startOffset),
+      "-t", String(totalDuration),
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-c:a", "aac",
       "-movflags", "+faststart",
       tempMp4Path,
     ];
 
     await new Promise((resolve, reject) => {
-      const proc = spawn(config.ffmpegBin, concatArgs, { stdio: "ignore" });
+      const proc = spawn(ffmpegBin, concatArgs, { stdio: "ignore" });
       proc.on("close", (code) => {
         if (code === 0) resolve();
         else reject(new Error(`FFmpeg exited with code ${code}`));
@@ -435,16 +482,37 @@ streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), async (r
       proc.on("error", reject);
     });
 
-    // Send the compiled MP4 file to user
-    res.download(tempMp4Path, `cctv_${id}_${startUnix}_${endUnix}.mp4`, async (err) => {
-      // Clean up temp files after transfer completed/aborted
+    if (concatTxtPath) {
       await fs.promises.unlink(concatTxtPath).catch(() => {});
-      await fs.promises.unlink(tempMp4Path).catch(() => {});
+      concatTxtPath = null;
+    }
+
+    const filename = `clip_${id}_${Math.floor(startUnix)}_${Math.floor(endUnix)}.mp4`;
+    res.setHeader("Content-Type", "video/mp4");
+    res.download(tempMp4Path, filename, async (err) => {
+      if (tempMp4Path) {
+        await fs.promises.unlink(tempMp4Path).catch(() => {});
+        tempMp4Path = null;
+      }
+      if (err && !res.headersSent) {
+        next(err);
+      }
     });
   } catch (err) {
+    if (concatTxtPath) {
+      await fs.promises.unlink(concatTxtPath).catch(() => {});
+      concatTxtPath = null;
+    }
+    if (tempMp4Path) {
+      await fs.promises.unlink(tempMp4Path).catch(() => {});
+      tempMp4Path = null;
+    }
     next(err);
   }
-});
+};
+
+streamRoutes.get("/:id/download", requirePermission("canViewPlayback"), handleClipDownload);
+streamRoutes.get("/:id/clip", requirePermission("canViewPlayback"), handleClipDownload);
 
 streamRoutes.get("/:id/:file", async (req, res, next) => {
   try {
