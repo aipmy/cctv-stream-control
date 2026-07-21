@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePlayback } from "../context/PlaybackContext";
+import { usePlaybackStore } from "../store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 import { playbackUrl, downloadUrl } from "@/lib/api";
 import { useCamerasQuery } from "@/features/cameras/queries";
 import { Card } from "@/components/ui/card";
@@ -21,7 +22,14 @@ export function DownloadClipForm() {
     previewStartTs, setPreviewStartTs,
     previewEndTs, setPreviewEndTs,
     isPreviewDownloadOpen, setIsPreviewDownloadOpen
-  } = usePlayback();
+  } = usePlaybackStore(useShallow(s => ({
+    selectedCameraId: s.selectedCameraId, selectedDate: s.selectedDate, playbackInfo: s.playbackInfo,
+    downloadStart: s.downloadStart, setDownloadStart: s.setDownloadStart,
+    downloadEnd: s.downloadEnd, setDownloadEnd: s.setDownloadEnd,
+    previewStartTs: s.previewStartTs, setPreviewStartTs: s.setPreviewStartTs,
+    previewEndTs: s.previewEndTs, setPreviewEndTs: s.setPreviewEndTs,
+    isPreviewDownloadOpen: s.isPreviewDownloadOpen, setIsPreviewDownloadOpen: s.setIsPreviewDownloadOpen
+  })));
 
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const previewHlsRef = useRef<any | null>(null);

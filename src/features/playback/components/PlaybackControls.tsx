@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePlayback } from "../context/PlaybackContext";
+import { usePlaybackStore } from "../store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 import { useCamerasQuery } from "@/features/cameras/queries";
 import { useSettings } from "@/features/settings/store";
 import { Card } from "@/components/ui/card";
@@ -24,9 +25,21 @@ export function PlaybackControls() {
     cameraSearchQuery, setCameraSearchQuery,
     isCameraPopoverOpen, setIsCameraPopoverOpen,
     playbackWindowMinutes, setPlaybackWindowMinutes,
-    currentPlaybackTs, setPlaybackWindowCenterTs,
-    setActivePosterUrl, playbackInfo
-  } = usePlayback();
+    setPlaybackWindowCenterTs,
+    setActivePosterUrl, playbackInfo,
+    preciseTimeInput, setPreciseTimeInput,
+    setJumpToTimeTrigger, setPendingSeekTs
+  } = usePlaybackStore(useShallow(s => ({
+    selectedCameraId: s.selectedCameraId, setSelectedCameraId: s.setSelectedCameraId,
+    selectedDate: s.selectedDate, setSelectedDate: s.setSelectedDate,
+    cameraSearchQuery: s.cameraSearchQuery, setCameraSearchQuery: s.setCameraSearchQuery,
+    isCameraPopoverOpen: s.isCameraPopoverOpen, setIsCameraPopoverOpen: s.setIsCameraPopoverOpen,
+    playbackWindowMinutes: s.playbackWindowMinutes, setPlaybackWindowMinutes: s.setPlaybackWindowMinutes,
+    setPlaybackWindowCenterTs: s.setPlaybackWindowCenterTs,
+    setActivePosterUrl: s.setActivePosterUrl, playbackInfo: s.playbackInfo,
+    preciseTimeInput: s.preciseTimeInput, setPreciseTimeInput: s.setPreciseTimeInput,
+    setJumpToTimeTrigger: s.setJumpToTimeTrigger, setPendingSeekTs: s.setPendingSeekTs
+  })));
 
   const filteredCameras = useMemo(() => {
     if (!cameraSearchQuery) return cameras;
@@ -51,7 +64,7 @@ export function PlaybackControls() {
 
   return (
     <Card className="p-2 sm:p-5 border border-border/40 bg-card/65 backdrop-blur-md shadow-sm">
-      <div className="flex overflow-x-auto lg:grid lg:grid-cols-4 flex-nowrap gap-2 sm:gap-4 items-end pb-1 lg:pb-0 scrollbar-hide">
+      <div className="flex overflow-x-auto lg:grid lg:grid-cols-5 flex-nowrap gap-2 sm:gap-4 items-end pb-1 lg:pb-0 scrollbar-hide">
         <div className="lg:space-y-1 shrink-0 w-[150px] lg:w-auto">
           <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("selectCamera")}</Label>
           <Popover open={isCameraPopoverOpen} onOpenChange={setIsCameraPopoverOpen}>
@@ -132,12 +145,55 @@ export function PlaybackControls() {
         </div>
 
         <div className="lg:space-y-1 shrink-0 w-[140px] lg:w-auto">
+          <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("time") || "Time"}</Label>
+          <div className="flex items-center gap-1">
+            <input
+              type="time"
+              step="1"
+              value={preciseTimeInput}
+              onChange={(e) => setPreciseTimeInput(e.target.value)}
+              className="w-full h-9 sm:h-10 px-2 py-1 sm:py-2 rounded-md border border-border bg-background text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+              style={{ colorScheme: theme === "dark" ? "dark" : "light", boxSizing: "border-box" }}
+            />
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              className="h-9 sm:h-10 px-2"
+              onClick={() => {
+                const parts = preciseTimeInput.split(":");
+                if (parts.length >= 2) {
+                  const targetTimeStr = `${selectedDate}T${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}:${(parts[2] || "00").padStart(2, "0")}`;
+                  const targetUnix = Math.floor(new Date(targetTimeStr).getTime() / 1000);
+                  if (!isNaN(targetUnix)) {
+                    if (playbackWindowMinutes !== "none") {
+                      const start = playbackInfo?.firstSegmentUnixTime;
+                      const end = playbackInfo?.lastSegmentUnixTime;
+                      if (start && end && targetUnix >= start && targetUnix <= end) {
+                        setJumpToTimeTrigger(targetUnix);
+                      } else {
+                        setPlaybackWindowCenterTs(targetUnix);
+                        setPendingSeekTs(targetUnix);
+                      }
+                    } else {
+                      setJumpToTimeTrigger(targetUnix);
+                    }
+                  }
+                }
+              }}
+            >
+              Go
+            </Button>
+          </div>
+        </div>
+
+        <div className="lg:space-y-1 shrink-0 w-[140px] lg:w-auto">
           <Label className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate hidden lg:block">{t("loadWindowLimit")}</Label>
           <Select 
             value={playbackWindowMinutes} 
             onValueChange={(val) => {
               setPlaybackWindowMinutes(val);
               if (val !== "none") {
+                const currentPlaybackTs = usePlaybackStore.getState().currentPlaybackTs;
                 setPlaybackWindowCenterTs(currentPlaybackTs || Math.floor(new Date(`${selectedDate}T12:00:00`).getTime() / 1000));
               } else {
                 setPlaybackWindowCenterTs(null);

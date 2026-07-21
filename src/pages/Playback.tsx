@@ -2,7 +2,8 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/features/auth/store";
-import { PlaybackProvider, usePlayback } from "@/features/playback/context/PlaybackContext";
+import { usePlaybackStore } from "@/features/playback/store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 
 // Components
 import { PlaybackControls } from "@/features/playback/components/PlaybackControls";
@@ -26,12 +27,37 @@ function PlaybackContent() {
     activeSnapshot, setActiveSnapshot,
     deleteEventTarget, setDeleteEventTarget,
     loadPlaybackTrigger, setLoadPlaybackTrigger,
-    isDownloadFormOpen, setIsDownloadFormOpen
-  } = usePlayback();
+    isDownloadFormOpen, setIsDownloadFormOpen,
+    setSelectedCameraId, setSelectedDate, setPlaybackWindowMinutes, setPlaybackWindowCenterTs
+  } = usePlaybackStore(useShallow(s => ({
+    selectedCameraId: s.selectedCameraId, selectedDate: s.selectedDate, playbackWindowMinutes: s.playbackWindowMinutes, playbackWindowCenterTs: s.playbackWindowCenterTs,
+    setLoading: s.setLoading, setError: s.setError, setCurrentPlaybackTs: s.setCurrentPlaybackTs, setCurrentRecordingTime: s.setCurrentRecordingTime, setTimelineCenterTs: s.setTimelineCenterTs,
+    setPlaybackInfo: s.setPlaybackInfo, setEvents: s.setEvents, setActivePosterUrl: s.setActivePosterUrl, setJumpToTimeTrigger: s.setJumpToTimeTrigger,
+    activeSnapshot: s.activeSnapshot, setActiveSnapshot: s.setActiveSnapshot,
+    deleteEventTarget: s.deleteEventTarget, setDeleteEventTarget: s.setDeleteEventTarget,
+    loadPlaybackTrigger: s.loadPlaybackTrigger, setLoadPlaybackTrigger: s.setLoadPlaybackTrigger,
+    isDownloadFormOpen: s.isDownloadFormOpen, setIsDownloadFormOpen: s.setIsDownloadFormOpen,
+    setSelectedCameraId: s.setSelectedCameraId, setSelectedDate: s.setSelectedDate, setPlaybackWindowMinutes: s.setPlaybackWindowMinutes, setPlaybackWindowCenterTs: s.setPlaybackWindowCenterTs
+  })));
 
   const location = useLocation();
   const effectiveState = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
   const initialSeekDone = React.useRef(false);
+
+  React.useEffect(() => {
+    if (effectiveState) {
+      if (effectiveState.cameraId && effectiveState.cameraId !== selectedCameraId) {
+        setSelectedCameraId(effectiveState.cameraId);
+      }
+      if (effectiveState.date && effectiveState.date !== selectedDate) {
+        setSelectedDate(effectiveState.date);
+      }
+      if (effectiveState.eventSeek) {
+        setPlaybackWindowMinutes("15");
+        setPlaybackWindowCenterTs(effectiveState.timestamp || null);
+      }
+    }
+  }, [effectiveState, selectedCameraId, selectedDate]);
 
   const loadPlaybackSegments = async () => {
     if (!selectedCameraId) return;
@@ -223,9 +249,5 @@ export default function Playback() {
     return <Navigate to="/" replace />;
   }
 
-  return (
-    <PlaybackProvider>
-      <PlaybackContent />
-    </PlaybackProvider>
-  );
+  return <PlaybackContent />;
 }

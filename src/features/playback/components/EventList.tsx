@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePlayback } from "../context/PlaybackContext";
+import { usePlaybackStore } from "../store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 import { eventApi } from "@/lib/api";
 import { SmartEvent } from "@/types";
 import { Card } from "@/components/ui/card";
@@ -65,8 +66,18 @@ export function EventList() {
   const {
     selectedCameraId, setSelectedCameraId, selectedDate, setSelectedDate, playbackInfo,
     events, searchKeyword, minScore, filterStartTime, filterEndTime,
-    setActivePosterUrl, setActiveSnapshot, setJumpToTimeTrigger
-  } = usePlayback();
+    setActivePosterUrl, setActiveSnapshot, setJumpToTimeTrigger,
+    playbackWindowMinutes, setPlaybackWindowCenterTs, setPendingSeekTs
+  } = usePlaybackStore(useShallow(s => ({
+    selectedCameraId: s.selectedCameraId, setSelectedCameraId: s.setSelectedCameraId,
+    selectedDate: s.selectedDate, setSelectedDate: s.setSelectedDate,
+    playbackInfo: s.playbackInfo, events: s.events,
+    searchKeyword: s.searchKeyword, minScore: s.minScore,
+    filterStartTime: s.filterStartTime, filterEndTime: s.filterEndTime,
+    setActivePosterUrl: s.setActivePosterUrl, setActiveSnapshot: s.setActiveSnapshot,
+    setJumpToTimeTrigger: s.setJumpToTimeTrigger, playbackWindowMinutes: s.playbackWindowMinutes,
+    setPlaybackWindowCenterTs: s.setPlaybackWindowCenterTs, setPendingSeekTs: s.setPendingSeekTs
+  })));
 
   const filteredEvents = useMemo(() => {
     return events.filter((evt) => {
@@ -121,7 +132,19 @@ export function EventList() {
     setActivePosterUrl(eventApi.snapshotUrl(evt.id));
     // Jump 3s before event
     const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
-    setJumpToTimeTrigger(eventTime);
+    if (playbackWindowMinutes !== "none") {
+      const start = playbackInfo?.firstSegmentUnixTime;
+      const end = playbackInfo?.lastSegmentUnixTime;
+      // If event is within the currently loaded window, just seek instantly
+      if (start && end && eventTime >= start && eventTime <= end) {
+        setJumpToTimeTrigger(eventTime);
+      } else {
+        setPlaybackWindowCenterTs(eventTime);
+        setPendingSeekTs(eventTime);
+      }
+    } else {
+      setJumpToTimeTrigger(eventTime);
+    }
   };
 
   if (!selectedCameraId) {
@@ -160,7 +183,18 @@ export function EventList() {
                       setSelectedCameraId(evt.cameraId);
                       
                       const eventTime = Math.floor(new Date(evt.ts).getTime() / 1000) - 3;
-                      setJumpToTimeTrigger(eventTime);
+                      if (playbackWindowMinutes !== "none") {
+                        const start = playbackInfo?.firstSegmentUnixTime;
+                        const end = playbackInfo?.lastSegmentUnixTime;
+                        if (start && end && eventTime >= start && eventTime <= end) {
+                          setJumpToTimeTrigger(eventTime);
+                        } else {
+                          setPlaybackWindowCenterTs(eventTime);
+                          setPendingSeekTs(eventTime);
+                        }
+                      } else {
+                        setJumpToTimeTrigger(eventTime);
+                      }
                     }}
                   >
                     <img
@@ -247,7 +281,28 @@ export function EventList() {
         ) : (
           groupedEvents.map((group) => (
             <div key={group.hour} className="space-y-2">
-              <div className="text-xs font-bold text-muted-foreground font-mono py-1 mb-2">
+              <div 
+                className="text-xs font-bold text-muted-foreground font-mono py-1 mb-2 cursor-pointer hover:text-primary transition-colors inline-block"
+                onClick={() => {
+                  const targetTimeStr = `${selectedDate}T${group.hour}:00`;
+                  const targetUnix = Math.floor(new Date(targetTimeStr).getTime() / 1000);
+                  if (!isNaN(targetUnix)) {
+                    if (playbackWindowMinutes !== "none") {
+                      const start = playbackInfo?.firstSegmentUnixTime;
+                      const end = playbackInfo?.lastSegmentUnixTime;
+                      if (start && end && targetUnix >= start && targetUnix <= end) {
+                        setJumpToTimeTrigger(targetUnix);
+                      } else {
+                        setPlaybackWindowCenterTs(targetUnix);
+                        setPendingSeekTs(targetUnix);
+                      }
+                    } else {
+                      setJumpToTimeTrigger(targetUnix);
+                    }
+                  }
+                }}
+                title={lang === "id" ? "Lompat ke jam ini" : "Jump to this hour"}
+              >
                 {group.hour}
               </div>
               <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-2 xl:grid-cols-2 gap-3">

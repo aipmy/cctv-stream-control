@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePlayback } from "../context/PlaybackContext";
+import { usePlaybackStore } from "../store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 import { playbackUrl } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,24 @@ export function VideoPlayer() {
     setCurrentPlaybackTs, setCurrentRecordingTime,
     setTimelineCenterTs,
     jumpToTimeTrigger, setJumpToTimeTrigger,
-    loadPlaybackTrigger,
+    pendingSeekTs, setPendingSeekTs,
+    loadPlaybackTrigger, setLoadPlaybackTrigger,
     setIsDownloadFormOpen
-  } = usePlayback();
+  } = usePlaybackStore(useShallow(s => ({
+    selectedCameraId: s.selectedCameraId, selectedDate: s.selectedDate, playbackWindowMinutes: s.playbackWindowMinutes, playbackWindowCenterTs: s.playbackWindowCenterTs,
+    playbackInfo: s.playbackInfo, loading: s.loading, error: s.error, setError: s.setError,
+    isPlaying: s.isPlaying, setIsPlaying: s.setIsPlaying,
+    isMuted: s.isMuted, setIsMuted: s.setIsMuted,
+    volume: s.volume, setVolume: s.setVolume,
+    playbackSpeed: s.playbackSpeed, setPlaybackSpeed: s.setPlaybackSpeed,
+    activePosterUrl: s.activePosterUrl, setActivePosterUrl: s.setActivePosterUrl,
+    setCurrentPlaybackTs: s.setCurrentPlaybackTs, setCurrentRecordingTime: s.setCurrentRecordingTime,
+    setTimelineCenterTs: s.setTimelineCenterTs,
+    jumpToTimeTrigger: s.jumpToTimeTrigger, setJumpToTimeTrigger: s.setJumpToTimeTrigger,
+    pendingSeekTs: s.pendingSeekTs, setPendingSeekTs: s.setPendingSeekTs,
+    loadPlaybackTrigger: s.loadPlaybackTrigger, setLoadPlaybackTrigger: s.setLoadPlaybackTrigger,
+    setIsDownloadFormOpen: s.setIsDownloadFormOpen
+  })));
 
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -67,7 +83,10 @@ export function VideoPlayer() {
         video.onloadedmetadata = () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+            if (pendingSeekTs !== null) {
+              seekToTimestamp(pendingSeekTs);
+              setPendingSeekTs(null);
+            } else if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
               seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
@@ -119,7 +138,10 @@ export function VideoPlayer() {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (!disposed) {
             video.muted = isMuted;
-            if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
+            if (pendingSeekTs !== null) {
+              seekToTimestamp(pendingSeekTs);
+              setPendingSeekTs(null);
+            } else if (effectiveState?.eventSeek && effectiveState?.timestamp && !initialSeekDone.current) {
               seekToTimestamp(effectiveState.timestamp);
               initialSeekDone.current = true;
             }
@@ -381,7 +403,17 @@ export function VideoPlayer() {
               <AlertTriangle className="h-7 w-7 text-destructive" />
               <div className="space-y-1">
                 <div className="text-xs font-semibold">{t("streamFailed")}</div>
-                <div className="text-[11px] text-white/60 max-w-md">{error}</div>
+                <div className="text-[11px] text-white/60 max-w-md mb-2">{error}</div>
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  onClick={() => {
+                    setError(null);
+                    setLoadPlaybackTrigger((prev) => prev + 1);
+                  }}
+                >
+                  {t("retry") || "Retry"}
+                </Button>
               </div>
             </div>
           )}

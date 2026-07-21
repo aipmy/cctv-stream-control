@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePlayback } from "../context/PlaybackContext";
+import { usePlaybackStore } from "../store/usePlaybackStore";
+import { useShallow } from "zustand/react/shallow";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,16 @@ export function TimelineCanvas() {
     preciseTimeInput, setPreciseTimeInput,
     playbackWindowMinutes, setPlaybackWindowCenterTs,
     setJumpToTimeTrigger, setActivePosterUrl
-  } = usePlayback();
+  } = usePlaybackStore(useShallow(s => ({
+    selectedDate: s.selectedDate, playbackInfo: s.playbackInfo, events: s.events,
+    timelineZoom: s.timelineZoom, setTimelineZoom: s.setTimelineZoom,
+    timelineCenterTs: s.timelineCenterTs, setTimelineCenterTs: s.setTimelineCenterTs,
+    currentPlaybackTs: s.currentPlaybackTs, setCurrentPlaybackTs: s.setCurrentPlaybackTs,
+    currentRecordingTime: s.currentRecordingTime, setCurrentRecordingTime: s.setCurrentRecordingTime,
+    preciseTimeInput: s.preciseTimeInput, setPreciseTimeInput: s.setPreciseTimeInput,
+    playbackWindowMinutes: s.playbackWindowMinutes, setPlaybackWindowCenterTs: s.setPlaybackWindowCenterTs,
+    setJumpToTimeTrigger: s.setJumpToTimeTrigger, setActivePosterUrl: s.setActivePosterUrl
+  })));
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
