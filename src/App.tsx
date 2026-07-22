@@ -1,6 +1,6 @@
 import { useState, Component, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -61,6 +61,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
+function ErrorBoundaryReset({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>;
+}
+
 const App = () => {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -74,8 +79,8 @@ const App = () => {
         <ThemeManager />
         <Toaster />
         <Sonner position="bottom-right" richColors closeButton />
-        <ErrorBoundary>
-          <BrowserRouter>
+        <BrowserRouter>
+          <ErrorBoundaryReset>
             <BootstrapGate>
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -91,8 +96,8 @@ const App = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BootstrapGate>
-          </BrowserRouter>
-        </ErrorBoundary>
+          </ErrorBoundaryReset>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );

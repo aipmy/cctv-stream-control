@@ -227,19 +227,21 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
         if (modePollInterval) clearInterval(modePollInterval);
         if (playerElement) {
-          if ('ondisconnect' in playerElement && typeof (playerElement as any).ondisconnect === 'function') {
-            (playerElement as any).ondisconnect();
-          }
-          if (playerElement instanceof HTMLVideoElement) {
-            playerElement.pause();
-            playerElement.src = "";
-            playerElement.load();
-          }
+          try {
+            if (typeof (playerElement as any).onclose === 'function') {
+              (playerElement as any).onclose();
+            }
+            if (playerElement instanceof HTMLVideoElement) {
+              playerElement.pause();
+              playerElement.src = "";
+              playerElement.load();
+            }
+          } catch (_) {}
           try {
             if (containerRef.current && containerRef.current.contains(playerElement)) {
               containerRef.current.removeChild(playerElement);
             }
-          } catch (e) {}
+          } catch (_) {}
         }
       };
     }
@@ -247,21 +249,6 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     return () => {
       disposed = true;
       if (autoRetryTimer) clearTimeout(autoRetryTimer);
-      if (playerElement) {
-        if ('ondisconnect' in playerElement && typeof (playerElement as any).ondisconnect === 'function') {
-          (playerElement as any).ondisconnect();
-        }
-        if (playerElement instanceof HTMLVideoElement) {
-          playerElement.pause();
-          playerElement.src = "";
-          playerElement.load();
-        }
-        try {
-          if (containerRef.current && containerRef.current.contains(playerElement)) {
-            containerRef.current.removeChild(playerElement);
-          }
-        } catch (e) {}
-      }
     };
   }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls, retryTrigger]);
 
