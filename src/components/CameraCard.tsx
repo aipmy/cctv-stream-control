@@ -44,7 +44,6 @@ interface Props {
   onTogglePin: (c: Camera) => void;
   hideManagementActions?: boolean;
   compact?: boolean;
-  fitScreen?: boolean;
 }
 
 function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string) {
@@ -240,7 +239,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   );
 
   return (
-    <Card className={cn("overflow-hidden border-border/60 glass-panel transition-all hover:shadow-card flex flex-col justify-center items-center w-full min-h-0 min-w-0", fitScreen ? "h-full" : "", compact && "border-white/10 rounded-lg")}>
+    <Card className={cn("overflow-hidden border-border/60 glass-panel transition-all hover:shadow-card", compact && "border-white/10 rounded-lg")}>
       {!compact && (
         <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2 w-full shrink-0">
           <div className="min-w-0 flex items-center gap-2">
@@ -276,7 +275,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
 
       <div
         ref={cardRef}
-        className={cn("relative bg-black overflow-hidden group w-full flex items-center justify-center min-h-0 min-w-0", fitScreen ? "h-full flex-1 max-h-full" : "aspect-video", !controlsVisible && "cursor-none")}
+        className={cn("relative aspect-video bg-black overflow-hidden group w-full flex items-center justify-center", !controlsVisible && "cursor-none")}
         onMouseMove={revealControls}
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
