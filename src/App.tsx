@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Component, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -6,17 +6,61 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeManager } from "@/components/ThemeManager";
-import { lazy, Suspense } from "react";
-const Login = lazy(() => import("./pages/Login"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const LiveView = lazy(() => import("./pages/LiveView"));
-const Cameras = lazy(() => import("./pages/Cameras"));
-const Users = lazy(() => import("./pages/Users"));
-const Settings = lazy(() => import("./pages/Settings"));
-const Events = lazy(() => import("./pages/Events"));
-const Playback = lazy(() => import("./pages/Playback"));
-const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import LiveView from "./pages/LiveView";
+import Cameras from "./pages/Cameras";
+import Users from "./pages/Users";
+import Settings from "./pages/Settings";
+import Events from "./pages/Events";
+import Playback from "./pages/Playback";
+import NotFound from "./pages/NotFound";
 import { BootstrapGate } from "@/features/auth/BootstrapGate";
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Uncaught render error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-background text-foreground">
+          <div className="max-w-md space-y-4">
+            <h2 className="text-lg font-bold">Gagal Memuat Tampilan</h2>
+            <p className="text-xs text-muted-foreground">
+              Terjadi masalah koneksi atau pembaruan sesi saat memuat halaman ini di perangkat Anda.
+            </p>
+            <button
+              onClick={() => {
+                sessionStorage.clear();
+                window.location.reload();
+              }}
+              className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground shadow hover:bg-primary/90 transition-colors"
+            >
+              Muat Ulang Halaman
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App = () => {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -30,13 +74,9 @@ const App = () => {
         <ThemeManager />
         <Toaster />
         <Sonner position="bottom-right" richColors closeButton />
-        <BrowserRouter>
-          <BootstrapGate>
-            <Suspense fallback={
-              <div className="flex h-screen w-full items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              </div>
-            }>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <BootstrapGate>
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route element={<AppLayout />}>
@@ -50,9 +90,9 @@ const App = () => {
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </Suspense>
-          </BootstrapGate>
-        </BrowserRouter>
+            </BootstrapGate>
+          </BrowserRouter>
+        </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   );
