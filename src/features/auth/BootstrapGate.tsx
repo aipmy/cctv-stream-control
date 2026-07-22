@@ -20,12 +20,14 @@ export function BootstrapGate({ children }: { children: React.ReactNode }) {
     queryKey: ["setup-status"],
     queryFn: setupApi.status,
     retry: false,
+    staleTime: Infinity, // setup status almost never changes once initialised
   });
   const session = useQuery({
     queryKey: ["auth-me", token],
     queryFn: authApi.me,
     enabled: hasHydrated && setup.data?.required === false && Boolean(token),
     retry: false,
+    staleTime: 5 * 60 * 1000, // revalidate session at most every 5 minutes
   });
 
   useEffect(() => {

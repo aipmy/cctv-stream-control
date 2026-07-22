@@ -1,4 +1,4 @@
-import { useState, Component, ReactNode } from "react";
+import { useState, useEffect, useRef, Component, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -19,16 +19,30 @@ import { BootstrapGate } from "@/features/auth/BootstrapGate";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  resetKey?: string;
 }
 interface ErrorBoundaryState {
   hasError: boolean;
+  prevResetKey?: string;
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false };
+  state: ErrorBoundaryState = { hasError: false, prevResetKey: undefined };
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
+  static getDerivedStateFromError(): Partial<ErrorBoundaryState> {
     return { hasError: true };
+  }
+
+  static getDerivedStateFromProps(
+    props: ErrorBoundaryProps,
+    state: ErrorBoundaryState,
+  ): Partial<ErrorBoundaryState> | null {
+    // When the resetKey changes (i.e. user navigated), clear the error
+    // WITHOUT unmounting the entire component tree.
+    if (props.resetKey !== state.prevResetKey) {
+      return { hasError: false, prevResetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
@@ -63,7 +77,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 function ErrorBoundaryReset({ children }: { children: ReactNode }) {
   const location = useLocation();
-  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>;
+  // Pass pathname as a prop-based resetKey instead of using it as React key.
+  // This resets error state on navigation WITHOUT destroying the component tree.
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
 }
 
 const App = () => {

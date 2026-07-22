@@ -64,7 +64,9 @@ export function AppLayout() {
 
   if (!user) return <Navigate to="/login" replace />;
   
-  if (camerasQuery.isPending) {
+  // Only show full-screen loading on first mount when there's no cached data.
+  // On subsequent navigations/refetches the cached data persists, avoiding blank pages.
+  if (camerasQuery.isPending && !camerasQuery.data) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

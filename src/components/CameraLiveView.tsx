@@ -151,6 +151,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       videoRtc.src = src;
 
       const bufferingTimerRef = { current: null as any };
+      const modePollRef = { current: null as ReturnType<typeof setInterval> | null };
 
       const attachEvents = () => {
         if (disposed) return;
@@ -174,7 +175,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
             else onModeChange("hls");
           };
 
-          const modePollInterval = setInterval(updateActiveMode, 1000);
+          modePollRef.current = setInterval(updateActiveMode, 1000);
 
           const handlePlaySuccess = () => {
             if (disposed) return;
@@ -225,7 +226,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         disposed = true;
         if (autoRetryTimer) clearTimeout(autoRetryTimer);
         if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
-        if (modePollInterval) clearInterval(modePollInterval);
+        if (modePollRef.current) clearInterval(modePollRef.current);
         if (playerElement) {
           try {
             if (typeof (playerElement as any).onclose === 'function') {
