@@ -371,9 +371,21 @@ export class VideoRTC extends HTMLElement {
         if (this.mode.includes('webrtc') && 'RTCPeerConnection' in window) {
             modes.push('webrtc');
             this.onwebrtc();
-        }
 
-        if (this.mode.includes('mse') && ('MediaSource' in window || 'ManagedMediaSource' in window)) {
+            // Give WebRTC up to 1200ms to complete SDP/ICE negotiation before starting MSE/HLS fallback
+            if (this.webrtcFallbackTimer) clearTimeout(this.webrtcFallbackTimer);
+            this.webrtcFallbackTimer = setTimeout(() => {
+                if (this.pcState !== 1 && !this.video.srcObject) { // 1 = OPEN
+                    if (this.mode.includes('mse') && ('MediaSource' in window || 'ManagedMediaSource' in window)) {
+                        modes.push('mse');
+                        this.onmse();
+                    } else if (this.mode.includes('hls') && this.video.canPlayType('application/vnd.apple.mpegurl')) {
+                        modes.push('hls');
+                        this.onhls();
+                    }
+                }
+            }, 1200);
+        } else if (this.mode.includes('mse') && ('MediaSource' in window || 'ManagedMediaSource' in window)) {
             modes.push('mse');
             this.onmse();
         } else if (this.mode.includes('hls') && this.video.canPlayType('application/vnd.apple.mpegurl')) {
