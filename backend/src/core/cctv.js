@@ -17,44 +17,28 @@ export function buildStreamUrl(camera, opts = {}) {
     ? `${encodeURIComponent(username)}:${maskPassword ? "••••••" : encodeURIComponent(camera.password || "")}@`
     : "";
 
-  let rawUrl = "";
   switch (sourceType) {
     case "ONVIF": {
-      rawUrl = `onvif://${auth}${host}:${port}`;
-      break;
+      return `onvif://${auth}${host}:${port}`;
     }
     case "RTSP": {
       const path = camera.streamPath || "/Streaming/Channels/101";
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      rawUrl = `rtsp://${auth}${host}:${port}${normalizedPath}`;
-      break;
+      return `rtsp://${auth}${host}:${port}${normalizedPath}`;
     }
     case "DVRIP": {
-      rawUrl = `dvrip://${auth}${host}:${port}`;
-      break;
+      return `dvrip://${auth}${host}:${port}`;
     }
     case "HomeAssistant": {
-      rawUrl = `homeassistant://${auth}${host}`;
-      break;
+      return `homeassistant://${auth}${host}`;
     }
     case "Custom": {
-      rawUrl = camera.customUrl || "";
-      break;
+      return camera.customUrl || "";
     }
     default: {
-      rawUrl = `rtsp://${auth}${host}:${port}`;
-      break;
+      return `rtsp://${auth}${host}:${port}`;
     }
   }
-
-  if (!rawUrl) return "";
-  if (camera.audioMode === "Disable") {
-    return rawUrl.includes("#") ? `${rawUrl}#audio=none` : `${rawUrl}#audio=none`;
-  } else if (!rawUrl.includes("#audio=")) {
-    // Append audio directives so WebRTC gets Opus/PCM transcoding if stream has AAC (EZVIZ), ensuring 100% audio compatibility on all modes
-    return `${rawUrl}#audio=pcmu#audio=opus#audio=copy`;
-  }
-  return rawUrl;
 }
 
 export function buildOnvifUrl(camera) {
