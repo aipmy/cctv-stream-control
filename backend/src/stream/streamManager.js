@@ -205,6 +205,17 @@ function stopRecording(cameraId) {
   }
 }
 
+/**
+ * Start recording only (no MJPEG capture, no AI/motion detection).
+ * Used for cameras with enableRecording=true but enableSmartDetection=false.
+ * This is much lighter than startAiStream — just one FFmpeg process doing copy.
+ */
+export async function startRecordingOnly(camera) {
+  if (!camera.enableRecording) return;
+  if (recordSessions.has(camera.id)) return; // already recording
+  await startRecording(camera);
+}
+
 const aiSessions = new Map();      // cameraId -> session, termasuk stopped/error beberapa menit untuk debug
 const aiStartLocks = new Map();    // cameraId -> Promise<session|null>
 
