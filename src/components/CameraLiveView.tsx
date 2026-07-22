@@ -137,38 +137,61 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       });
       videoRtc.src = src;
 
+      const bufferingTimerRef = { current: null as any };
+
       const attachEvents = () => {
         if (disposed) return;
         const internalVideo = videoRtc.querySelector("video");
         if (internalVideo) {
           internalVideo.controls = controls;
           internalVideo.muted = typeof muted === 'boolean' ? muted : true;
-          internalVideo.addEventListener("playing", () => {
-            if (!disposed) {
-              setStatus("playing");
-              if (onModeChange && videoRtc) {
-                 if (videoRtc.pcState === 1) onModeChange("webrtc");
-                 else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
-                 else if (videoRtc.wsState === 1) onModeChange("mjpeg");
-                 else onModeChange("hls");
-              }
+          
+          const clearBufferingTimer = () => {
+            if (bufferingTimerRef.current) {
+              clearTimeout(bufferingTimerRef.current);
+              bufferingTimerRef.current = null;
+            }
+          };
+
+          const handlePlaySuccess = () => {
+            if (disposed) return;
+            clearBufferingTimer();
+            setStatus("playing");
+            if (onModeChange && videoRtc) {
+              if (videoRtc.pcState === 1) onModeChange("webrtc");
+              else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
+              else if (videoRtc.wsState === 1) onModeChange("mjpeg");
+              else onModeChange("hls");
+            }
+          };
+
+          internalVideo.addEventListener("playing", handlePlaySuccess);
+          internalVideo.addEventListener("canplay", handlePlaySuccess);
+
+          internalVideo.addEventListener("waiting", () => {
+            if (disposed) return;
+            if (!bufferingTimerRef.current) {
+              // Debounce buffering status: only set buffering if waiting lasts > 1500ms
+              bufferingTimerRef.current = setTimeout(() => {
+                if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting");
+                bufferingTimerRef.current = null;
+              }, 1500);
             }
           });
-          internalVideo.addEventListener("canplay", () => {
-            if (!disposed) {
-              setStatus("playing");
-              if (onModeChange && videoRtc) {
-                 if (videoRtc.pcState === 1) onModeChange("webrtc");
-                 else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
-                 else if (videoRtc.wsState === 1) onModeChange("mjpeg");
-                 else onModeChange("hls");
-              }
+
+          internalVideo.addEventListener("stalled", () => {
+            if (disposed) return;
+            if (!bufferingTimerRef.current) {
+              bufferingTimerRef.current = setTimeout(() => {
+                if (!disposed) setStatus("buffering");
+                bufferingTimerRef.current = null;
+              }, 1500);
             }
           });
-          internalVideo.addEventListener("waiting", () => { if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting"); });
-          internalVideo.addEventListener("stalled", () => { if (!disposed) setStatus("buffering"); });
+
           internalVideo.addEventListener("error", () => {
             if (disposed) return;
+            clearBufferingTimer();
             const err = internalVideo.error;
             setErrorMsg(`Stream Error [${err?.code}]: ${err?.message || "Network or decoding failed"}`);
             setStatus("error");
