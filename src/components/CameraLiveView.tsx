@@ -1,4 +1,4 @@
-import { AlertTriangle, PowerOff, Loader2 } from "lucide-react";
+import { AlertTriangle, PowerOff, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, useMemo } from "react";
 import type { Camera, StreamType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   type PlaybackStatus = "connecting" | "playing" | "buffering" | "error";
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
   useEffect(() => {
     if (onStatusChange) {
@@ -66,9 +67,19 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     if (!scriptLoaded || !camera.enabled || !containerRef.current) return;
     
     let disposed = false;
+    let autoRetryTimer: any = null;
     containerRef.current.innerHTML = "";
     setStatus("connecting");
     setErrorMsg("");
+
+    const scheduleAutoRetry = () => {
+      if (disposed || autoRetryTimer) return;
+      autoRetryTimer = setTimeout(() => {
+        if (!disposed) {
+          setRetryTrigger((prev) => prev + 1);
+        }
+      }, 3500);
+    };
 
     const modes = output || camera.streamType || "webrtc,mse,hls,mjpeg";
     
@@ -115,6 +126,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         if (disposed) return;
         setErrorMsg(`Format not supported or Network Error`);
         setStatus("error");
+        scheduleAutoRetry();
       });
     } else {
       // For WebRTC, MSE, legacy MP4, legacy HLS, MJPEG use video-rtc component
@@ -134,6 +146,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         const msg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
         setErrorMsg(msg || "Unknown backend error");
         setStatus("error");
+        scheduleAutoRetry();
       });
       videoRtc.src = src;
 
@@ -195,6 +208,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
             const err = internalVideo.error;
             setErrorMsg(`Stream Error [${err?.code}]: ${err?.message || "Network or decoding failed"}`);
             setStatus("error");
+            scheduleAutoRetry();
           });
         } else {
           setTimeout(attachEvents, 100);
@@ -221,7 +235,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         } catch (e) {}
       }
     };
-  }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls]);
+  }, [scriptLoaded, camera.enabled, camera.id, camera.streamType, output, controls, retryTrigger]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -267,13 +281,17 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       )}
 
       {status === "error" && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
-          <AlertTriangle className="h-7 w-7 mb-3 text-destructive opacity-80" />
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/65 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
+          <AlertTriangle className="h-7 w-7 mb-2 text-destructive opacity-80" />
           <div className="text-xs font-semibold tracking-widest uppercase text-destructive/90">
             Koneksi Terputus
           </div>
           <div className="text-[10px] text-muted-foreground mt-1 max-w-[90%] text-center px-4 font-mono">
             {errorMsg || "Kamera lambat merespon atau server terputus dari jaringan CCTV."}
+          </div>
+          <div className="text-[10px] text-primary/90 mt-2.5 flex items-center gap-1.5 font-medium animate-pulse bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+            <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+            <span>Mencoba menghubungkan ulang otomatis...</span>
           </div>
         </div>
       )}
