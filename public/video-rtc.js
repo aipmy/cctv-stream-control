@@ -617,6 +617,9 @@ export class VideoRTC extends HTMLElement {
             }
             if (stream.getAudioTracks().length > 0) rtcPriority += 0x102;
 
+            // Prioritize low-latency WebRTC over MSE when WebRTC is requested
+            if (rtcPriority > 0 && this.mode.startsWith('webrtc')) rtcPriority += 0x200;
+
             if (this.mseCodecs.includes('hvc1.')) msePriority += 0x230;
             if (this.mseCodecs.includes('avc1.')) msePriority += 0x210;
             if (this.mseCodecs.includes('mp4a.')) msePriority += 0x101;
