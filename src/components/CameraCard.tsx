@@ -44,6 +44,7 @@ interface Props {
   onTogglePin: (c: Camera) => void;
   hideManagementActions?: boolean;
   compact?: boolean;
+  fitScreen?: boolean;
 }
 
 function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string) {
@@ -227,33 +228,21 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     void sendPtz("stop").catch(() => undefined);
   };
 
-  const ptzButton = (action: PtzAction, icon: ReactNode, label: string, extra = "") => (
+  const ptzButton = (action: PtzAction, icon: ReactNode, label: string, extraCls = "") => (
     <button
       type="button"
       title={label}
-      disabled={!ptzAvailable}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        activePtzPointer.current = e.pointerId;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        holdPtz(action);
-      }}
-      onPointerUp={(e) => stopPtz(e.pointerId)}
-      onPointerCancel={(e) => stopPtz(e.pointerId)}
-      onLostPointerCapture={(e) => stopPtz(e.pointerId)}
-      className={cn(
-        "h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75 disabled:opacity-35 disabled:cursor-not-allowed",
-        extra,
-      )}
+      onClick={() => void sendPtz(action).catch(() => undefined)}
+      className={cn("h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75", extraCls)}
     >
       {icon}
     </button>
   );
 
   return (
-    <Card className={cn("overflow-hidden border-border/60 glass-panel transition-all hover:shadow-card", compact && "border-white/10 rounded-lg")}>
+    <Card className={cn("overflow-hidden border-border/60 glass-panel transition-all hover:shadow-card flex flex-col justify-center items-center w-full min-h-0 min-w-0", fitScreen ? "h-full" : "", compact && "border-white/10 rounded-lg")}>
       {!compact && (
-        <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2">
+        <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2 w-full shrink-0">
           <div className="min-w-0 flex items-center gap-2">
             <span className={cn("status-dot", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
             <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
@@ -287,7 +276,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
 
       <div
         ref={cardRef}
-        className={cn("relative aspect-video bg-black overflow-hidden group", !controlsVisible && "cursor-none")}
+        className={cn("relative bg-black overflow-hidden group w-full flex items-center justify-center min-h-0 min-w-0", fitScreen ? "h-full flex-1 max-h-full" : "aspect-video", !controlsVisible && "cursor-none")}
         onMouseMove={revealControls}
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}

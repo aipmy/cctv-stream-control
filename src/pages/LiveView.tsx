@@ -30,6 +30,7 @@ export default function LiveView() {
   const [stream, setStream] = useState("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [fitScreen, setFitScreen] = useState(false);
   const [page, setPage] = useState(1);
 
   const [editCam, setEditCam] = useState<Camera | null>(null);
@@ -189,7 +190,23 @@ export default function LiveView() {
               title="Toggle Compact Video Wall Mode"
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              {isCompact ? (lang === "id" ? "Mode Compact: On" : "Compact: On") : (lang === "id" ? "Mode Compact: Off" : "Compact: Off")}
+              {isCompact ? (lang === "id" ? "Compact: On" : "Compact: On") : (lang === "id" ? "Compact: Off" : "Compact: Off")}
+            </Button>
+
+            <Button
+              type="button"
+              variant={fitScreen ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1 border-border/40 font-medium"
+              onClick={() => {
+                const next = !fitScreen;
+                setFitScreen(next);
+                if (next) setIsCompact(true);
+              }}
+              title="Fit Viewport without Vertical Scrolling"
+            >
+              <MonitorPlay className="h-3.5 w-3.5" />
+              {fitScreen ? (lang === "id" ? "Fit Screen: On" : "Fit Screen: On") : (lang === "id" ? "Fit Screen: Off" : "Fit Screen: Off")}
             </Button>
           </div>
           <div className="text-xs text-muted-foreground font-semibold">
@@ -205,7 +222,7 @@ export default function LiveView() {
           <p className="text-sm text-muted-foreground mt-1 max-w-xs">{t("noCamerasSub")}</p>
         </Card>
       ) : (
-        <div className={cn("grid grid-cols-1 gap-4", gridCls)}>
+        <div className={cn("grid grid-cols-1 gap-4", gridCls, fitScreen && "flex-1 min-h-0 h-[calc(100vh-16rem)] grid-rows-none auto-rows-fr")}>
           {pagination.items.map((c) => (
             <CameraCard
               key={c.id} camera={c}
@@ -216,6 +233,7 @@ export default function LiveView() {
               onTogglePin={(cam) => void togglePin(cam)}
               hideManagementActions={true}
               compact={isCompact}
+              fitScreen={fitScreen}
             />
           ))}
         </div>
