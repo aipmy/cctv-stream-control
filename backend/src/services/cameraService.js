@@ -228,16 +228,14 @@ setInterval(async () => {
            if (streamData.consumers) {
             const humanConsumers = streamData.consumers.filter(c => {
               if (c.format_name === 'keyframe' || c.format_name === 'snapshot') return false;
-              if (c.remote_addr && c.remote_addr.startsWith('127.0.0.1')) return false;
-              if (c.remote_addr && c.remote_addr.startsWith('[::1]')) return false;
               if (c.user_agent === 'node' || c.user_agent === 'go2rtc') return false;
               return true;
             });
 
             outBytes = humanConsumers.reduce((acc, c) => acc + (c.bytes_send || 0), 0);
 
-            // Step 2: Deduplicate by username — 1 person = 1 viewer
-            const viewerMap = new Map(); // key: username or IP
+            // Step 2: Track active viewers (deduplicating by username if known, or consumer ID)
+            const viewerMap = new Map();
             for (const c of humanConsumers) {
               let rawIp = c.remote_addr || "Unknown IP";
               let realIp = rawIp;
@@ -253,7 +251,9 @@ setInterval(async () => {
               }
 
               const username = getUsernameByIp(realIp) || getFallbackUsername() || "Pengguna";
-              const viewerKey = username !== "Pengguna" ? username : realIp;
+              const viewerKey = (realIp === "127.0.0.1" || realIp === "::1" || username === "Pengguna")
+                ? `viewer-${c.id}`
+                : username;
 
               if (!viewerMap.has(viewerKey)) {
                 viewerMap.set(viewerKey, {
