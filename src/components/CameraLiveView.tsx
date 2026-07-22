@@ -169,6 +169,12 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
 
           const updateActiveMode = () => {
             if (disposed || !onModeChange || !videoRtc) return;
+            // If a single mode is set (no fallback chain), report it directly
+            if (!modes.includes(",")) {
+              onModeChange(modes);
+              return;
+            }
+            // Auto/multi-mode: detect which mode is actually active
             if (videoRtc.pcState === 1) onModeChange("webrtc");
             else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
             else if (videoRtc.wsState === 1) onModeChange("mjpeg");
