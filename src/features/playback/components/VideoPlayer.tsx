@@ -128,6 +128,9 @@ export function VideoPlayer() {
 
         const hls = new Hls({
           maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          backBufferLength: 30,
+          enableWorker: true,
           manifestLoadingMaxRetry: 6,
           manifestLoadingRetryDelay: 1000,
         });
