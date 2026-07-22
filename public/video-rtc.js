@@ -368,6 +368,11 @@ export class VideoRTC extends HTMLElement {
 
         const modes = [];
 
+        if (this.mode.includes('webrtc') && 'RTCPeerConnection' in window) {
+            modes.push('webrtc');
+            this.onwebrtc();
+        }
+
         if (this.mode.includes('mse') && ('MediaSource' in window || 'ManagedMediaSource' in window)) {
             modes.push('mse');
             this.onmse();
@@ -377,11 +382,6 @@ export class VideoRTC extends HTMLElement {
         } else if (this.mode.includes('mp4')) {
             modes.push('mp4');
             this.onmp4();
-        }
-
-        if (this.mode.includes('webrtc') && 'RTCPeerConnection' in window) {
-            modes.push('webrtc');
-            this.onwebrtc();
         }
 
         if (this.mode.includes('mjpeg')) {
