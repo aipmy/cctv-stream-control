@@ -293,16 +293,16 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         onMouseLeave={hideControls}
       >
         {compact && (
-          <div className="absolute top-0 inset-x-0 z-30 p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 pointer-events-auto">
-            <div className="min-w-0 flex items-center gap-1.5">
+          <div className="absolute top-2 inset-x-2 z-30 flex items-center justify-between gap-2 pointer-events-none">
+            <div className="min-w-0 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-1 rounded-md border border-white/15 shadow-md pointer-events-auto">
               <span className={cn("status-dot shrink-0", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
-              <h3 className="text-xs font-bold text-white truncate drop-shadow">{camera.name}</h3>
+              <h3 className="text-xs font-bold text-white truncate drop-shadow-sm">{camera.name}</h3>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Badge variant="outline" className={cn("text-[9px] uppercase font-mono font-bold tracking-wider bg-black/60 text-white border-white/20", streamColors[activeMode || camera.streamType || "webrtc"])}>
+            <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
+              <Badge variant="outline" className={cn("text-[9px] uppercase font-mono font-bold tracking-wider bg-black/40 backdrop-blur-md text-white border-white/15 shadow-md", streamColors[activeMode || camera.streamType || "webrtc"])}>
                 {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
               </Badge>
-              <Badge variant="outline" className={cn("text-[9px] uppercase tracking-wider bg-black/60 border-white/20 text-white", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
+              <Badge variant="outline" className={cn("text-[9px] uppercase tracking-wider bg-black/40 backdrop-blur-md border-white/15 text-white shadow-md", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
                 {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
               </Badge>
             </div>
