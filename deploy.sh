@@ -11,12 +11,6 @@ if [[ ! -f backend/.env ]]; then
   exit 1
 fi
 
-if [[ -d backend/data ]]; then
-  BACKUP_DIR="backend/backups/data_$(date +%Y%m%d_%H%M%S)"
-  mkdir -p "$BACKUP_DIR"
-  cp -a backend/data/. "$BACKUP_DIR/"
-  echo "==> Data backup: $BACKUP_DIR"
-fi
 
 echo "==> Installing frontend deps"
 npm install --no-audit --no-fund --progress=false --loglevel=info
