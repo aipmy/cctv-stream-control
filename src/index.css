@@ -164,3 +164,16 @@
     animation: pure-fade-in 0.2s ease-out;
   }
 }
+
+/* Fullscreen video display optimization */
+:fullscreen video-rtc,
+:fullscreen video,
+:-webkit-full-screen video-rtc,
+:-webkit-full-screen video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  object-fit: contain !important;
+}
+

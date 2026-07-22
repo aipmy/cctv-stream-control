@@ -8,6 +8,7 @@ export interface ViewSettings {
   pageSize: 1 | 2 | 3 | 4 | 5 | 6;
   autoRefresh: boolean;
   defaultStream: StreamType;
+  compactMode: boolean;
 }
 
 interface SettingsState {
@@ -24,6 +25,7 @@ export const useSettings = create<SettingsState>()(
         pageSize: 4,
         autoRefresh: true,
         defaultStream: "HLS Stable",
+        compactMode: false,
       },
       setSettings: (patch) =>
         set((state) => ({ settings: { ...state.settings, ...patch } })),

@@ -29,7 +29,7 @@ export default function LiveView() {
   const [status, setStatus] = useState("all");
   const [stream, setStream] = useState("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [isCompact, setIsCompact] = useState(false);
+  const isCompact = settings.compactMode ?? false;
   const [page, setPage] = useState(1);
 
   const [editCam, setEditCam] = useState<Camera | null>(null);
@@ -185,7 +185,7 @@ export default function LiveView() {
               variant={isCompact ? "default" : "outline"}
               size="sm"
               className="h-8 text-xs gap-1 border-border/40 font-medium ml-1"
-              onClick={() => setIsCompact(!isCompact)}
+              onClick={() => setSettings({ compactMode: !isCompact })}
               title="Toggle Compact Video Wall Mode"
             >
               <LayoutGrid className="h-3.5 w-3.5" />
