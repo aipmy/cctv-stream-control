@@ -43,6 +43,7 @@ interface Props {
   pinned: boolean;
   onTogglePin: (c: Camera) => void;
   hideManagementActions?: boolean;
+  compact?: boolean;
 }
 
 function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string) {
@@ -97,7 +98,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 
 
 
-export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin, hideManagementActions = false }: Props) {
+export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogglePin, hideManagementActions = false, compact = false }: Props) {
   const user = useAuth((s) => s.user);
   const role = user?.role;
   const perms = user?.permissions;
@@ -250,37 +251,39 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   );
 
   return (
-    <Card className="overflow-hidden border-border/60 glass-panel transition-shadow hover:shadow-card">
-      <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2">
-        <div className="min-w-0 flex items-center gap-2">
-          <span className={cn("status-dot", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
-          <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {hideManagementActions && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-              onClick={() => onTogglePin(camera)}
-              title={pinned ? t("unpinCamera") : t("pinCameraPriority")}
-            >
-              {pinned ? <PinOff className="h-3.5 w-3.5 text-primary" /> : <Pin className="h-3.5 w-3.5" />}
-            </Button>
-          )}
-          {isError && (
-            <Badge variant="outline" title={badgeTooltip} className="text-[9px] px-1 h-4 cursor-help border-destructive/50 text-destructive">
-              Error
+    <Card className={cn("overflow-hidden border-border/60 glass-panel transition-all hover:shadow-card", compact && "border-white/10 rounded-lg")}>
+      {!compact && (
+        <div className="px-3 py-2 border-b border-border/50 bg-card/80 flex items-center justify-between gap-2">
+          <div className="min-w-0 flex items-center gap-2">
+            <span className={cn("status-dot", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
+            <h3 className="text-sm font-semibold truncate">{camera.name}</h3>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {hideManagementActions && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => onTogglePin(camera)}
+                title={pinned ? t("unpinCamera") : t("pinCameraPriority")}
+              >
+                {pinned ? <PinOff className="h-3.5 w-3.5 text-primary" /> : <Pin className="h-3.5 w-3.5" />}
+              </Button>
+            )}
+            {isError && (
+              <Badge variant="outline" title={badgeTooltip} className="text-[9px] px-1 h-4 cursor-help border-destructive/50 text-destructive">
+                Error
+              </Badge>
+            )}
+            <Badge variant="outline" className={cn("text-[10px] uppercase font-mono font-bold tracking-wider", streamColors[activeMode || camera.streamType || "webrtc"])}>
+              {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
             </Badge>
-          )}
-          <Badge variant="outline" className={cn("text-[10px] uppercase font-mono font-bold tracking-wider", streamColors[activeMode || camera.streamType || "webrtc"])}>
-            {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
-          </Badge>
-          <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
-            {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
-          </Badge>
+            <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
+              {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
+            </Badge>
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         ref={cardRef}
@@ -289,6 +292,22 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
       >
+        {compact && (
+          <div className="absolute top-0 inset-x-0 z-30 p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 pointer-events-auto">
+            <div className="min-w-0 flex items-center gap-1.5">
+              <span className={cn("status-dot shrink-0", !camera.enabled || effectiveStatus === "offline" ? "status-dot-offline" : effectiveStatus === "starting" ? "status-dot-warning" : "status-dot-online")} />
+              <h3 className="text-xs font-bold text-white truncate drop-shadow">{camera.name}</h3>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Badge variant="outline" className={cn("text-[9px] uppercase font-mono font-bold tracking-wider bg-black/60 text-white border-white/20", streamColors[activeMode || camera.streamType || "webrtc"])}>
+                {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
+              </Badge>
+              <Badge variant="outline" className={cn("text-[9px] uppercase tracking-wider bg-black/60 border-white/20 text-white", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
+                {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
+              </Badge>
+            </div>
+          </div>
+        )}
         <CameraLiveView camera={camera} muted={effectiveMuted} volume={effectiveVolume} controlsVisible={controlsVisible} onStatusChange={setLiveStatus} onModeChange={setActiveMode} />
         {ptzFeedback && (
           <Badge
@@ -381,94 +400,96 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
         </div>
       </div>
 
-      <div className="p-3 space-y-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span className="truncate">{camera.site}</span>
-              <span>·</span>
-              <span>{camera.brand}</span>
-              {canSeeIp && <><span>·</span><span className="font-mono">{camera.ip}</span></>}
-              {camera.enablePTZ && <span className="text-primary">· PTZ</span>}
-              {!camera.enabled && <span className="text-warning">· Nonaktif</span>}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button 
-                    type="button"
-                    className={cn(
-                      "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:bg-muted/30 px-1 py-0.5 rounded transition-colors",
-                      camera.viewerCount > 0 && "cursor-pointer font-medium"
-                    )}
-                    disabled={!camera.viewerCount}
-                  >
-                    <Users className={cn("h-3 w-3", camera.viewerCount > 0 && "animate-blink text-emerald-500")} />
-                    {camera.viewerCount || 0} viewer
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-3 bg-card/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-xl">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between border-b pb-1.5 border-border/55">
-                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5 text-primary" />
-                        Penonton Aktif ({camera.viewerCount})
-                      </h4>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                      {camera.activeViewers && camera.activeViewers.length > 0 ? (
-                        camera.activeViewers.map((v, i) => (
-                          <div key={v.id || i} className="text-[11px] leading-tight p-1.5 rounded bg-muted/30 border border-border/20">
-                            <div className="flex items-center justify-between font-semibold text-foreground">
-                              <span className="truncate max-w-[130px]" title={v.username}>{v.username}</span>
-                              <span className="text-[9px] px-1 py-0.25 rounded bg-primary/10 text-primary border border-primary/20">{v.output}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-muted-foreground mt-1 text-[10px]">
-                              <span className="font-mono text-[9.5px]">{v.ip}</span>
-                              <span>dilihat {v.lastSeenAgoSeconds} detik lalu</span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-muted-foreground text-center py-4">
-                          Tidak ada data penonton aktif.
-                        </div>
+      {!compact && (
+        <div className="p-3 space-y-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span className="truncate">{camera.site}</span>
+                <span>·</span>
+                <span>{camera.brand}</span>
+                {canSeeIp && <><span>·</span><span className="font-mono">{camera.ip}</span></>}
+                {camera.enablePTZ && <span className="text-primary">· PTZ</span>}
+                {!camera.enabled && <span className="text-warning">· Nonaktif</span>}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:bg-muted/30 px-1 py-0.5 rounded transition-colors",
+                        camera.viewerCount > 0 && "cursor-pointer font-medium"
                       )}
+                      disabled={!camera.viewerCount}
+                    >
+                      <Users className={cn("h-3 w-3", camera.viewerCount > 0 && "animate-blink text-emerald-500")} />
+                      {camera.viewerCount || 0} viewer
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-3 bg-card/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-xl">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between border-b pb-1.5 border-border/55">
+                        <h4 className="text-xs font-bold text-foreground flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5 text-primary" />
+                          Penonton Aktif ({camera.viewerCount})
+                        </h4>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                        {camera.activeViewers && camera.activeViewers.length > 0 ? (
+                          camera.activeViewers.map((v, i) => (
+                            <div key={v.id || i} className="text-[11px] leading-tight p-1.5 rounded bg-muted/30 border border-border/20">
+                              <div className="flex items-center justify-between font-semibold text-foreground">
+                                <span className="truncate max-w-[130px]" title={v.username}>{v.username}</span>
+                                <span className="text-[9px] px-1 py-0.25 rounded bg-primary/10 text-primary border border-primary/20">{v.output}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-muted-foreground mt-1 text-[10px]">
+                                <span className="font-mono text-[9.5px]">{v.ip}</span>
+                                <span>dilihat {v.lastSeenAgoSeconds} detik lalu</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-muted-foreground text-center py-4">
+                            Tidak ada data penonton aktif.
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <span className="inline-flex items-center gap-1 text-muted-foreground"><Gauge className="h-3 w-3" />out {outRate}</span>
-              <span className="inline-flex items-center gap-1 text-muted-foreground"><Radio className="h-3 w-3" />pull {pullRate}</span>
-              {camera.status === "offline" && camera.enabled && <span className="inline-flex items-center gap-1 text-muted-foreground"><Activity className="h-3 w-3" />last {timeAgo(camera.lastSeen, t)}</span>}
+                  </PopoverContent>
+                </Popover>
+                <span className="inline-flex items-center gap-1 text-muted-foreground"><Gauge className="h-3 w-3" />out {outRate}</span>
+                <span className="inline-flex items-center gap-1 text-muted-foreground"><Radio className="h-3 w-3" />pull {pullRate}</span>
+                {camera.status === "offline" && camera.enabled && <span className="inline-flex items-center gap-1 text-muted-foreground"><Activity className="h-3 w-3" />last {timeAgo(camera.lastSeen, t)}</span>}
+              </div>
             </div>
           </div>
-        </div>
 
-        {!hideManagementActions && (
-          <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
-            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? t("unpinCamera") : t("pinCameraPriority")}>
-              {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
-            </Button>
-            {canRestart && (
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title={t("restartStream")}>
-                  <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
-                </Button>
-            )}
-            {canEdit && (
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title={t("editCameraTitle")}>
-                  <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                </Button>
-            )}
-            {canDelete && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title={t("deleteCameraTitleLabel")}>
-                <Trash2 className="h-4 w-4" />
+          {!hideManagementActions && (
+            <div className="flex items-center justify-end gap-1 pt-1 -mx-2 -mb-2">
+              <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onTogglePin(camera)} title={pinned ? t("unpinCamera") : t("pinCameraPriority")}>
+                {pinned ? <PinOff className="h-4 w-4 text-primary" /> : <Pin className="h-4 w-4 text-muted-foreground hover:text-foreground" />}
               </Button>
-            )}
-          </div>
-        )}
-      </div>
+              {canRestart && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onRestart(camera)} title={t("restartStream")}>
+                    <RefreshCw className="h-4 w-4 text-muted-foreground hover:text-info" />
+                  </Button>
+              )}
+              {canEdit && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => onEdit(camera)} title={t("editCameraTitle")}>
+                    <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+              )}
+              {canDelete && (
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(camera)} title={t("deleteCameraTitleLabel")}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

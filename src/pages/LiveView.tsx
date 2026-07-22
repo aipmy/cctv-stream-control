@@ -29,6 +29,7 @@ export default function LiveView() {
   const [status, setStatus] = useState("all");
   const [stream, setStream] = useState("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const [page, setPage] = useState(1);
 
   const [editCam, setEditCam] = useState<Camera | null>(null);
@@ -178,6 +179,18 @@ export default function LiveView() {
                 {[1, 2, 3, 4, 5, 6].map((value) => <SelectItem key={value} value={String(value)}>{value}</SelectItem>)}
               </SelectContent>
             </Select>
+
+            <Button
+              type="button"
+              variant={isCompact ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1 border-border/40 font-medium ml-1"
+              onClick={() => setIsCompact(!isCompact)}
+              title="Toggle Compact Video Wall Mode"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              {isCompact ? (lang === "id" ? "Mode Compact: On" : "Compact: On") : (lang === "id" ? "Mode Compact: Off" : "Compact: Off")}
+            </Button>
           </div>
           <div className="text-xs text-muted-foreground font-semibold">
             {t("camerasFoundCount", { n: filtered.length })}
@@ -202,6 +215,7 @@ export default function LiveView() {
               pinned={pinnedCameraIds.includes(c.id)}
               onTogglePin={(cam) => void togglePin(cam)}
               hideManagementActions={true}
+              compact={isCompact}
             />
           ))}
         </div>
