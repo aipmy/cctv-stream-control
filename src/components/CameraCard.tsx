@@ -275,7 +275,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
 
       <div
         ref={cardRef}
-        className={cn("relative aspect-video bg-black overflow-hidden group w-full flex items-center justify-center", compact && "max-h-[35vh] mx-auto", !controlsVisible && "cursor-none")}
+        className={cn("relative aspect-video bg-black overflow-hidden group w-full flex items-center justify-center", !controlsVisible && "cursor-none")}
         onMouseMove={revealControls}
         onMouseEnter={revealControls}
         onMouseLeave={hideControls}
