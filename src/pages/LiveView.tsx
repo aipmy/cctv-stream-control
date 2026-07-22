@@ -98,7 +98,7 @@ export default function LiveView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", isCompact && "space-y-3")}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
