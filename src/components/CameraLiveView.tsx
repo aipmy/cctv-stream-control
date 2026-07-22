@@ -166,16 +166,21 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
             }
           };
 
+          const updateActiveMode = () => {
+            if (disposed || !onModeChange || !videoRtc) return;
+            if (videoRtc.pcState === 1) onModeChange("webrtc");
+            else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
+            else if (videoRtc.wsState === 1) onModeChange("mjpeg");
+            else onModeChange("hls");
+          };
+
+          const modePollInterval = setInterval(updateActiveMode, 1000);
+
           const handlePlaySuccess = () => {
             if (disposed) return;
             clearBufferingTimer();
             setStatus("playing");
-            if (onModeChange && videoRtc) {
-              if (videoRtc.pcState === 1) onModeChange("webrtc");
-              else if (videoRtc.wsState === 1 && videoRtc.mseCodecs) onModeChange("mse");
-              else if (videoRtc.wsState === 1) onModeChange("mjpeg");
-              else onModeChange("hls");
-            }
+            updateActiveMode();
           };
 
           internalVideo.addEventListener("playing", handlePlaySuccess);
@@ -215,10 +220,33 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         }
       };
       attachEvents();
+
+      return () => {
+        disposed = true;
+        if (autoRetryTimer) clearTimeout(autoRetryTimer);
+        if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
+        if (modePollInterval) clearInterval(modePollInterval);
+        if (playerElement) {
+          if ('ondisconnect' in playerElement && typeof (playerElement as any).ondisconnect === 'function') {
+            (playerElement as any).ondisconnect();
+          }
+          if (playerElement instanceof HTMLVideoElement) {
+            playerElement.pause();
+            playerElement.src = "";
+            playerElement.load();
+          }
+          try {
+            if (containerRef.current && containerRef.current.contains(playerElement)) {
+              containerRef.current.removeChild(playerElement);
+            }
+          } catch (e) {}
+        }
+      };
     }
 
     return () => {
       disposed = true;
+      if (autoRetryTimer) clearTimeout(autoRetryTimer);
       if (playerElement) {
         if ('ondisconnect' in playerElement && typeof (playerElement as any).ondisconnect === 'function') {
           (playerElement as any).ondisconnect();
