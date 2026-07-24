@@ -149,7 +149,7 @@ async function startRecording(camera) {
   await fs.mkdir(outputDir, { recursive: true });
   
   const playlistPath = path.join(outputDir, "index.m3u8");
-  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}?mp4`;
+  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
 
   const args = [
     "-hide_banner", "-loglevel", "error",
@@ -166,7 +166,8 @@ async function startRecording(camera) {
   }
   
   args.push(
-    "-c:a", "copy",
+    "-c:a", "aac",
+    "-b:a", "128k",
     "-f", "hls",
     "-hls_time", "5",
     "-hls_list_size", "0",
