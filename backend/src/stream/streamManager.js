@@ -172,7 +172,7 @@ async function startRecording(camera) {
     "-hls_time", "5",
     "-hls_list_size", "0",
     "-hls_segment_type", "fmp4",
-    "-hls_fmp4_init_filename", "init.mp4",
+    "-hls_fmp4_init_filename", path.join(outputDir, "init.mp4"),
     "-hls_flags", "independent_segments+append_list",
     "-movflags", "+faststart",
     "-strftime", "1",
