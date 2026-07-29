@@ -162,39 +162,39 @@ export default function LiveView() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-border/40 dark:border-white/5 pt-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 border-t border-border/40 dark:border-white/5 pt-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <LayoutGrid className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>{t("grid")}</span>
             <Select value={String(settings.gridCols)} onValueChange={(value) => setSettings({ gridCols: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })}>
-              <SelectTrigger className="h-8 w-16 sm:w-20 bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-16 bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {[1, 2, 3, 4, 5, 6].map((value) => <SelectItem key={value} value={String(value)}>{value}</SelectItem>)}
               </SelectContent>
             </Select>
             <span>{t("perPage")}</span>
             <Select value={String(settings.pageSize)} onValueChange={(value) => setSettings({ pageSize: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })}>
-              <SelectTrigger className="h-8 w-16 sm:w-20 bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-16 bg-background/40 border-border/40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {[1, 2, 3, 4, 5, 6].map((value) => <SelectItem key={value} value={String(value)}>{value}</SelectItem>)}
               </SelectContent>
             </Select>
-
+          </div>
+          <div className="flex items-center justify-between">
             <Button
               type="button"
               variant={isCompact ? "default" : "outline"}
               size="sm"
-              className="h-8 text-xs gap-1 border-border/40 font-medium ml-auto sm:ml-1 shrink-0"
+              className="h-8 text-xs gap-1.5 border-border/40 font-medium"
               onClick={() => setSettings({ compactMode: !isCompact })}
               title="Toggle Compact Video Wall Mode"
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isCompact ? (lang === "id" ? "Compact: On" : "Compact: On") : (lang === "id" ? "Compact: Off" : "Compact: Off")}</span>
-              <span className="sm:hidden">{isCompact ? "On" : "Off"}</span>
+              {isCompact ? (lang === "id" ? "Compact: On" : "Compact: On") : (lang === "id" ? "Compact: Off" : "Compact: Off")}
             </Button>
-          </div>
-          <div className="text-xs text-muted-foreground font-semibold shrink-0">
-            {t("camerasFoundCount", { n: filtered.length })}
+            <span className="text-xs text-muted-foreground font-semibold">
+              {t("camerasFoundCount", { n: filtered.length })}
+            </span>
           </div>
         </div>
       </Card>
