@@ -133,7 +133,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       const src = `${window.location.protocol}//${window.location.host}/api/ws?src=${encodeURIComponent(camera.id)}`;
       const videoRtc = document.createElement("video-rtc") as any;
       videoRtc.mode = modes;
-      videoRtc.background = true;
+      videoRtc.background = false;
       videoRtc.style.display = "block";
       videoRtc.style.width = "100%";
       videoRtc.style.height = "100%";
