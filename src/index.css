@@ -177,3 +177,7 @@
   object-fit: contain !important;
 }
 
+/* Force native fullscreen backdrop to be completely black */
+:fullscreen::backdrop { background-color: #000000 !important; }
+:-webkit-full-screen::backdrop { background-color: #000000 !important; }
+::backdrop { background-color: #000000 !important; }

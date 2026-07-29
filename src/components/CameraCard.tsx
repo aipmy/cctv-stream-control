@@ -180,11 +180,25 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     try {
       if (document.fullscreenElement === cardRef.current) {
         await document.exitFullscreen();
+      } else if (cardRef.current?.requestFullscreen) {
+        await cardRef.current.requestFullscreen();
       } else {
-        await cardRef.current?.requestFullscreen?.();
+        // Fallback for iOS Safari which only supports full-screening the video element directly
+        const video = cardRef.current?.querySelector("video");
+        if (video && (video as any).webkitEnterFullscreen) {
+          (video as any).webkitEnterFullscreen();
+        } else {
+          toast.error(t("browserDeniedFullscreen"));
+        }
       }
     } catch {
-      toast.error(t("browserDeniedFullscreen"));
+      // If requestFullscreen throws (e.g. not triggered by user gesture), try fallback
+      const video = cardRef.current?.querySelector("video");
+      if (video && (video as any).webkitEnterFullscreen) {
+        (video as any).webkitEnterFullscreen();
+      } else {
+        toast.error(t("browserDeniedFullscreen"));
+      }
     }
   };
 
