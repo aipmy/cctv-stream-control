@@ -195,20 +195,29 @@ async function startRecording(camera) {
       console.log(`[Recording] FFmpeg stopped for camera ${camera.id} (code ${code})`);
       recordSessions.delete(camera.id);
       
-      if (!child.intentionallyKilled && camera.enableRecording) {
-        // Only auto-restart if NOT already being managed by an AI session
-        const aiSession = aiSessions.get(camera.id);
-        if (aiSession && isChildAlive(aiSession)) {
-          console.log(`[Recording] AI session active for ${camera.id}, it will handle recording restart.`);
-          return;
-        }
-        console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
-        setTimeout(() => {
-          // Re-check before restarting — state may have changed
-          if (!recordSessions.has(camera.id)) {
-            startRecording(camera).catch(console.error);
+      if (!child.intentionallyKilled) {
+        // Re-fetch camera from DB to check CURRENT settings (not stale closure data)
+        getCamera(camera.id, { revealSecret: true }).then(freshCamera => {
+          if (!freshCamera || !freshCamera.enableRecording) {
+            console.log(`[Recording] Recording disabled for ${camera.id}, not restarting.`);
+            return;
           }
-        }, 5000);
+          // Only auto-restart if NOT already being managed by an AI session
+          const aiSession = aiSessions.get(camera.id);
+          if (aiSession && isChildAlive(aiSession)) {
+            console.log(`[Recording] AI session active for ${camera.id}, it will handle recording restart.`);
+            return;
+          }
+          console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
+          setTimeout(() => {
+            // Re-check before restarting — state may have changed
+            if (!recordSessions.has(camera.id)) {
+              startRecording(freshCamera).catch(console.error);
+            }
+          }, 5000);
+        }).catch(err => {
+          console.error(`[Recording] Failed to re-fetch camera ${camera.id} for restart:`, err.message);
+        });
       }
     });
   } finally {
