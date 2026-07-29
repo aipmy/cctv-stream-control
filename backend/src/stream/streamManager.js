@@ -140,61 +140,80 @@ function getMotionEngine(cameraId) {
 }
 
 const recordSessions = new Map(); // cameraId -> ChildProcess (FFmpeg)
+const recordStarting = new Set(); // re-entrancy guard for async startRecording
 
 async function startRecording(camera) {
   if (!camera.enableRecording) return;
   if (recordSessions.has(camera.id)) return;
+  // Prevent duplicate spawns during async gaps (mkdir, etc.)
+  if (recordStarting.has(camera.id)) return;
+  recordStarting.add(camera.id);
   
-  const outputDir = path.join(config.storageDir, "record_hls", camera.id);
-  await fs.mkdir(outputDir, { recursive: true });
-  
-  const playlistPath = path.join(outputDir, "index.m3u8");
-  const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
-
-  const args = [
-    "-hide_banner", "-loglevel", "error",
-    "-rtsp_transport", "tcp",
-    "-use_wallclock_as_timestamps", "1",
-    "-i", go2rtcInput,
-    "-sn", "-dn"
-  ];
-  
-  if (camera.recordMode === "transcode") {
-    args.push("-c:v", config.videoEncoder || "libx264", "-preset", "ultrafast");
-  } else {
-    args.push("-c:v", "copy");
-  }
-  
-  args.push(
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-f", "hls",
-    "-hls_time", "5",
-    "-hls_list_size", "0",
-    "-hls_segment_type", "fmp4",
-    "-hls_fmp4_init_filename", "init.mp4",
-    "-hls_flags", "independent_segments+append_list",
-    "-movflags", "+faststart",
-    "-strftime", "1",
-    "-hls_segment_filename", path.join(outputDir, "seg_%s.m4s"),
-    playlistPath
-  );
-
-  const child = spawn(config.ffmpegBin || "ffmpeg", args);
-  recordSessions.set(camera.id, child);
-  console.log(`[Recording] Started FFmpeg recording for camera ${camera.id}`);
-
-  child.on("close", (code) => {
-    console.log(`[Recording] FFmpeg stopped for camera ${camera.id} (code ${code})`);
-    recordSessions.delete(camera.id);
+  try {
+    const outputDir = path.join(config.storageDir, "record_hls", camera.id);
+    await fs.mkdir(outputDir, { recursive: true });
     
-    if (!child.intentionallyKilled && camera.enableRecording) {
-      console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
-      setTimeout(() => {
-        startRecording(camera).catch(console.error);
-      }, 5000);
+    // Re-check after await — another call may have started recording
+    if (recordSessions.has(camera.id)) return;
+    
+    const playlistPath = path.join(outputDir, "index.m3u8");
+    const go2rtcInput = `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${camera.id}`;
+
+    const args = [
+      "-hide_banner", "-loglevel", "error",
+      "-rtsp_transport", "tcp",
+      "-use_wallclock_as_timestamps", "1",
+      "-i", go2rtcInput,
+      "-sn", "-dn"
+    ];
+    
+    if (camera.recordMode === "transcode") {
+      args.push("-c:v", config.videoEncoder || "libx264", "-preset", "ultrafast");
+    } else {
+      args.push("-c:v", "copy");
     }
-  });
+    
+    args.push(
+      "-c:a", "copy",
+      "-f", "hls",
+      "-hls_time", "5",
+      "-hls_list_size", "0",
+      "-hls_segment_type", "fmp4",
+      "-hls_fmp4_init_filename", "init.mp4",
+      "-hls_flags", "independent_segments+append_list",
+      "-movflags", "+faststart",
+      "-strftime", "1",
+      "-hls_segment_filename", path.join(outputDir, "seg_%s.m4s"),
+      playlistPath
+    );
+
+    const child = spawn(config.ffmpegBin || "ffmpeg", args);
+    recordSessions.set(camera.id, child);
+    console.log(`[Recording] Started FFmpeg recording for camera ${camera.id} (pid ${child.pid})`);
+
+    child.on("close", (code) => {
+      console.log(`[Recording] FFmpeg stopped for camera ${camera.id} (code ${code})`);
+      recordSessions.delete(camera.id);
+      
+      if (!child.intentionallyKilled && camera.enableRecording) {
+        // Only auto-restart if NOT already being managed by an AI session
+        const aiSession = aiSessions.get(camera.id);
+        if (aiSession && isChildAlive(aiSession)) {
+          console.log(`[Recording] AI session active for ${camera.id}, it will handle recording restart.`);
+          return;
+        }
+        console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
+        setTimeout(() => {
+          // Re-check before restarting — state may have changed
+          if (!recordSessions.has(camera.id)) {
+            startRecording(camera).catch(console.error);
+          }
+        }, 5000);
+      }
+    });
+  } finally {
+    recordStarting.delete(camera.id);
+  }
 }
 
 function stopRecording(cameraId) {
@@ -340,7 +359,7 @@ export async function startAiStream(id) {
 
     logLifecycle(session, `start polling go2rtc for camera: ${id}`);
     
-    const fps = camera.detectFps || 6;
+    const fps = camera.detectFps || 1;
     const args = [
       "-hide_banner", "-loglevel", "error",
       "-rtsp_transport", "tcp",
@@ -513,8 +532,18 @@ export async function startAiStream(id) {
 
     session.child.on("close", (code) => {
       if (session.status !== "stopping" && code !== 0 && code !== 255) {
-        console.error(`[AI-FFmpeg] Process for ${id} died (code ${code}). Restarting in 5s...`);
-        setTimeout(() => startAiStream(id), 5000);
+        console.error(`[AI-FFmpeg] Process for ${id} died (code ${code}). Restarting in 10s...`);
+        // Delay restart longer to let system stabilize & prevent rapid respawn loops
+        setTimeout(() => {
+          // Only restart if no other session has been started for this camera
+          const current = aiSessions.get(id);
+          if (current === session || !current) {
+            aiSessions.delete(id);
+            startAiStream(id).catch(err => {
+              console.error(`[AI-FFmpeg] Failed to restart stream for ${id}:`, err.message);
+            });
+          }
+        }, 10000);
       }
     });
 
