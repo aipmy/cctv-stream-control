@@ -216,17 +216,19 @@ app.use("/api/audit", auditRoutes);
 app.use("/api/events", eventRoutes);
 
 if (fs.existsSync(config.frontendDist)) {
-  // Cache hashed assets (JS/CSS) for 1 year, other files for 1 hour
+  // Cache hashed assets (JS/CSS) for 1 year, other files (like index.html) no-cache
   app.use(express.static(config.frontendDist, {
-    maxAge: '1h',
     setHeaders(res, filePath) {
       if (filePath.match(/\.(js|css)$/) && filePath.includes('assets')) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       }
     }
   }));
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(config.frontendDist, "index.html"));
   });
 }
