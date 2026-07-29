@@ -196,11 +196,11 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
           internalVideo.addEventListener("waiting", () => {
             if (disposed) return;
             if (!bufferingTimerRef.current) {
-              // Debounce buffering status: only set buffering if waiting lasts > 5000ms
+              // Debounce buffering status: only set buffering if waiting lasts > 10000ms
               bufferingTimerRef.current = setTimeout(() => {
                 if (!disposed) setStatus(prev => prev === "playing" ? "buffering" : "connecting");
                 bufferingTimerRef.current = null;
-              }, 5000);
+              }, 10000);
             }
           });
 
@@ -210,7 +210,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
               bufferingTimerRef.current = setTimeout(() => {
                 if (!disposed) setStatus("buffering");
                 bufferingTimerRef.current = null;
-              }, 5000);
+              }, 10000);
             }
           });
 
