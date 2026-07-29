@@ -124,26 +124,41 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
         if (cached && now - cached.ts < 30000) { // Cache for 30s
           diskUsageBytes = cached.size;
         } else {
-          const calculateDirSize = async (dirPath) => {
-            let total = 0;
-            const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
-            for (const item of list) {
-              const fullPath = path.join(dirPath, item.name);
-              if (item.isDirectory()) {
-                total += await calculateDirSize(fullPath);
-              } else if (item.isFile()) {
-                const stats = await fs.promises.stat(fullPath);
-                total += stats.size;
+          // If expired or missing, return the last known size immediately
+          diskUsageBytes = cached ? cached.size : 0;
+          
+          // And kick off a background refresh if one isn't already running
+          if (!diskUsageCache.has(`calc_${id}`)) {
+            diskUsageCache.set(`calc_${id}`, true);
+            (async () => {
+              try {
+                const calculateDirSize = async (dirPath) => {
+                  let total = 0;
+                  const list = await fs.promises.readdir(dirPath, { withFileTypes: true });
+                  for (const item of list) {
+                    const fullPath = path.join(dirPath, item.name);
+                    if (item.isDirectory()) {
+                      total += await calculateDirSize(fullPath);
+                    } else if (item.isFile()) {
+                      const stats = await fs.promises.stat(fullPath);
+                      total += stats.size;
+                    }
+                  }
+                  return total;
+                };
+                const size = await calculateDirSize(hlsBaseDir);
+                diskUsageCache.set(id, { size, ts: Date.now() });
+              } catch (err) {
+                console.error("Error calculating HLS dir size:", err);
+              } finally {
+                diskUsageCache.delete(`calc_${id}`);
               }
-            }
-            return total;
-          };
-          diskUsageBytes = await calculateDirSize(hlsBaseDir);
-          diskUsageCache.set(id, { size: diskUsageBytes, ts: now });
+            })();
+          }
         }
       }
     } catch (err) {
-      console.error("Error calculating HLS dir size:", err);
+      console.error("Error initiating HLS dir size calc:", err);
     }
 
     const camera = await getCamera(id);
