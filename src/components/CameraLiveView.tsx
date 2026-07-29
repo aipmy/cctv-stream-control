@@ -286,10 +286,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     <div
       className={cn("absolute inset-0 overflow-hidden flex items-center justify-center", className)}
       style={{
-        backgroundColor: '#000',
-        backgroundImage: `url(${posterUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundColor: '#000'
       }}
     >
       {/* Container managed purely by React for the loading/status overlay */}
