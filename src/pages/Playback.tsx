@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/features/auth/store";
 import { usePlaybackStore } from "@/features/playback/store/usePlaybackStore";
@@ -41,6 +41,7 @@ function PlaybackContent() {
   })));
 
   const location = useLocation();
+  const navigate = useNavigate();
   const effectiveState = location.state as { cameraId?: string; date?: string; timestamp?: number; eventSeek?: boolean } | null;
   const initialSeekDone = React.useRef(false);
 
@@ -56,8 +57,10 @@ function PlaybackContent() {
         setPlaybackWindowMinutes("15");
         setPlaybackWindowCenterTs(effectiveState.timestamp || null);
       }
+      // Clear the state so it doesn't get reapplied when the user manually changes camera/date
+      navigate(location.pathname, { replace: true, state: null });
     }
-  }, [effectiveState, selectedCameraId, selectedDate]);
+  }, [effectiveState, location.pathname, navigate, selectedCameraId, selectedDate, setPlaybackWindowMinutes, setPlaybackWindowCenterTs, setSelectedCameraId, setSelectedDate]);
 
   const loadPlaybackSegments = async () => {
     if (!selectedCameraId) return;
