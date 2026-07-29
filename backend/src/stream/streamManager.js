@@ -18,7 +18,7 @@ import {
 } from "./ffmpegArgs.js";
 import { classifyStreamError } from "./streamError.js";
 import { triggerEvent, updateLastMotionAt, extendEventDuration } from "../services/recordingService.js";
-import { CameraMotionEngine, motionEmitter, isIgnoredPoint } from "../core/motionEngine.js";
+import { CameraMotionEngine, motionEmitter, isIgnoredPoint, getDetectDimensions } from "../core/motionEngine.js";
 
 const motionEngines = new Map(); // cameraId -> CameraMotionEngine
 
@@ -360,12 +360,15 @@ export async function startAiStream(id) {
     logLifecycle(session, `start polling go2rtc for camera: ${id}`);
     
     const fps = camera.detectFps || 1;
+    const { width: dw, height: dh } = getDetectDimensions(camera.detectResolution);
+    logLifecycle(session, `AI stream: fps=${fps}, detectResolution=${camera.detectResolution || 'Auto'} → scale=${dw}x${dh}`);
     const args = [
       "-hide_banner", "-loglevel", "error",
       "-rtsp_transport", "tcp",
       "-i", `rtsp://127.0.0.1:${config.go2rtcRtspPort}/${id}?mp4`,
-      "-vf", `fps=${fps}`,
+      "-vf", `fps=${fps},scale=${dw}:${dh}`,
       "-c:v", "mjpeg",
+      "-q:v", "5",
       "-f", "image2pipe",
       "pipe:1"
     ];
