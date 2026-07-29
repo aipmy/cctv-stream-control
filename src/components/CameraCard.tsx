@@ -266,9 +266,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
             <Badge variant="outline" className={cn("text-[10px] uppercase font-mono font-bold tracking-wider", streamColors[activeMode || camera.streamType || "webrtc"])}>
               {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
             </Badge>
-            <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
-              {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
-            </Badge>
           </div>
         </div>
       )}
@@ -293,9 +290,6 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
             <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
               <Badge variant="outline" className={cn("text-[9px] uppercase font-mono font-bold tracking-wider bg-black/40 backdrop-blur-md text-white border-white/15 shadow-md", streamColors[activeMode || camera.streamType || "webrtc"])}>
                 {activeMode || (camera.streamType === "webrtc,mse,hls,mjpeg" ? "AUTO" : (camera.streamType || "webrtc").split(",")[0])}
-              </Badge>
-              <Badge variant="outline" className={cn("text-[9px] uppercase tracking-wider bg-black/40 backdrop-blur-md border-white/15 text-white shadow-md", isDisabled ? "bg-muted text-muted-foreground" : statusColors[effectiveStatus])}>
-                {isDisabled ? t("inactive") : effectiveStatus === "online" ? t("online") : effectiveStatus === "offline" ? t("offline") : effectiveStatus}
               </Badge>
             </div>
           </div>

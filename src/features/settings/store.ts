@@ -25,7 +25,7 @@ export const useSettings = create<SettingsState>()(
         pageSize: 4,
         autoRefresh: true,
         defaultStream: "HLS Stable",
-        compactMode: false,
+        compactMode: true,
       },
       setSettings: (patch) =>
         set((state) => ({ settings: { ...state.settings, ...patch } })),
