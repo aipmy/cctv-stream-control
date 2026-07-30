@@ -25,6 +25,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
   const [status, setStatus] = useState<PlaybackStatus>("connecting");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [retryTrigger, setRetryTrigger] = useState<number>(0);
+  const autoRetryRef = useRef(false);
 
   useEffect(() => {
     if (onStatusChange) {
