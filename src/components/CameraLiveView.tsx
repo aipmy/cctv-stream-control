@@ -235,8 +235,10 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         if (modePollRef.current) clearInterval(modePollRef.current);
         if (playerElement) {
           try {
-            if (typeof (playerElement as any).onclose === 'function') {
-              (playerElement as any).onclose();
+            if (typeof (playerElement as any).ondisconnect === 'function') {
+              (playerElement as any).ondisconnect();
+            } else if (typeof (playerElement as any).disconnectedCallback === 'function') {
+              (playerElement as any).disconnectedCallback();
             }
             if (playerElement instanceof HTMLVideoElement) {
               playerElement.pause();
