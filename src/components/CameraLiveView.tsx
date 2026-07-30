@@ -69,13 +69,18 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
     let disposed = false;
     let autoRetryTimer: any = null;
     containerRef.current.innerHTML = "";
-    setStatus("connecting");
-    setErrorMsg("");
+    
+    if (!autoRetryRef.current) {
+      setStatus("connecting");
+      setErrorMsg("");
+    }
+    autoRetryRef.current = false;
 
     const scheduleAutoRetry = () => {
       if (disposed || autoRetryTimer) return;
       autoRetryTimer = setTimeout(() => {
         if (!disposed) {
+          autoRetryRef.current = true;
           setRetryTrigger((prev) => prev + 1);
         }
       }, 3500);
