@@ -117,12 +117,14 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       vid.addEventListener("playing", () => {
         if (!disposed) {
           setStatus("playing");
+          if (containerRef.current) containerRef.current.style.backgroundImage = "none";
           if (onModeChange) onModeChange(modes.startsWith("mp4") ? "mp4" : modes.startsWith("hls") ? "hls" : modes);
         }
       });
       vid.addEventListener("canplay", () => {
         if (!disposed) {
           setStatus("playing");
+          if (containerRef.current) containerRef.current.style.backgroundImage = "none";
           if (onModeChange) onModeChange(modes.startsWith("mp4") ? "mp4" : modes.startsWith("hls") ? "hls" : modes);
         }
       });
@@ -193,6 +195,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
             if (disposed) return;
             clearBufferingTimer();
             setStatus("playing");
+            if (containerRef.current) containerRef.current.style.backgroundImage = "none";
             updateActiveMode();
           };
 
@@ -240,6 +243,25 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
         if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current);
         if (modePollRef.current) clearInterval(modePollRef.current);
         if (playerElement) {
+          try {
+            // Capture last frame before disconnecting to avoid black screen on reconnect
+            const vid = playerElement.tagName.toLowerCase() === "video" ? playerElement : playerElement.querySelector("video");
+            if (vid && (vid as HTMLVideoElement).videoWidth > 0 && containerRef.current) {
+              const canvas = document.createElement("canvas");
+              canvas.width = (vid as HTMLVideoElement).videoWidth;
+              canvas.height = (vid as HTMLVideoElement).videoHeight;
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(vid as HTMLVideoElement, 0, 0, canvas.width, canvas.height);
+                const frameUrl = canvas.toDataURL("image/jpeg", 0.7);
+                containerRef.current.style.backgroundImage = `url(${frameUrl})`;
+                containerRef.current.style.backgroundSize = 'contain';
+                containerRef.current.style.backgroundPosition = 'center';
+                containerRef.current.style.backgroundRepeat = 'no-repeat';
+              }
+            }
+          } catch (e) {}
+
           try {
             if (typeof (playerElement as any).ondisconnect === 'function') {
               (playerElement as any).ondisconnect();
