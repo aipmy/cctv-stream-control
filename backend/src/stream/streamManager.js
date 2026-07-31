@@ -161,10 +161,12 @@ async function startRecording(camera) {
 
     const args = [
       "-hide_banner", "-loglevel", "error",
+      "-fflags", "+genpts+discardcorrupt",
       "-rtsp_transport", "tcp",
       "-use_wallclock_as_timestamps", "1",
       "-i", go2rtcInput,
-      "-sn", "-dn"
+      "-sn", "-dn",
+      "-max_muxing_queue_size", "1024"
     ];
     
     if (camera.recordMode === "transcode") {
