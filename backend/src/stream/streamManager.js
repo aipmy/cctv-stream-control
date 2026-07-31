@@ -202,12 +202,6 @@ async function startRecording(camera) {
             console.log(`[Recording] Recording disabled for ${camera.id}, not restarting.`);
             return;
           }
-          // Only auto-restart if NOT already being managed by an AI session
-          const aiSession = aiSessions.get(camera.id);
-          if (aiSession && isChildAlive(aiSession)) {
-            console.log(`[Recording] AI session active for ${camera.id}, it will handle recording restart.`);
-            return;
-          }
           console.log(`[Recording] Auto-restarting FFmpeg for camera ${camera.id} in 5s...`);
           setTimeout(() => {
             // Re-check before restarting — state may have changed
