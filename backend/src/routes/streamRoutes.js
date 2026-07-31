@@ -177,10 +177,9 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
     const startUnix = req.query.start ? parseInt(req.query.start, 10) : Math.floor(startOfDay.getTime() / 1000);
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
-    const files = await fs.promises.readdir(dir);
-    
-    // Parse index.m3u8 to get exact float durations to prevent MSE PTS drift
+    let files = [];
     const exactDurations = new Map();
+    let indexParsed = false;
     try {
       const indexPath = path.join(dir, "index.m3u8");
       if (fs.existsSync(indexPath)) {
@@ -191,12 +190,18 @@ streamRoutes.get("/:id/playback-info", requirePermission("canViewPlayback"), asy
             const file = lines[i + 1]?.trim();
             if (file && file.startsWith("seg_")) {
               exactDurations.set(file, dur);
+              files.push(file);
             }
           }
         }
+        indexParsed = true;
       }
     } catch (err) {
-      console.error("Error reading index.m3u8 for exact durations", err);
+      console.error("Error reading index.m3u8 for playback segment discovery", err);
+    }
+
+    if (!indexParsed) {
+      files = await fs.promises.readdir(dir);
     }
 
     const segments = [];
@@ -289,10 +294,9 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
     const startUnix = req.query.start ? parseInt(req.query.start, 10) : Math.floor(startOfDay.getTime() / 1000);
     const endUnix = req.query.end ? parseInt(req.query.end, 10) : Math.floor(endOfDay.getTime() / 1000);
 
-    const files = await fs.promises.readdir(dir);
-    
-    // Parse index.m3u8 to get exact float durations to prevent MSE PTS drift
+    let files = [];
     const exactDurations = new Map();
+    let indexParsed = false;
     try {
       const indexPath = path.join(dir, "index.m3u8");
       if (fs.existsSync(indexPath)) {
@@ -303,12 +307,18 @@ streamRoutes.get("/:id/playback.m3u8", requirePermission("canViewPlayback"), asy
             const file = lines[i + 1]?.trim();
             if (file && file.startsWith("seg_")) {
               exactDurations.set(file, dur);
+              files.push(file);
             }
           }
         }
+        indexParsed = true;
       }
     } catch (err) {
-      console.error("Error reading index.m3u8 for exact durations", err);
+      console.error("Error reading index.m3u8 for playback segment discovery", err);
+    }
+
+    if (!indexParsed) {
+      files = await fs.promises.readdir(dir);
     }
 
     const segments = [];
