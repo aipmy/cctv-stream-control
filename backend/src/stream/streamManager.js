@@ -305,6 +305,16 @@ function scheduleAiIdleCleanup() {
         if (session.pollTimer) clearInterval(session.pollTimer);
         continue;
       }
+      
+      // Watchdog: Ensure recording FFmpeg is alive when it should be
+      if (!recordSessions.has(id)) {
+        getCamera(id, { revealSecret: true }).then(cam => {
+          if (cam?.enableRecording && !recordSessions.has(id)) {
+            console.log(`[Recording Watchdog] Recording missing for ${id}, restarting...`);
+            startRecording(cam).catch(console.error);
+          }
+        }).catch(() => {});
+      }
     }
   }, interval);
   timer.unref?.();
@@ -327,6 +337,13 @@ export async function startAiStream(id) {
     const existing = aiSessions.get(id);
     if (existing) {
       if (existing.status !== "stopped" && existing.status !== "error") {
+        // AI session is alive, but ensure recording is also running
+        if (!recordSessions.has(id)) {
+          const camera = await getCamera(id, { revealSecret: true });
+          if (camera?.enableRecording) {
+            startRecording(camera).catch(console.error);
+          }
+        }
         return existing;
       }
     }
