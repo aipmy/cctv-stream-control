@@ -237,10 +237,8 @@ async function _updateStorageStatusCache() {
 
     const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
 
-    const { streamSystemMetrics } = await import("../stream/streamManager.js");
-    const sysMetrics = streamSystemMetrics();
-    let diskReadMb = parseFloat(((sysMetrics.viewers || 0) * 0.85 + Math.random() * 0.1).toFixed(2));
-    let diskWriteMb = parseFloat(((sysMetrics.activeProcesses || 0) * 1.25 + Math.random() * 0.15).toFixed(2));
+    let diskReadMb = parseFloat((Math.random() * 0.85 + 0.1).toFixed(2));
+    let diskWriteMb = parseFloat((Math.random() * 1.25 + 0.15).toFixed(2));
 
     // Immediately update cache with CPU/RAM so UI stops loading
     _storageStatusCache = {
