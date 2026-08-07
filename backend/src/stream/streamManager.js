@@ -175,8 +175,11 @@ async function startRecording(camera) {
       args.push("-c:v", "copy");
     }
     
+    // Drop audio for recording — some cameras (Bardi) send PCMU with severely broken
+    // timestamps that hang FFmpeg indefinitely, even when re-encoding to AAC.
+    // Video-only recording is standard for security cameras.
     args.push(
-      "-c:a", "copy",
+      "-an",
       "-f", "hls",
       "-hls_time", "5",
       "-hls_list_size", "0",
