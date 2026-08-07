@@ -244,38 +244,6 @@ async function _updateStorageStatusCache() {
       _ts: Date.now(),
     };
 
-    // Fast dir size: walk files and sum stat.size (avoids spawning du process)
-    async function fastDirSize(dirPath) {
-      let total = 0;
-      try {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dirPath, entry.name);
-          if (entry.isDirectory()) {
-            total += await fastDirSize(fullPath);
-          } else {
-            try {
-              const stat = await fs.stat(fullPath);
-              total += stat.size;
-            } catch (_) {}
-          }
-        }
-      } catch (_) {}
-      return total;
-    }
-
-    // Run this asynchronously so we can exit this function and unblock the event loop
-    Promise.all([
-      fastDirSize(eventsDir),
-      fastDirSize(hlsDir),
-      fastDirSize(recordHlsDir),
-    ]).then(([eventsSize, hlsSize, recordHlsSize]) => {
-      const usedBytes = eventsSize + hlsSize + recordHlsSize;
-      if (_storageStatusCache) {
-        _storageStatusCache.usedBytes = usedBytes;
-      }
-    }).catch(() => {});
-
 
 
   } catch (err) {
