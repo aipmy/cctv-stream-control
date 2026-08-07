@@ -185,35 +185,7 @@ async function _updateStorageStatusCache() {
       diskAvailable = diskStats.bavail * diskStats.bsize;
     } catch (_) {}
 
-    // Fast dir size: walk files and sum stat.size (avoids spawning du process)
-    async function fastDirSize(dirPath) {
-      let total = 0;
-      try {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dirPath, entry.name);
-          if (entry.isDirectory()) {
-            total += await fastDirSize(fullPath);
-          } else {
-            try {
-              const stat = await fs.stat(fullPath);
-              total += stat.size;
-            } catch (_) {}
-          }
-        }
-      } catch (_) {}
-      return total;
-    }
-
-    const [eventsSize, hlsSize, recordHlsSize] = await Promise.all([
-      fastDirSize(eventsDir),
-      fastDirSize(hlsDir),
-      fastDirSize(recordHlsDir),
-    ]);
-    const usedBytes = eventsSize + hlsSize + recordHlsSize;
-    const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
-
-    // CPU & RAM — lightweight, no shell commands
+    // CPU & RAM — lightweight, no shell commands, calculate FIRST
     const numCpus = os.cpus().length || 1;
     const loadPercentage = Math.round((os.loadavg()[0] / numCpus) * 100);
     const cpuUsage = Math.min(Math.max(loadPercentage, 3), 98);
@@ -250,14 +222,18 @@ async function _updateStorageStatusCache() {
     const ramUsed = ramTotal - ramFree;
     const ramUsage = Math.round((ramUsed / ramTotal) * 100);
 
+    const maxBytes = (settings.maxStorageGb || 5) * 1024 * 1024 * 1024;
+
+    // Immediately update cache with CPU/RAM so UI stops loading
     _storageStatusCache = {
-      usedBytes,
-      maxBytes,
+      ...(_storageStatusCache || {}),
       recordingMode: settings.recordingMode || "continuous",
       maxStorageGb: settings.maxStorageGb || 5,
       retentionDays: settings.retentionDays || 7,
+      maxBytes,
       diskTotal,
       diskAvailable,
+      usedBytes: diskTotal - diskAvailable > 0 ? diskTotal - diskAvailable : 0,
       cpuUsage,
       ramUsage,
       ramTotal,
@@ -267,6 +243,41 @@ async function _updateStorageStatusCache() {
       diskWriteMb: 0,
       _ts: Date.now(),
     };
+
+    // Fast dir size: walk files and sum stat.size (avoids spawning du process)
+    async function fastDirSize(dirPath) {
+      let total = 0;
+      try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+          if (entry.isDirectory()) {
+            total += await fastDirSize(fullPath);
+          } else {
+            try {
+              const stat = await fs.stat(fullPath);
+              total += stat.size;
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+      return total;
+    }
+
+    // Run this asynchronously so we can exit this function and unblock the event loop
+    Promise.all([
+      fastDirSize(eventsDir),
+      fastDirSize(hlsDir),
+      fastDirSize(recordHlsDir),
+    ]).then(([eventsSize, hlsSize, recordHlsSize]) => {
+      const usedBytes = eventsSize + hlsSize + recordHlsSize;
+      if (_storageStatusCache) {
+        _storageStatusCache.usedBytes = usedBytes;
+      }
+    }).catch(() => {});
+
+
+
   } catch (err) {
     console.error("[StorageStatus] Background update error:", err.message);
   } finally {
