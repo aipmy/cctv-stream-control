@@ -215,6 +215,19 @@ async function _updateStorageStatusCache() {
           }
           freeMem = memFree + buffers + cached + reclaimable;
         }
+      } else if (process.platform === "darwin") {
+        const util = await import('util');
+        const exec = util.promisify((await import('child_process')).exec);
+        const { stdout } = await exec('vm_stat');
+        const lines = stdout.split('\n');
+        let free = 0, inactive = 0;
+        for (const line of lines) {
+          if (line.includes('Pages free:')) free = parseInt(line.split(':')[1].trim(), 10);
+          if (line.includes('Pages inactive:')) inactive = parseInt(line.split(':')[1].trim(), 10);
+        }
+        const match = stdout.match(/page size of (\d+) bytes/);
+        const pageSize = match ? parseInt(match[1], 10) : 4096;
+        freeMem = (free + inactive) * pageSize;
       }
     } catch (_) {}
 
