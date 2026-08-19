@@ -45,6 +45,7 @@ const getClassificationLabel = (classification?: string, fallback?: string) => {
 
 export default function Events() {
   const user = useAuth((s) => s.user);
+  const canPlayback = user?.role === "admin" || user?.permissions?.playback;
 
   const navigate = useNavigate();
   const { t, lang } = useTranslation();
@@ -331,15 +332,17 @@ export default function Events() {
                         <Eye className="h-3 w-3 mr-1.5" />
                         Snapshot
                       </Button>
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        className="h-8 text-xs flex-1 bg-primary/80 hover:bg-primary border border-primary/20 text-white backdrop-blur-md shadow-lg shadow-primary/25" 
-                        onClick={(e) => { e.stopPropagation(); handleEventClick(evt); }}
-                      >
-                        <Video className="h-3 w-3 mr-1.5" />
-                        Playback
-                      </Button>
+                      {canPlayback && (
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="h-8 text-xs flex-1 bg-primary/80 hover:bg-primary border border-primary/20 text-white backdrop-blur-md shadow-lg shadow-primary/25" 
+                          onClick={(e) => { e.stopPropagation(); handleEventClick(evt); }}
+                        >
+                          <Video className="h-3 w-3 mr-1.5" />
+                          Playback
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

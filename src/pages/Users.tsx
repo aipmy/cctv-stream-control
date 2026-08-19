@@ -316,7 +316,7 @@ export default function Users() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-foreground">{item.actor.username}</span>
                       <span className="text-[9px] text-muted-foreground font-mono shrink-0">
-                        {new Date(item.ts).toLocaleTimeString("id-ID", { hour12: false })}
+                        {formatExactTime(item.ts)}
                       </span>
                     </div>
                     <div className="text-muted-foreground font-mono text-[10px] mt-1 break-all bg-muted/40 p-1.5 rounded border border-border/20">
