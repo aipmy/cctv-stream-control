@@ -245,8 +245,21 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
     <button
       type="button"
       title={label}
-      onClick={() => void sendPtz(action).catch(() => undefined)}
-      className={cn("h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75", extraCls)}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        activePtzPointer.current = e.pointerId;
+        void sendPtz(action).catch(() => undefined);
+      }}
+      onPointerUp={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        stopPtz(e.pointerId);
+      }}
+      onPointerLeave={(e) => stopPtz(e.pointerId)}
+      onPointerCancel={(e) => stopPtz(e.pointerId)}
+      onContextMenu={(e) => e.preventDefault()}
+      className={cn("h-7 w-7 rounded-md bg-black/55 text-white/90 border border-white/15 backdrop-blur-sm inline-flex items-center justify-center hover:bg-black/75 touch-none select-none", extraCls)}
     >
       {icon}
     </button>
