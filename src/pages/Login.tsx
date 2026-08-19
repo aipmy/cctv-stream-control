@@ -21,7 +21,7 @@ export default function Login() {
   const { t, lang } = useTranslation();
   const setLang = useLangStore((s) => s.setLang);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/live" replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export default function Login() {
           ? `Selamat datang, ${found.username}` 
           : `Welcome, ${found.username}`
       );
-      navigate("/");
+      navigate("/live");
     } catch (err) {
       toast.error(
         err instanceof Error 
