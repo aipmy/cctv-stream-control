@@ -174,10 +174,17 @@
   height: 100% !important;
   max-width: 100vw !important;
   max-height: 100vh !important;
-  object-fit: contain !important;
+  object-fit: fill !important;
 }
 
 /* Force native fullscreen backdrop to be completely black */
 :fullscreen::backdrop { background-color: #000000 !important; }
 :-webkit-full-screen::backdrop { background-color: #000000 !important; }
 ::backdrop { background-color: #000000 !important; }
+
+/* Fix for Chrome MSE ignoring DAR/SAR and displaying 16:9 cameras as 4:3 */
+video-rtc video {
+  object-fit: fill !important;
+  width: 100% !important;
+  height: 100% !important;
+}

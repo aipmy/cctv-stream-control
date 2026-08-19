@@ -110,7 +110,7 @@ export function CameraLiveView({ camera, output, className, controls = false, mu
       vid.style.display = "block";
       vid.style.width = "100%";
       vid.style.height = "100%";
-      vid.style.objectFit = "contain";
+      vid.style.objectFit = "fill";
       containerRef.current.appendChild(vid);
       playerElement = vid;
 
