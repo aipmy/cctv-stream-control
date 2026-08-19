@@ -21,8 +21,8 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       settings: {
         theme: "dark",
-        gridCols: 3,
-        pageSize: 4,
+        gridCols: 2,
+        pageSize: 6,
         autoRefresh: true,
         defaultStream: "HLS Stable",
         compactMode: true,
