@@ -21,7 +21,8 @@ export function buildStreamUrl(camera, opts = {}) {
     case "ONVIF": {
       return `onvif://${auth}${host}:${port}`;
     }
-    case "RTSP": {
+    case "RTSP":
+    case "RTSP+ONVIF": {
       const path = camera.streamPath || "/Streaming/Channels/101";
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       return `rtsp://${auth}${host}:${port}${normalizedPath}`;
@@ -109,9 +110,9 @@ export function normalizeCamera(input, existing = {}) {
     customUrl = input.sourcePath ?? existing.sourcePath ?? existing.rtspUrl ?? "";
   }
 
-  // For RTSP, keep streamPath
+  // For RTSP and RTSP+ONVIF, keep streamPath
   let streamPath = input.streamPath ?? existing.streamPath ?? "";
-  if (!streamPath && sourceType === "RTSP") {
+  if (!streamPath && (sourceType === "RTSP" || sourceType === "RTSP+ONVIF")) {
     streamPath = input.sourcePath ?? existing.sourcePath ?? "/Streaming/Channels/101";
   }
 
@@ -129,7 +130,7 @@ export function normalizeCamera(input, existing = {}) {
       : "offline",
     sourceType,
     streamType: input.streamType || existing.streamType || "mse",
-    streamPath: sourceType === "RTSP" ? streamPath : undefined,
+    streamPath: (sourceType === "RTSP" || sourceType === "RTSP+ONVIF") ? streamPath : undefined,
     customUrl: sourceType === "Custom" ? customUrl : undefined,
     username: input.username ?? existing.username ?? "",
     password,
