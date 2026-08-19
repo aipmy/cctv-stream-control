@@ -51,7 +51,7 @@ export function buildOnvifUrl(camera) {
  */
 function migrateSourceType(oldType) {
   switch (oldType) {
-    case "RTSP+ONVIF": return "ONVIF";
+    case "RTSP+ONVIF": return "RTSP+ONVIF";
     case "RTSP": return "RTSP";
     case "MJPEG": return "Custom";
     case "HLS": return "Custom";

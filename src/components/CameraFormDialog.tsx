@@ -158,7 +158,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
 
   const ptzSupported = SOURCE_SUPPORTS_PTZ[form.sourceType];
   const needsAuth = form.sourceType !== "Custom";
-  const needsStreamPath = form.sourceType === "RTSP";
+  const needsStreamPath = form.sourceType === "RTSP" || form.sourceType === "RTSP+ONVIF";
   const needsCustomUrl = form.sourceType === "Custom";
   const needsPort = form.sourceType !== "Custom" && form.sourceType !== "HomeAssistant";
 
@@ -167,8 +167,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       ...f,
       sourceType: v,
       port: DEFAULT_PORTS[v] || f.port,
+      onvifPort: v === "RTSP+ONVIF" ? 80 : undefined,
       enablePTZ: SOURCE_SUPPORTS_PTZ[v] ? f.enablePTZ : false,
-      streamPath: v === "RTSP" ? (f.streamPath || defaultPath("RTSP")) : "",
+      streamPath: (v === "RTSP" || v === "RTSP+ONVIF") ? (f.streamPath || defaultPath("RTSP")) : "",
       customUrl: v === "Custom" ? f.customUrl : "",
     }));
   };
@@ -192,8 +193,9 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
     } else {
       if (!form.ip.trim()) e.ip = t("ipRequired");
       if (needsPort && (!form.port || form.port < 1)) e.port = "Port tidak valid";
+      if (form.sourceType === "RTSP+ONVIF" && (!form.onvifPort || form.onvifPort < 1)) e.onvifPort = "Port ONVIF tidak valid";
     }
-    if (needsStreamPath && !form.streamPath.trim()) e.streamPath = "Stream path wajib diisi";
+    if (needsStreamPath && !form.streamPath?.trim()) e.streamPath = "Stream path wajib diisi";
     if (Object.keys(e).length) { setErrors(e); return; }
 
     const payload: CameraInput = {
@@ -201,6 +203,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
       brand: form.brand,
       ip: form.ip,
       port: form.port,
+      onvifPort: form.onvifPort,
       sourceType: form.sourceType,
       streamPath: form.streamPath || undefined,
       customUrl: form.customUrl || undefined,
@@ -332,16 +335,25 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
                       <Input value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.10" />
                     </Field>
                     {needsPort && (
-                      <Field label="Port" error={errors.port}>
-                        <Input type="number" min={1} max={65535} value={form.port}
-                          onChange={(e) => setForm({ ...form, port: Number(e.target.value) })}
-                          placeholder={String(DEFAULT_PORTS[form.sourceType])} />
-                      </Field>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label={form.sourceType === "RTSP+ONVIF" ? "RTSP Port" : "Port"} error={errors.port}>
+                          <Input type="number" min={1} max={65535} value={form.port}
+                            onChange={(e) => setForm({ ...form, port: Number(e.target.value) })}
+                            placeholder={String(DEFAULT_PORTS[form.sourceType])} />
+                        </Field>
+                        {form.sourceType === "RTSP+ONVIF" && (
+                          <Field label="ONVIF Port" error={errors.onvifPort}>
+                            <Input type="number" min={1} max={65535} value={form.onvifPort || 80}
+                              onChange={(e) => setForm({ ...form, onvifPort: Number(e.target.value) })}
+                              placeholder="80" />
+                          </Field>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
 
-                {/* Stream Path — only RTSP */}
+                {/* Stream Path */}
                 {needsStreamPath && (
                   <Field label="Stream Path" className="md:col-span-2" error={errors.streamPath}>
                     <Input

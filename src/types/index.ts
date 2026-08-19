@@ -28,6 +28,7 @@ export interface Camera {
   site: string;
   ip: string;
   port: number;
+  onvifPort?: number;
   brand: Brand;
   /** Runtime status. Backend update dari probe/stream. */
   status: CameraStatus;
@@ -88,6 +89,7 @@ export interface CameraInput extends Partial<Omit<Camera, "password" | "hasPassw
   name: string;
   site: string;
   ip: string;
+  onvifPort?: number;
   password?: string;
   clearPassword?: boolean;
   enableRecording?: boolean;
