@@ -88,8 +88,8 @@ function validateCamera(camera) {
     error.status = 409;
     throw error;
   }
-  if (!camera.enablePTZ || camera.sourceType !== "ONVIF") {
-    const error = new Error("PTZ hanya tersedia untuk kamera ONVIF dengan PTZ aktif");
+  if (!camera.enablePTZ || (camera.sourceType !== "ONVIF" && camera.sourceType !== "RTSP+ONVIF")) {
+    const error = new Error("PTZ hanya tersedia untuk kamera ONVIF atau RTSP+ONVIF dengan PTZ aktif");
     error.status = 400;
     throw error;
   }

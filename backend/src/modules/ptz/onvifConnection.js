@@ -1,4 +1,11 @@
 function profileToken(cam) {
+  if (cam?.profiles && Array.isArray(cam.profiles)) {
+    const ptzProfile = cam.profiles.find((p) => p.PTZConfiguration);
+    if (ptzProfile) {
+      return ptzProfile.token || ptzProfile.$?.token || ptzProfile.profileToken;
+    }
+  }
+
   return cam?.activeSource?.profileToken
     || cam?.profiles?.[0]?.token
     || cam?.profiles?.[0]?.$?.token
