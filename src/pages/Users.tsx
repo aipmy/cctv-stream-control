@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/store";
 import { useAuditQuery, useUserActions, useUsersQuery } from "@/features/users/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCamerasQuery } from "@/features/cameras/queries";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,20 @@ export default function Users() {
     outcome: auditOutcome,
   }), [auditAction, auditActor, auditOutcome]);
   const audit = useAuditQuery(auditFilters, role === "admin");
+  const queryClient = useQueryClient();
+
+  const handleClearAudit = async () => {
+    if (confirm("Are you sure you want to clear all audit logs?")) {
+      try {
+        await auditApi.clear();
+        queryClient.invalidateQueries({ queryKey: ["audit"] });
+        toast.success("Audit logs cleared successfully");
+      } catch (e) {
+        toast.error("Failed to clear audit logs");
+      }
+    }
+  };
+
   const auditItems = audit.data?.pages.flatMap((page) => page.items) || [];
 
   const formatExactTime = (iso: string) => {
@@ -277,9 +292,14 @@ export default function Users() {
               <ScrollText className="mr-2 h-4 w-4 text-primary" /> 
               {t("recentActivity")}
             </h2>
-            <Button variant="outline" size="sm" className="h-7 text-xs border-border/40" onClick={() => window.open(auditApi.exportUrl(), "_blank")}>
-              <Download className="h-3 w-3 mr-1.5" /> Export
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-7 text-xs border-border/40 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10" onClick={handleClearAudit}>
+                <Trash2 className="h-3 w-3 mr-1.5" /> Clear Log
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs border-border/40" onClick={() => window.open(auditApi.exportUrl(), "_blank")}>
+                <Download className="h-3 w-3 mr-1.5" /> Export
+              </Button>
+            </div>
           </div>
           
           <Card className="flex flex-col h-[520px] bg-card/65 backdrop-blur-sm border border-border/40 dark:border-white/5 rounded-xl shadow-2xl overflow-hidden">
@@ -320,7 +340,7 @@ export default function Users() {
                       </span>
                     </div>
                     <div className="text-muted-foreground font-mono text-[10px] mt-1 break-all bg-muted/40 p-1.5 rounded border border-border/20">
-                      {item.action}
+                      {item.action}{item.target && item.target.label ? ` → ${item.target.label}` : (item.target && item.target.id ? ` → ${item.target.id}` : "")}
                     </div>
                   </div>
                 </div>
