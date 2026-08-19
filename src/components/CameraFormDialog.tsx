@@ -792,7 +792,7 @@ export function CameraFormDialog({ open, onOpenChange, camera }: Props) {
               <UrlRow icon={<Radio className="h-3.5 w-3.5" />} label={`Restream URL`} value={restreamUrl} tone="success" />
             </div>
 
-            {camera && form.sourceType === "ONVIF" && form.enablePTZ && (
+            {camera && (form.sourceType === "ONVIF" || form.sourceType === "RTSP+ONVIF") && form.enablePTZ && (
               <div className="rounded-md border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>

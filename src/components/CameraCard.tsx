@@ -115,7 +115,7 @@ export function CameraCard({ camera, onRestart, onEdit, onDelete, pinned, onTogg
   const canUsePtz = role === "admin" || !!perms?.canControlPTZ;
   const canSeeIp = role !== "guest";
   const isDisabled = !camera.enabled;
-  const ptzAvailable = canUsePtz && camera.enabled && camera.enablePTZ && (camera.sourceType === "ONVIF" || camera.sourceType === "Custom");
+  const ptzAvailable = canUsePtz && camera.enabled && camera.enablePTZ && (camera.sourceType === "ONVIF" || camera.sourceType === "RTSP+ONVIF" || camera.sourceType === "Custom");
   const audioAvailable = canUseAudio && camera.audioMode !== "Disable" && camera.streamType !== "MJPEG";
 
   const cardRef = useRef<HTMLDivElement | null>(null);
