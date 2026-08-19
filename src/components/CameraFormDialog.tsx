@@ -61,6 +61,7 @@ const empty = {
 const SOURCE_LABELS: Record<SourceType, string> = {
   ONVIF: "ONVIF (Recommended)",
   RTSP: "RTSP",
+  "RTSP+ONVIF": "RTSP + ONVIF",
   DVRIP: "DVRIP / XMeye",
   HomeAssistant: "Home Assistant",
   Custom: "Custom URL",
@@ -69,6 +70,7 @@ const SOURCE_LABELS: Record<SourceType, string> = {
 const SOURCE_HELP: Record<SourceType, string> = {
   ONVIF: "Auto-detect stream, PTZ support, audio 2-way. Cocok untuk Hikvision, Bardi, Reolink, dll.",
   RTSP: "Koneksi RTSP langsung. Perlu path manual (contoh: /Streaming/Channels/101).",
+  "RTSP+ONVIF": "Video via RTSP, PTZ via ONVIF. Cocok untuk kamera 2-lensa atau dual-channel.",
   DVRIP: "Protokol DVR China / XMeye. Cukup IP & port.",
   HomeAssistant: "Integrasi dengan Home Assistant camera entities.",
   Custom: "Masukkan URL go2rtc apapun: rtsp://, onvif://, ffmpeg://, http://, dll.",

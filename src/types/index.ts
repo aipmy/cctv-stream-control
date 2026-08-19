@@ -1,12 +1,13 @@
 export type Role = "admin" | "teknisi" | "guest" | "internal" | "external";
 export type StreamType = string;
 export type Brand = "Universal" | "Bardi" | "EZVIZ" | "Hikvision";
-export type SourceType = "ONVIF" | "RTSP" | "DVRIP" | "HomeAssistant" | "Custom";
+export type SourceType = "ONVIF" | "RTSP" | "RTSP+ONVIF" | "DVRIP" | "HomeAssistant" | "Custom";
 export type CameraStatus = "online" | "offline" | "starting";
 
 export const SOURCE_SUPPORTS_PTZ: Record<SourceType, boolean> = {
   ONVIF: true,
   RTSP: false,
+  "RTSP+ONVIF": true,
   DVRIP: false,
   HomeAssistant: false,
   Custom: true,
@@ -15,6 +16,7 @@ export const SOURCE_SUPPORTS_PTZ: Record<SourceType, boolean> = {
 export const DEFAULT_PORTS: Record<SourceType, number> = {
   ONVIF: 80,
   RTSP: 554,
+  "RTSP+ONVIF": 554,
   DVRIP: 34567,
   HomeAssistant: 0,
   Custom: 0,
