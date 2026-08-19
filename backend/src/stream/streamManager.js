@@ -301,7 +301,6 @@ function scheduleAiIdleCleanup() {
         if (closedAt && now - closedAt > config.streamErrorRetentionMs) aiSessions.delete(id);
         continue;
       }
-      
       // Watchdog: Detect frozen stream (no frames for 45s)
       if (session.lastFrameAt && now - session.lastFrameAt > 45000) {
         logLifecycle(session, `watchdog timeout: no frames received for 45s, stream appears stuck.`);
@@ -309,6 +308,20 @@ function scheduleAiIdleCleanup() {
         session.rawError = "Stream frozen (Watchdog timeout: no frames received)";
         if (session.pollTimer) clearInterval(session.pollTimer);
         continue;
+      }
+
+      // Idle Cleanup: Stop stream if no one is listening and background recording/notifications are off
+      if (!session.keepAlive) {
+        const listenersCount = motionEmitter.listenerCount(`motion-${id}`);
+        const aiListenersCount = motionEmitter.listenerCount(`ai-motion-${id}`);
+        
+        if (listenersCount === 0 && aiListenersCount === 0) {
+          logLifecycle(session, `idle timeout: no active SSE listeners, stopping AI stream to save CPU.`);
+          stopAiStream(id).catch(err => {
+            console.error(`[AI-FFmpeg] Failed to stop idle stream for ${id}:`, err.message);
+          });
+          continue;
+        }
       }
       
       // Watchdog: Ensure recording FFmpeg is alive when it should be
