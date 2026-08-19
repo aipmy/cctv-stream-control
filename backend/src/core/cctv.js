@@ -121,6 +121,7 @@ export function normalizeCamera(input, existing = {}) {
     site: String(input.site ?? existing.site ?? "Default").trim(),
     ip: String(input.ip ?? existing.ip ?? "").trim(),
     port,
+    onvifPort: input.onvifPort !== undefined ? Number(input.onvifPort) : (existing.onvifPort !== undefined ? Number(existing.onvifPort) : undefined),
     brand: input.brand || existing.brand || "Universal",
     enabled: Boolean(input.enabled ?? existing.enabled ?? true),
     status: ["online", "offline", "starting"].includes(String(input.status ?? existing.status ?? "offline"))
